@@ -42,8 +42,8 @@ const TournamentView = ({ user }) => {
         } catch (error) { console.error(error); setLoading(false); }
     };
 
-    // --- CÁLCULO DE CLASIFICACIÓN REAL-TIME (PUNTOS: 2 GANAR, 1 EMPATAR) ---
-    const getStandings = () => {
+    // --- LÓGICA DE CLASIFICACIÓN (Calculada en cada renderizado) ---
+    const getStandingsList = () => {
         let table = {};
         teams.forEach(t => { table[t.id] = { id: t.id, name: t.name, logo: t.logo_url, pts: 0, gf: 0, gc: 0, pj: 0 }; });
         matches.forEach(m => {
@@ -54,8 +54,8 @@ const TournamentView = ({ user }) => {
                     tA.pj++; tB.pj++;
                     tA.gf += m.team_a_goals; tA.gc += m.team_b_goals;
                     tB.gf += m.team_b_goals; tB.gc += m.team_a_goals;
-                    if (m.team_a_goals > m.team_b_goals) { tA.pts += 2; }
-                    else if (m.team_a_goals < m.team_b_goals) { tB.pts += 2; }
+                    if (m.team_a_goals > m.team_b_goals) tA.pts += 2;
+                    else if (m.team_a_goals < m.team_b_goals) tB.pts += 2;
                     else { tA.pts += 1; tB.pts += 1; }
                 }
             }
@@ -63,10 +63,10 @@ const TournamentView = ({ user }) => {
         return Object.values(table).sort((a, b) => b.pts - a.pts || (b.gf - b.gc) - (a.gf - a.gc) || b.gf - a.gf);
     };
 
-    const standingsList = getStandings();
-    
-    // --- LÓGICA DE PROYECCIÓN DE CUADRO ---
-    const getProjectedTeam = (rank) => standingsList[rank - 1] || { name: `${rank}º Clasificado`, id: null };
+    const standings = getStandingsList();
+
+    // --- HELPERS PARA EL CUADRO ---
+    const getTeamByRank = (rank) => standings[rank - 1] || { name: `${rank}º Clasif.`, id: null };
     
     const getWinner = (m) => {
         if (!m || !m.played) return { name: '???', id: null };
@@ -90,24 +90,24 @@ const TournamentView = ({ user }) => {
         } catch (e) { alert("Error"); }
     };
 
+    const activatePhase = async (phase, pairings) => {
+        await axios.post(`${API_URL}/generate-playoffs-custom/${id}`, { phase, pairings });
+        loadData();
+    };
+
     const handleSaveMatch = async (m) => {
         await axios.put(`${API_URL}/matches/${m.id}`, m);
         setEditingMatch(null);
         loadData();
     };
 
-    const activatePhase = async (phase, pairings) => {
-        await axios.post(`${API_URL}/generate-playoffs-custom/${id}`, { phase, pairings });
-        loadData();
-    };
-
-    // --- COMPONENTE PARTIDO ---
+    // --- COMPONENTE TARJETA DE PARTIDO ---
     const MatchCard = ({ m }) => {
         const isExpanded = expandedMatchId === m.id;
         return (
             <div onClick={() => isAdmin && setExpandedMatchId(isExpanded ? null : m.id)}
                  style={{ border: '1px solid #ddd', borderRadius: '15px', background: 'white', marginBottom: '15px', overflow:'hidden', boxShadow:'0 3px 6px rgba(0,0,0,0.05)', cursor: isAdmin ? 'pointer' : 'default' }}>
-                <div style={{ background: '#f1f3f5', padding: '10px 15px', fontSize: '10px', color: '#666', borderBottom: '1px solid #eee', display:'flex', justifyContent:'space-between' }}>
+                <div style={{ background: '#f8f9fa', padding: '10px 15px', fontSize: '10px', color: '#666', borderBottom: '1px solid #eee', display:'flex', justifyContent:'space-between' }}>
                     <span>📅 {m.match_date ? m.match_date.split(' ')[0] : 'S/F'} | 🕒 {m.match_date ? m.match_date.split(' ')[1]?.slice(0,5) : '--:--'}</span>
                     <span>🏟️ C{m.field} | 👤 {m.referee || 'S/A'}</span>
                 </div>
@@ -123,7 +123,7 @@ const TournamentView = ({ user }) => {
                         ))}
                     </div>
                     <div style={{ flex: '0 0 28%', textAlign: 'center', paddingTop: '5px' }}>
-                        <div style={{ fontSize: '24px', fontWeight: '900', whiteSpace: 'nowrap' }}>{m.team_a_goals} - {m.team_b_goals}</div>
+                        <div style={{ fontSize: '28px', fontWeight: '900', whiteSpace: 'nowrap' }}>{m.team_a_goals} - {m.team_b_goals}</div>
                         {isAdmin && <button onClick={(e) => { e.stopPropagation(); setEditingMatch({...m}); }} style={{fontSize:9, marginTop:15, background:'#eee', border:'none', padding:'6px 12px', borderRadius:4}}>✏️ EDITAR</button>}
                     </div>
                     <div style={{ flex: '1 1 35%', textAlign: 'center' }}>
@@ -151,6 +151,7 @@ const TournamentView = ({ user }) => {
     return (
         <div style={{ padding: '0 0 50px 0', fontFamily: 'Arial', maxWidth: '600px', margin: 'auto', background: '#f8f9fa', minHeight: '100vh' }}>
             
+            {/* CABECERA FIJA */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#000', padding: '15px 20px', color: 'white', position: 'sticky', top: 0, zIndex: 1000 }}>
                 <button onClick={() => navigate('/dashboard')} style={{ background: 'none', color: 'white', border: 'none', fontSize:'20px' }}>←</button>
                 <div style={{textAlign:'center'}}>
@@ -162,17 +163,18 @@ const TournamentView = ({ user }) => {
 
             <div style={{ padding: '15px' }}>
                 
-                {/* 🏆 CUADRO DE ELIMINATORIAS (DINÁMICO) */}
+                {/* 1. CUADRO DE ELIMINATORIAS DINÁMICO (LA CLAVE ESTÁ AQUÍ) */}
                 {!showTable && tournamentInfo?.type === 'campeonato' && teams.length === 8 && (
                     <div style={{ background: '#fff', padding: '15px', borderRadius: '15px', marginBottom: '30px', border: '1px solid #eee', boxShadow:'0 4px 10px rgba(0,0,0,0.05)' }}>
-                        <h4 style={{ textAlign: 'center', margin: '0 0 10px 0', fontSize: '11px', color: '#666' }}>🏆 CUADRO PROYECTADO (REAL-TIME)</h4>
+                        <h4 style={{ textAlign: 'center', margin: '0 0 10px 0', fontSize: '11px', color: '#666' }}>🏆 CUADRO DE PLAYOFFS</h4>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '5px' }}>
                             {/* COLUMNA CUARTOS */}
                             <div style={{ flex: 1.2 }}>
+                                <div style={{fontSize:8, fontWeight:'bold', textAlign:'center', color:'#999'}}>CUARTOS</div>
                                 {[ [1,8], [2,7], [3,6], [4,5] ].map((pair, i) => {
                                     const m = qMatches[i];
-                                    const teamA = m ? {name: m.team_a_name} : getProjectedTeam(pair[0]);
-                                    const teamB = m ? {name: m.team_b_name} : getProjectedTeam(pair[1]);
+                                    const teamA = m ? {name: m.team_a_name} : getTeamByRank(pair[0]);
+                                    const teamB = m ? {name: m.team_b_name} : getTeamByRank(pair[1]);
                                     return (
                                         <div key={i} style={{ background: '#f8f9fa', marginBottom: '5px', padding: '5px', borderRadius: '5px', border: '1px solid #eee', fontSize: '9px' }}>
                                             <div style={{display:'flex', justifyContent:'space-between', color: m ? '#000' : '#007bff'}}>
@@ -185,25 +187,28 @@ const TournamentView = ({ user }) => {
                                     );
                                 })}
                             </div>
-                            {/* COLUMNA SEMIS */}
-                            <div style={{ flex: 1, display:'flex', flexDirection:'column', justifyContent:'space-around', fontSize:8, textAlign:'center', color:'#999' }}>
+                            {/* COLUMNA SEMIFINALES */}
+                            <div style={{ flex: 1, display:'flex', flexDirection:'column', justifyContent:'space-around' }}>
+                                <div style={{fontSize:8, fontWeight:'bold', textAlign:'center', color:'#999'}}>SEMIS</div>
                                 {[0, 1].map(i => {
                                     const m = sMatches[i];
-                                    const teamA = m ? {name: m.team_a_name} : getWinner(qMatches[i*2]);
-                                    const teamB = m ? {name: m.team_b_name} : getWinner(qMatches[i*2+1]);
+                                    const winnerA = m ? {name: m.team_a_name} : getWinner(qMatches[i*2]);
+                                    const winnerB = m ? {name: m.team_b_name} : getWinner(qMatches[i*2+1]);
                                     return (
-                                        <div key={i} style={{border:'1px dashed #ccc', padding:5, borderRadius:5}}>
-                                            <div style={{color: m ? '#000' : '#999'}}>{teamA.name}</div>
-                                            <div style={{color: m ? '#000' : '#999'}}>{teamB.name}</div>
+                                        <div key={i} style={{ background: '#f0f7ff', padding: '5px', borderRadius: '5px', border: '1px solid #c2dbff', fontSize: '9px' }}>
+                                            <div style={{display:'flex', justifyContent:'space-between'}}><span>{winnerA.name}</span><b>{m?.team_a_goals ?? ''}</b></div>
+                                            <div style={{display:'flex', justifyContent:'space-between', borderTop:'1px solid #fff'}}><span>{winnerB.name}</span><b>{m?.team_b_goals ?? ''}</b></div>
                                         </div>
                                     );
                                 })}
                             </div>
-                            <div style={{ flex: 0.8, display:'flex', alignItems:'center' }}>
-                                <div style={{ height:'60px', width:'100%', background:'#fff3cd', border:'2px solid #ffeeba', borderRadius:'8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontSize:'8px', textAlign:'center' }}>
-                                    <b>{fMatches[0] ? fMatches[0].team_a_name : getWinner(sMatches[0]).name}</b>
-                                    <span style={{fontSize:12, fontWeight:900}}>{fMatches[0] ? `${fMatches[0].team_a_goals}-${fMatches[0].team_b_goals}` : 'vs'}</span>
-                                    <b>{fMatches[0] ? fMatches[0].team_b_name : getWinner(sMatches[1]).name}</b>
+                            {/* COLUMNA FINAL */}
+                            <div style={{ flex: 0.8, display:'flex', flexDirection:'column', justifyContent:'center' }}>
+                                <div style={{fontSize:8, fontWeight:'bold', textAlign:'center', color:'#999'}}>FINAL</div>
+                                <div style={{ background:'#fff3cd', border:'2px solid #ffeeba', borderRadius:'8px', padding:'10px 5px', textAlign:'center', fontSize:'8px' }}>
+                                    <div style={{fontWeight:'bold'}}>{fMatches[0] ? fMatches[0].team_a_name : getWinner(sMatches[0]).name}</div>
+                                    <div style={{fontSize:12, fontWeight:900}}>{fMatches[0] ? `${fMatches[0].team_a_goals} - ${fMatches[0].team_b_goals}` : 'vs'}</div>
+                                    <div style={{fontWeight:'bold'}}>{fMatches[0] ? fMatches[0].team_b_name : getWinner(sMatches[1]).name}</div>
                                 </div>
                             </div>
                         </div>
@@ -211,46 +216,33 @@ const TournamentView = ({ user }) => {
                 )}
 
                 {showTable ? (
-                    <div style={{ background: 'white', padding: '15px', borderRadius: '15px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+                    <div style={{ background: 'white', padding: '15px', borderRadius: '15px' }}>
                         <h3>📊 Clasificación</h3>
                         <table width="100%" style={{ fontSize: '13px' }}>
                             <thead><tr style={{textAlign:'left', color:'#888'}}><th>POS</th><th>EQUIPO</th><th>PTS</th><th>GF</th></tr></thead>
-                            <tbody>{standingsList.map((t, i) => (
+                            <tbody>{standings.map((t, i) => (
                                 <tr key={t.id} style={{ borderBottom: '1px solid #f8f9fa' }}><td style={{padding:'15px 0'}}>{i + 1}</td><td>{t.name}</td><td style={{fontWeight:'bold', color:'#007bff'}}>{t.pts}</td><td>{t.gf}</td></tr>
                             ))}</tbody>
                         </table>
                     </div>
                 ) : (
                     <div>
-                        {/* 1. GRUPOS */}
-                        <div style={{ background: '#333', color: 'white', padding: '10px', borderRadius: '8px', fontSize: '12px', marginBottom: '15px', textAlign:'center', fontWeight:'bold' }}>1. FASE DE GRUPOS</div>
+                        {isAdmin && (
+                            <div style={{marginBottom:20}}>
+                                {allGroupsPlayed && qMatches.length === 0 && <button onClick={() => activatePhase('cuartos', [{a: standings[0].id, b: standings[7].id, field: 1}, {a: standings[1].id, b: standings[6].id, field: 2}, {a: standings[2].id, b: standings[5].id, field: 1}, {a: standings[3].id, b: standings[4].id, field: 2}])} style={{width:'100%', padding:15, background:'#28a745', color:'#fff', border:'none', borderRadius:10, fontWeight:'bold'}}>⚡ ACTIVAR CUARTOS</button>}
+                                {qMatches.length === 4 && qMatches.every(m => m.played) && sMatches.length === 0 && <button onClick={() => activatePhase('semi', [{a: getWinner(qMatches[0]).id, b: getWinner(qMatches[3]).id, field: 1}, {a: getWinner(qMatches[1]).id, b: getWinner(qMatches[2]).id, field: 2}])} style={{width:'100%', padding:15, background:'#28a745', color:'#fff', border:'none', borderRadius:10, fontWeight:'bold'}}>⚡ ACTIVAR SEMIFINALES</button>}
+                                {sMatches.length === 2 && sMatches.every(m => m.played) && fMatches.length === 0 && <button onClick={() => activatePhase('final', [{a: getWinner(sMatches[0]).id, b: getWinner(sMatches[1]).id, field: 1}])} style={{width:'100%', padding:15, background:'#28a745', color:'#fff', border:'none', borderRadius:10, fontWeight:'bold'}}>⚡ ACTIVAR GRAN FINAL</button>}
+                            </div>
+                        )}
+
+                        <div style={{ background: '#333', color: 'white', padding: '10px', borderRadius: '8px', fontSize: '12px', marginBottom: '15px', textAlign:'center', fontWeight:'bold' }}>PARTIDOS</div>
+                        {/* LISTADO DE PARTIDOS EN CASCADA */}
                         {matches.filter(m => m.phase === 'grupo' || m.phase === 'liga').map(m => <MatchCard key={m.id} m={m} />)}
-
-                        {/* 2. CUARTOS */}
-                        <div style={{ background: '#007bff', color: 'white', padding: '10px', borderRadius: '8px', fontSize: '12px', marginBottom: '15px', marginTop:'40px', textAlign:'center', fontWeight:'bold' }}>2. CUARTOS DE FINAL</div>
-                        {qMatches.length > 0 ? qMatches.map(m => <MatchCard key={m.id} m={m} />) : 
-                            isAdmin && standingsList.length === 8 && <button onClick={() => activatePhase('cuartos', [{a: standingsList[0].id, b: standingsList[7].id, field: 1}, {a: standingsList[1].id, b: standingsList[6].id, field: 2}, {a: standingsList[2].id, b: standingsList[5].id, field: 1}, {a: standingsList[3].id, b: standingsList[4].id, field: 2}])} style={{width:'100%', padding:15, background:'#28a745', color:'#fff', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer'}}>⚡ ACTIVAR CUARTOS</button>
-                        }
-
-                        {/* 3. SEMIFINALES */}
-                        <div style={{ background: '#198754', color: 'white', padding: '10px', borderRadius: '8px', fontSize: '12px', marginBottom: '15px', marginTop:'40px', textAlign:'center', fontWeight:'bold' }}>3. SEMIFINALES</div>
-                        {sMatches.length > 0 ? sMatches.map(m => <MatchCard key={m.id} m={m} />) : 
-                            isAdmin && qMatches.length === 4 && qMatches.every(m => m.played) && <button onClick={() => activatePhase('semi', [{a: getWinner(qMatches[0]).id, b: getWinner(qMatches[3]).id, field: 1}, {a: getWinner(qMatches[1]).id, b: getWinner(qMatches[2]).id, field: 2}])} style={{width:'100%', padding:15, background:'#28a745', color:'#fff', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer'}}>⚡ ACTIVAR SEMIFINALES</button>
-                        }
-
-                        {/* 4. GRAN FINAL */}
-                        <div style={{ background: '#ffc107', color: 'black', padding: '10px', borderRadius: '8px', fontSize: '12px', marginBottom: '15px', marginTop:'40px', textAlign:'center', fontWeight:'bold' }}>4. GRAN FINAL</div>
-                        {fMatches.length > 0 ? fMatches.map(m => <MatchCard key={m.id} m={m} />) : 
-                            isAdmin && sMatches.length === 2 && sMatches.every(m => m.played) && <button onClick={() => activatePhase('final', [{a: getWinner(sMatches[0]).id, b: getWinner(sMatches[1]).id, field: 1}])} style={{width:'100%', padding:15, background:'#28a745', color:'#fff', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer'}}>⚡ ACTIVAR GRAN FINAL</button>
-                        }
+                        {qMatches.map(m => <MatchCard key={m.id} m={m} />)}
+                        {sMatches.map(m => <MatchCard key={m.id} m={m} />)}
+                        {fMatches.map(m => <MatchCard key={m.id} m={m} />)}
                     </div>
                 )}
-                
-                {/* ESTADÍSTICAS */}
-                <div style={{ marginTop: '50px', background: 'white', padding: '20px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
-                    <h4 style={{margin: '0 0 15px 0'}}>🏆 Goleadores (Pichichi)</h4>
-                    {stats.goleadores.map((g, i) => <div key={i} style={{fontSize:13, padding:'10px 0', borderBottom:'1px solid #eee', display:'flex', justifyContent:'space-between'}}><span>{i+1}. {g.name} ({g.team_name})</span><b>{g.total_goals} ⚽</b></div>)}
-                </div>
             </div>
 
             {/* MODAL EDICIÓN */}
@@ -258,8 +250,8 @@ const TournamentView = ({ user }) => {
                 <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.85)', zIndex:2000, padding:20, display:'flex', alignItems:'center'}}>
                     <div style={{background:'#fff', width:'100%', padding:20, borderRadius:15}}>
                         <h4 style={{marginTop:0}}>Editar Partido</h4>
-                        <input type="datetime-local" value={editingMatch.match_date?.replace(' ', 'T').slice(0, 16)} onChange={e => setEditingMatch({...editingMatch, match_date: e.target.value})} style={{width:'100%', padding:15, marginBottom:15, borderRadius:10, border:'1px solid #ccc'}} />
-                        <input placeholder="Árbitro" value={editingMatch.referee} onChange={e => setEditingMatch({...editingMatch, referee: e.target.value})} style={{width:'100%', padding:15, marginBottom:15, borderRadius:10, border:'1px solid #ccc'}} />
+                        <input type="datetime-local" value={editingMatch.match_date?.replace(' ', 'T').slice(0, 16)} onChange={e => setEditingMatch({...editingMatch, match_date: e.target.value})} style={{width:'100%', padding:12, marginBottom:15, borderRadius:8, border:'1px solid #ccc'}} />
+                        <input placeholder="Árbitro" value={editingMatch.referee} onChange={e => setEditingMatch({...editingMatch, referee: e.target.value})} style={{width:'100%', padding:12, marginBottom:15, borderRadius:8, border:'1px solid #ccc'}} />
                         <div style={{display:'flex', gap:10}}><button onClick={() => handleSaveMatch(editingMatch)} style={{flex:1, padding:15, background:'green', color:'#fff', borderRadius:10, border:'none', fontWeight:'bold'}}>GUARDAR</button><button onClick={() => setEditingMatch(null)} style={{flex:1, padding:15, border:'none', background:'#eee', borderRadius:10}}>CERRAR</button></div>
                     </div>
                 </div>
