@@ -13,21 +13,21 @@ const Login = ({ onLogin }) => {
             const res = await axios.post(`${API_URL}/login`, form);
             onLogin(res.data);
             navigate('/dashboard');
-        } catch (error) { alert("Error"); }
+        } catch (error) { alert("Usuario o contraseña incorrectos"); }
     };
 
     return (
-        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: '#f0f2f5', padding: '20px' }}>
+        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: '#f0f2f5', padding: '20px', fontFamily: 'Arial' }}>
             <div style={{ background: '#fff', padding: '40px 20px', borderRadius: '25px', boxShadow: '0 15px 35px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
-                <div style={{ fontSize: '60px' }}>🏆</div>
-                <h2 style={{ marginBottom: '30px' }}>Gestión de Fútbol</h2>
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <input type="text" placeholder="Usuario" style={{ padding: '20px', fontSize: '18px', borderRadius: '12px', border: '1px solid #ddd' }} onChange={e => setForm({...form, username: e.target.value})} />
-                    <input type="password" placeholder="Contraseña" style={{ padding: '20px', fontSize: '18px', borderRadius: '12px', border: '1px solid #ddd' }} onChange={e => setForm({...form, password: e.target.value})} />
-                    <button type="submit" style={{ padding: '18px', background: '#007bff', color: '#fff', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '18px' }}>ENTRAR</button>
+                <div style={{ fontSize: '80px', marginBottom: '10px' }}>🏆</div>
+                <h2 style={{ marginBottom: '30px', color: '#333', fontSize: '28px' }}>Gestión de Fútbol</h2>
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <input type="text" placeholder="Usuario" style={{ padding: '22px', fontSize: '20px', borderRadius: '15px', border: '2px solid #eee', outline: 'none', background: '#f9f9f9' }} onChange={e => setForm({...form, username: e.target.value})} />
+                    <input type="password" placeholder="Contraseña" style={{ padding: '22px', fontSize: '20px', borderRadius: '15px', border: '2px solid #eee', outline: 'none', background: '#f9f9f9' }} onChange={e => setForm({...form, password: e.target.value})} />
+                    <button type="submit" style={{ padding: '20px', fontSize: '20px', background: '#007bff', color: 'white', border: 'none', borderRadius: '15px', fontWeight: 'bold', cursor: 'pointer' }}>ENTRAR</button>
                 </form>
-                <div style={{ marginTop: '30px', fontSize: '10px', color: '#bbb' }}>
-                    v2.0 - Creado por <b>Daniel Martinez</b>
+                <div style={{ marginTop: '40px', fontSize: '12px', color: '#aaa' }}>
+                    <b>v2.2</b> - Creado por Daniel Martinez
                 </div>
             </div>
         </div>
