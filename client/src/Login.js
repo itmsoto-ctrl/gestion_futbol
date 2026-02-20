@@ -22,12 +22,12 @@ const Login = ({ onLogin }) => {
                 <div style={{ fontSize: '80px', marginBottom: '10px' }}>🏆</div>
                 <h2 style={{ marginBottom: '30px', color: '#333', fontSize: '28px' }}>Gestión de Fútbol</h2>
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <input type="text" placeholder="Usuario" style={{ padding: '22px', fontSize: '20px', borderRadius: '15px', border: '2px solid #eee', outline: 'none', background: '#f9f9f9' }} onChange={e => setForm({...form, username: e.target.value})} />
-                    <input type="password" placeholder="Contraseña" style={{ padding: '22px', fontSize: '20px', borderRadius: '15px', border: '2px solid #eee', outline: 'none', background: '#f9f9f9' }} onChange={e => setForm({...form, password: e.target.value})} />
+                    <input type="text" placeholder="Usuario" style={{ padding: '22px', fontSize: '18px', borderRadius: '15px', border: '1px solid #ddd', background: '#f9f9f9' }} onChange={e => setForm({...form, username: e.target.value})} />
+                    <input type="password" placeholder="Contraseña" style={{ padding: '22px', fontSize: '18px', borderRadius: '15px', border: '1px solid #ddd', background: '#f9f9f9' }} onChange={e => setForm({...form, password: e.target.value})} />
                     <button type="submit" style={{ padding: '20px', fontSize: '20px', background: '#007bff', color: 'white', border: 'none', borderRadius: '15px', fontWeight: 'bold', cursor: 'pointer' }}>ENTRAR</button>
                 </form>
                 <div style={{ marginTop: '40px', fontSize: '12px', color: '#aaa' }}>
-                    <b>v2.2</b> - Creado por Daniel Martinez
+                    <b>v2.3</b> - Creado por Daniel Martinez
                 </div>
             </div>
         </div>
