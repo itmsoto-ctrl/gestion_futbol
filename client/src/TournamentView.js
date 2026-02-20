@@ -6,14 +6,14 @@ const TournamentView = ({ user }) => {
     const { id } = useParams();
     const navigate = useNavigate();
     
-    // ESTADOS DE DATOS
+    // DATOS
     const [matches, setMatches] = useState([]);
     const [teams, setTeams] = useState([]);
     const [players, setPlayers] = useState([]);
     const [stats, setStats] = useState({ goleadores: [], porteros: [] });
     const [tournamentInfo, setTournamentInfo] = useState(null);
 
-    // ESTADOS DE INTERFAZ
+    // INTERFAZ
     const [showTable, setShowTable] = useState(false);
     const [editingMatch, setEditingMatch] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -66,25 +66,17 @@ const TournamentView = ({ user }) => {
             }
         });
 
-        // ORDEN: Puntos > Diferencia de Goles > Goles a Favor
-        return Object.values(table).sort((a, b) => {
-            if (b.pts !== a.pts) return b.pts - a.pts;
-            const diffA = a.gf - a.gc;
-            const diffB = b.gf - b.gc;
-            if (diffB !== diffA) return diffB - diffA;
-            return b.gf - a.gf;
-        });
+        return Object.values(table).sort((a, b) => b.pts - a.pts || (b.gf - b.gc) - (a.gf - a.gc) || b.gf - a.gf);
     };
 
     const standingsList = getStandings();
     
-    // Ayudante para el cuadro de Playoff
     const getProjectedTeam = (rank) => {
         const team = standingsList[rank - 1];
         return team ? { name: team.name, logo: team.logo } : { name: `${rank}º Clasif.`, logo: null };
     };
 
-    // --- FORMATO DE HORA ---
+    // --- HELPERS VISUALES ---
     const formatDisplayTime = (dateStr) => {
         if (!dateStr) return "--:--";
         const parts = dateStr.split(' ');
@@ -99,11 +91,29 @@ const TournamentView = ({ user }) => {
         return `${d}/${m}/${y}`;
     };
 
-    // --- ACCIONES ---
+    const getWinnerId = (m) => (m?.team_a_goals > m?.team_b_goals ? m.team_a_id : m?.team_b_id);
+
+    // --- FUNCIONES DE ACCIÓN ---
+    const handleAddTeam = async () => {
+        const limit = tournamentInfo?.type === 'liga' ? 6 : 8;
+        if (teams.length >= limit) return alert("Límite de equipos alcanzado");
+        if (!newTeam.name) return alert("El nombre es obligatorio");
+        await axios.post(`${API_URL}/teams`, { ...newTeam, tournament_id: id });
+        setNewTeam({ name: '', group_num: 1, logo_url: '' });
+        loadData();
+    };
+
+    const handleGenerateSchedule = async () => {
+        if (!startDate && tournamentInfo.type === 'campeonato') return alert("Selecciona fecha");
+        const route = tournamentInfo.type === 'liga' ? 'generate-league' : 'generate-schedule';
+        await axios.post(`${API_URL}/${route}/${id}`, { startTime: startDate });
+        loadData();
+    };
+
     const addGoal = async (mId, pId, tId, side) => {
         if (!isAdmin) return;
         await axios.post(`${API_URL}/add-player-goal`, { match_id: mId, player_id: pId, team_id: tId, team_side: side });
-        loadData(); // RECARGA TODO
+        loadData();
     };
 
     const removeGoal = async (mId, pId, tId, side) => {
@@ -111,23 +121,19 @@ const TournamentView = ({ user }) => {
         try {
             await axios.post(`${API_URL}/remove-player-goal`, { match_id: mId, player_id: pId, team_id: tId, team_side: side });
             loadData();
-        } catch (e) { alert("Sin goles registrados."); }
+        } catch (e) { alert("Sin goles para quitar."); }
     };
 
     const handleSaveMatch = async (m) => {
-        try {
-            await axios.put(`${API_URL}/matches/${m.id}`, m);
-            setEditingMatch(null);
-            loadData();
-        } catch (e) { alert("Error al guardar"); }
+        await axios.put(`${API_URL}/matches/${m.id}`, m);
+        setEditingMatch(null);
+        loadData();
     };
 
     const activatePhase = async (phase, pairings) => {
         await axios.post(`${API_URL}/generate-playoffs-custom/${id}`, { phase, pairings });
         loadData();
     };
-
-    const getWinnerId = (m) => (m?.team_a_goals > m?.team_b_goals ? m.team_a_id : m?.team_b_id);
 
     // --- COMPONENTE PARTIDO ---
     const MatchCard = ({ m }) => (
@@ -175,7 +181,7 @@ const TournamentView = ({ user }) => {
     return (
         <div style={{ padding: '0 0 50px 0', fontFamily: 'Arial', maxWidth: '600px', margin: 'auto', background: '#f8f9fa', minHeight: '100vh' }}>
             
-            {/* CABECERA */}
+            {/* CABECERA FIJA */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#000', padding: '15px 20px', color: 'white', position: 'sticky', top: 0, zIndex: 1000 }}>
                 <button onClick={() => navigate('/dashboard')} style={{ background: 'none', color: 'white', border: 'none', fontSize:'20px' }}>←</button>
                 <div style={{textAlign:'center'}}>
@@ -187,7 +193,7 @@ const TournamentView = ({ user }) => {
 
             <div style={{ padding: '15px' }}>
                 
-                {/* 1. CUADRO ELIMINATORIAS (DINÁMICO SEGÚN TABLA) */}
+                {/* 1. CUADRO ELIMINATORIAS (DINÁMICO) */}
                 {!showTable && tournamentInfo?.type === 'campeonato' && teams.length === 8 && (
                     <div style={{ background: '#fff', padding: '15px', borderRadius: '15px', marginBottom: '30px', border: '1px solid #eee', boxShadow:'0 4px 10px rgba(0,0,0,0.05)' }}>
                         <h4 style={{ textAlign: 'center', margin: '0 0 10px 0', fontSize: '12px', color: '#666' }}>🏆 CUADRO PROYECTADO (1º vs 8º...)</h4>
@@ -195,17 +201,15 @@ const TournamentView = ({ user }) => {
                             <div style={{ flex: 1.2 }}>
                                 {[ {a:1, b:8}, {a:2, b:7}, {a:3, b:6}, {a:4, b:5} ].map((p, i) => {
                                     const dbM = qMatches[i];
-                                    const teamA = dbM ? {name: dbM.team_a_name, logo: dbM.team_a_logo} : getProjectedTeam(p.a);
-                                    const teamB = dbM ? {name: dbM.team_b_name, logo: dbM.team_b_logo} : getProjectedTeam(p.b);
+                                    const tA = dbM ? {name: dbM.team_a_name} : getProjectedTeam(p.a);
+                                    const tB = dbM ? {name: dbM.team_b_name} : getProjectedTeam(p.b);
                                     return (
                                         <div key={i} style={{ background: '#f8f9fa', marginBottom: '5px', padding: '5px', borderRadius: '5px', border: '1px solid #eee', fontSize: '9px' }}>
                                             <div style={{display:'flex', justifyContent:'space-between', color: dbM ? '#000' : '#007bff'}}>
-                                                <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'65px'}}>{teamA.name}</span>
-                                                <b>{dbM?.team_a_goals ?? '-'}</b>
+                                                <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'65px'}}>{tA.name}</span><b>{dbM?.team_a_goals ?? '-'}</b>
                                             </div>
                                             <div style={{display:'flex', justifyContent:'space-between', color: dbM ? '#000' : '#007bff', borderTop:'1px solid #fff'}}>
-                                                <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'65px'}}>{teamB.name}</span>
-                                                <b>{dbM?.team_b_goals ?? '-'}</b>
+                                                <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'65px'}}>{tB.name}</span><b>{dbM?.team_b_goals ?? '-'}</b>
                                             </div>
                                         </div>
                                     );
@@ -214,8 +218,8 @@ const TournamentView = ({ user }) => {
                             <div style={{ flex: 1, display:'flex', flexDirection:'column', justifyContent:'space-around', fontSize:8, textAlign:'center', color:'#999' }}>
                                 {[0,1].map(i => (
                                     <div key={i} style={{border:'1px dashed #ccc', padding:5, borderRadius:5}}>
-                                        <div>{sMatches[i] ? sMatches[i].team_a_name : 'Ganador...'} {sMatches[i]?.team_a_goals ?? ''}</div>
-                                        <div style={{borderTop:'1px solid #fff'}}>{sMatches[i] ? sMatches[i].team_b_name : 'Ganador...'} {sMatches[i]?.team_b_goals ?? ''}</div>
+                                        <div>{sMatches[i] ? sMatches[i].team_a_name : 'Winner'} {sMatches[i]?.team_a_goals ?? ''}</div>
+                                        <div>{sMatches[i] ? sMatches[i].team_b_name : 'Winner'} {sMatches[i]?.team_b_goals ?? ''}</div>
                                     </div>
                                 ))}
                             </div>
@@ -225,25 +229,16 @@ const TournamentView = ({ user }) => {
                 )}
 
                 {showTable ? (
-                    /* TABLA CLASIFICACIÓN */
-                    <div style={{ background: 'white', padding: '15px', borderRadius: '15px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-                        <h3 style={{marginTop:0, fontSize:18}}>📊 Clasificación</h3>
-                        <table width="100%" style={{ borderCollapse: 'collapse', fontSize: '13px' }}>
-                            <thead><tr style={{ textAlign: 'left', color:'#888', borderBottom:'2px solid #eee' }}><th>POS</th><th>EQUIPO</th><th>PTS</th><th>GF</th></tr></thead>
+                    <div style={{ background: 'white', padding: '15px', borderRadius: '15px' }}>
+                        <h3>📊 Clasificación</h3>
+                        <table width="100%" style={{ fontSize: '13px' }}>
+                            <thead><tr style={{textAlign:'left', color:'#888'}}><th>POS</th><th>EQUIPO</th><th>PTS</th><th>GF</th></tr></thead>
                             <tbody>{standingsList.map((t, i) => (
-                                <tr key={t.id} style={{ borderBottom: '1px solid #f8f9fa' }}>
-                                    <td style={{ padding: '12px 0' }}>{i + 1}</td>
-                                    <td style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 0', fontWeight: 'bold' }}>
-                                        {t.logo && <img src={t.logo} width="25" height="25" style={{ borderRadius: '50%', objectFit:'cover' }} />}
-                                        {t.name}
-                                    </td>
-                                    <td style={{ fontWeight: 'bold', color:'#007bff' }}>{t.pts}</td><td>{t.gf}</td>
-                                </tr>
+                                <tr key={t.id} style={{ borderBottom: '1px solid #f8f9fa' }}><td style={{padding:'15px 0'}}>{i + 1}</td><td>{t.name}</td><td style={{fontWeight:'bold', color:'#007bff'}}>{t.pts}</td><td>{t.gf}</td></tr>
                             ))}</tbody>
                         </table>
                     </div>
                 ) : (
-                    /* LISTA PARTIDOS */
                     <div>
                         {/* REGISTRO EQUIPOS */}
                         {isAdmin && matches.length === 0 && (
