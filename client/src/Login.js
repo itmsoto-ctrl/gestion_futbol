@@ -7,7 +7,7 @@ const Login = ({ onLogin }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('http://localhost:3001/login', form);
+      const res = await axios.post('https://gestionfutbol-production.up.railway.app/login', form);
       onLogin(res.data);
     } catch (error) {
       alert("Usuario o contraseña incorrectos");

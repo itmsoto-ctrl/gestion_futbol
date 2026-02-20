@@ -11,13 +11,13 @@ const AdminPanel = ({ user, onLogout }) => {
     }, []);
 
     const fetchTournaments = async () => {
-        const res = await axios.get('http://localhost:3001/tournaments');
+        const res = await axios.get('https://gestionfutbol-production.up.railway.app/tournaments');
         setTournaments(res.data);
     };
 
     const handleCreate = async () => {
         if (!name) return alert("Ponle un nombre");
-        await axios.post('http://localhost:3001/tournaments', { name, type });
+        await axios.post('https://gestionfutbol-production.up.railway.app/tournaments', { name, type });
         setName('');
         fetchTournaments();
     };

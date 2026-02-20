@@ -30,11 +30,11 @@ const TournamentView = ({ user }) => {
     const loadData = async () => {
         try {
             const [resM, resT, resP, resS, resTourneys] = await Promise.all([
-                axios.get(`http://localhost:3001/matches/${id}`),
-                axios.get(`http://localhost:3001/teams/${id}`),
-                axios.get(`http://localhost:3001/players/${id}`),
-                axios.get(`http://localhost:3001/stats/${id}`),
-                axios.get(`http://localhost:3001/tournaments`)
+                axios.get(`https://gestionfutbol-production.up.railway.app/matches/${id}`),
+                axios.get(`https://gestionfutbol-production.up.railway.app/teams/${id}`),
+                axios.get(`https://gestionfutbol-production.up.railway.app/players/${id}`),
+                axios.get(`https://gestionfutbol-production.up.railway.app/stats/${id}`),
+                axios.get(`https://gestionfutbol-production.up.railway.app/tournaments`)
             ]);
             setMatches(resM.data || []);
             setTeams(resT.data || []);
@@ -73,14 +73,14 @@ const TournamentView = ({ user }) => {
     // --- ACCIONES ---
     const addGoal = async (mId, pId, tId, side) => {
         if (!isAdmin) return;
-        await axios.post('http://localhost:3001/add-player-goal', { match_id: mId, player_id: pId, team_id: tId, team_side: side });
+        await axios.post('https://gestionfutbol-production.up.railway.app/add-player-goal', { match_id: mId, player_id: pId, team_id: tId, team_side: side });
         loadData();
     };
 
     const removeGoal = async (mId, pId, tId, side) => {
         if (!isAdmin) return;
         try {
-            await axios.post('http://localhost:3001/remove-player-goal', { match_id: mId, player_id: pId, team_id: tId, team_side: side });
+            await axios.post('https://gestionfutbol-production.up.railway.app/remove-player-goal', { match_id: mId, player_id: pId, team_id: tId, team_side: side });
             loadData();
         } catch (e) { alert("No hay más goles."); }
     };
@@ -89,7 +89,7 @@ const TournamentView = ({ user }) => {
         const limit = tournamentInfo?.type === 'liga' ? 6 : 8;
         if (teams.length >= limit) return alert("Límite alcanzado");
         if (!newTeam.name) return alert("Nombre obligatorio");
-        await axios.post('http://localhost:3001/teams', { ...newTeam, tournament_id: id });
+        await axios.post('https://gestionfutbol-production.up.railway.app/teams', { ...newTeam, tournament_id: id });
         setNewTeam({ name: '', group_num: 1, logo_url: '' });
         loadData();
     };
@@ -98,21 +98,21 @@ const TournamentView = ({ user }) => {
         if (!startDate && tournamentInfo.type === 'campeonato') return alert("Selecciona fecha");
         const route = tournamentInfo.type === 'liga' ? 'generate-league' : 'generate-schedule';
         try {
-            await axios.post(`http://localhost:3001/${route}/${id}`, { startTime: startDate });
+            await axios.post(`https://gestionfutbol-production.up.railway.app/${route}/${id}`, { startTime: startDate });
             loadData();
         } catch (e) { alert("Error al conectar con el servidor."); }
     };
 
     const handleSaveMatch = async (m) => {
         try {
-            await axios.put(`http://localhost:3001/matches/${m.id}`, m);
+            await axios.put(`https://gestionfutbol-production.up.railway.app/matches/${m.id}`, m);
             setEditingMatch(null);
             loadData();
         } catch (e) { alert("Error al guardar"); }
     };
 
     const activatePhase = async (phase, pairings) => {
-        await axios.post(`http://localhost:3001/generate-playoffs-custom/${id}`, { phase, pairings });
+        await axios.post(`https://gestionfutbol-production.up.railway.app/generate-playoffs-custom/${id}`, { phase, pairings });
         loadData();
     };
 
@@ -272,7 +272,7 @@ const TournamentView = ({ user }) => {
                                     <option value="">Equipo...</option>
                                     {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                 </select>
-                                <button onClick={async () => { await axios.post('http://localhost:3001/players', newPlayer); loadData(); setNewPlayer({name:'', team_id:'', is_goalkeeper:false}); }}>OK</button>
+                                <button onClick={async () => { await axios.post('https://gestionfutbol-production.up.railway.app/players', newPlayer); loadData(); setNewPlayer({name:'', team_id:'', is_goalkeeper:false}); }}>OK</button>
                             </div>
                         )}
 

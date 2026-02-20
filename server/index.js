@@ -188,7 +188,8 @@ app.get('/stats/:tournamentId', (req, res) => {
 });
 
 // --- PUERTO DINÁMICO PARA CLOUD ---
-const PORT = process.env.PORT || 3001;
+// Al final de server/index.js
+const PORT = process.env.PORT || 3001; // Railway asigna el puerto automáticamente
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor funcionando en puerto ${PORT}`);
+    console.log(`🚀 Servidor corriendo en el puerto ${PORT}`);
 });
