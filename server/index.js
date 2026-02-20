@@ -20,7 +20,7 @@ const formatDateToMySQL = (dateStr) => {
     return dateStr.replace('T', ' ').slice(0, 19);
 };
 
-// --- RUTAS ---
+// --- RUTAS DE DATOS ---
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
     db.query('SELECT * FROM users WHERE username = ? AND password = ? AND active = 1', [username, password], (err, result) => {
@@ -39,14 +39,17 @@ app.post('/players', (req, res) => {
     db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], (err, result) => res.send(result));
 });
 
-// GET MATCHES mejorado para traer TODO sin filtros raros
+// GET MATCHES: Trae nombres y logos de ambos equipos
 app.get('/matches/:tournamentId', (req, res) => {
     const sql = `SELECT m.*, t1.name as team_a_name, t1.logo_url as team_a_logo, t2.name as team_b_name, t2.logo_url as team_b_logo 
                  FROM matches m 
                  LEFT JOIN teams t1 ON m.team_a_id = t1.id 
                  LEFT JOIN teams t2 ON m.team_b_id = t2.id 
                  WHERE m.tournament_id = ? ORDER BY m.match_date ASC, m.id ASC`;
-    db.query(sql, [req.params.tournamentId], (err, result) => res.send(result));
+    db.query(sql, [req.params.tournamentId], (err, result) => {
+        if (err) return res.status(500).send(err);
+        res.send(result);
+    });
 });
 
 app.put('/matches/:matchId', (req, res) => {
@@ -64,10 +67,11 @@ app.post('/add-player-goal', (req, res) => {
 
 app.post('/remove-player-goal', (req, res) => {
     const { match_id, player_id, team_id, team_side } = req.body;
-    db.query('DELETE FROM goals WHERE match_id = ? AND player_id = ? AND team_id = ? ORDER BY id DESC LIMIT 1', [match_id, player_id, team_id], (err, result) => {
+    const sqlDel = 'DELETE FROM goals WHERE match_id = ? AND player_id = ? AND team_id = ? ORDER BY id DESC LIMIT 1';
+    db.query(sqlDel, [match_id, player_id, team_id], (err, result) => {
         if (result && result.affectedRows > 0) {
             db.query(`UPDATE matches SET ${team_side} = CASE WHEN ${team_side} > 0 THEN ${team_side} - 1 ELSE 0 END WHERE id = ?`, [match_id], (err2) => res.send("OK"));
-        } else res.status(404).send("Error");
+        } else res.status(404).send("No hay goles");
     });
 });
 
@@ -84,4 +88,4 @@ app.get('/stats/:tournamentId', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, '0.0.0.0', () => { console.log(`🚀 Servidor listo ${PORT}`); });
+app.listen(PORT, '0.0.0.0', () => { console.log(`🚀 Servidor v2.1 listo`); });
