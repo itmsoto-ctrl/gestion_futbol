@@ -6,7 +6,7 @@ const TournamentView = ({ user }) => {
     const { id } = useParams();
     const navigate = useNavigate();
     
-    // DATOS
+    // 1. ESTADOS DE DATOS
     const [matches, setMatches] = useState([]);
     const [teams, setTeams] = useState([]);
     const [players, setPlayers] = useState([]);
@@ -14,14 +14,14 @@ const TournamentView = ({ user }) => {
     const [stats, setStats] = useState({ goleadores: [], porteros: [] });
     const [tournamentInfo, setTournamentInfo] = useState(null);
 
-    // INTERFAZ
+    // 2. ESTADOS DE INTERFAZ
     const [showTable, setShowTable] = useState(false);
     const [editingMatch, setEditingMatch] = useState(null);
     const [loading, setLoading] = useState(true);
     const [expandedMatchId, setExpandedMatchId] = useState(null);
     const [showResetMenu, setShowResetMenu] = useState(false);
 
-    // FORMULARIO JUGADORES
+    // 3. FORMULARIO JUGADORES
     const [newPlayer, setNewPlayer] = useState({ name: '', team_id: '', is_goalkeeper: false });
 
     const isAdmin = user?.role === 'admin';
@@ -37,17 +37,23 @@ const TournamentView = ({ user }) => {
                 axios.get(`${API_URL}/goals/${id}`),
                 axios.get(`${API_URL}/tournaments`)
             ]);
-            setMatches(resM.data || []); setTeams(resT.data || []); setPlayers(resP.data || []);
-            setStats(resS.data || { goleadores: [], porteros: [] }); setAllGoals(resG.data || []);
+            setMatches(resM.data || []);
+            setTeams(resT.data || []);
+            setPlayers(resP.data || []);
+            setStats(resS.data || { goleadores: [], porteros: [] });
+            setAllGoals(resG.data || []);
             setTournamentInfo(resTourneys.data.find(t => t.id === parseInt(id)));
             setLoading(false);
-        } catch (error) { console.error(error); }
+        } catch (error) { 
+            console.error("Error cargando datos:", error); 
+            setLoading(false); 
+        }
     }, [id, API_URL]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    // --- CLASIFICACIÓN REAL-TIME ---
-    const standingsList = useMemo(() => {
+    // --- LÓGICA DE CLASIFICACIÓN (Variable unificada como 'standings') ---
+    const standings = useMemo(() => {
         let table = {};
         teams.forEach(t => { table[t.id] = { id: t.id, name: t.name, logo: t.logo_url, pts: 0, gf: 0, gc: 0, pj: 0 }; });
         matches.forEach(m => {
@@ -67,13 +73,21 @@ const TournamentView = ({ user }) => {
         return Object.values(table).sort((a, b) => b.pts - a.pts || (b.gf - b.gc) - (a.gf - a.gc));
     }, [matches, teams, tournamentInfo]);
 
-    const getTeamByRank = (rank) => standingsList[rank - 1] || { name: `${rank}º Clasif.`, id: null };
-    const getWinner = (m) => (m?.team_a_goals > m?.team_b_goals ? {name: m.team_a_name, id: m.team_a_id} : {name: m.team_b_name, id: m.team_b_id});
+    // Helpers para el cuadro
+    const getTeamByRank = (rank) => standings[rank - 1] || { name: `${rank}º Clasif.`, id: null };
+    const getWinnerName = (m) => {
+        if (!m || !m.played) return '???';
+        return m.team_a_goals > m.team_b_goals ? m.team_a_name : m.team_b_name;
+    };
+    const getWinnerId = (m) => {
+        if (!m || m.team_a_goals === m.team_b_goals) return null;
+        return m.team_a_goals > m.team_b_goals ? m.team_a_id : m.team_b_id;
+    };
     const getGoalsInMatch = (pId, mId) => allGoals.filter(g => g.player_id === pId && g.match_id === mId).length;
 
     // --- ACCIONES ---
     const handleAddPlayer = async () => {
-        if (!newPlayer.name || !newPlayer.team_id) return alert("Faltan datos");
+        if (!newPlayer.name || !newPlayer.team_id) return alert("Faltan datos del jugador");
         await axios.post(`${API_URL}/players`, newPlayer);
         setNewPlayer({ name: '', team_id: '', is_goalkeeper: false });
         loadData();
@@ -86,13 +100,13 @@ const TournamentView = ({ user }) => {
     };
 
     const handleReset = async (target) => {
-        if (window.prompt(`Código para resetear ${target}:`) !== "0209") return alert("Código incorrecto");
+        if (window.prompt(`Escribe el código para resetear ${target}:`) !== "0209") return alert("Código incorrecto");
         await axios.post(`${API_URL}/reset-tournament/${id}`, { target });
         window.location.reload();
     };
 
     const activatePhase = async (phase, pairings) => {
-        if (window.prompt(`Código activación ${phase}:`) !== "0209") return alert("Código incorrecto");
+        if (window.prompt(`Activar ${phase} (Código):`) !== "0209") return alert("Error");
         await axios.post(`${API_URL}/activate-phase/${id}`, { phase, pairings });
         loadData();
     };
@@ -116,7 +130,7 @@ const TournamentView = ({ user }) => {
                 
                 <div style={{ display: 'flex', padding: '15px 5px', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                     <div style={{ flex: '1 1 35%', textAlign: 'center' }}>
-                        <img src={m.team_a_logo || 'https://via.placeholder.com/40'} width="40" height="40" style={{borderRadius:'50%'}} alt="logo" />
+                        <img src={m.team_a_logo || 'https://via.placeholder.com/40'} width="40" height="40" style={{borderRadius:'50%', objectFit:'cover'}} alt="logo" />
                         <div style={{ fontWeight: 'bold', fontSize: '12px', margin:'5px 0' }}>{m.team_a_name}</div>
                         {isExp && isAdmin && !isFinished && players.filter(p => p.team_id === m.team_a_id).map(p => {
                             const g = getGoalsInMatch(p.id, m.id);
@@ -137,7 +151,7 @@ const TournamentView = ({ user }) => {
                         )}
                     </div>
                     <div style={{ flex: '1 1 35%', textAlign: 'center' }}>
-                        <img src={m.team_b_logo || 'https://via.placeholder.com/40'} width="40" height="40" style={{borderRadius:'50%'}} alt="logo" />
+                        <img src={m.team_b_logo || 'https://via.placeholder.com/40'} width="40" height="40" style={{borderRadius:'50%', objectFit:'cover'}} alt="logo" />
                         <div style={{ fontWeight: 'bold', fontSize: '12px', margin:'5px 0' }}>{m.team_b_name}</div>
                         {isExp && isAdmin && !isFinished && players.filter(p => p.team_id === m.team_b_id).map(p => {
                             const g = getGoalsInMatch(p.id, m.id);
@@ -154,15 +168,16 @@ const TournamentView = ({ user }) => {
         );
     };
 
+    if (loading) return <div style={{ padding: '100px 0', textAlign: 'center' }}>Iniciando v3.7...</div>;
+
     const qM = matches.filter(m => m.phase.toLowerCase().includes('cuarto'));
     const sM = matches.filter(m => m.phase.toLowerCase().includes('semi'));
     const fM = matches.filter(m => m.phase.toLowerCase().includes('final'));
     const allGPlayed = matches.filter(m=>m.phase.includes('grupo')).length > 0 && matches.filter(m=>m.phase.includes('grupo')).every(m=>m.played);
 
-    if (loading) return <div style={{ padding: '100px 0', textAlign: 'center' }}>Cargando v3.7...</div>;
-
     return (
         <div style={{ padding: '0 0 50px 0', fontFamily: 'Arial', maxWidth: '600px', margin: 'auto', background: '#f8f9fa', minHeight: '100vh' }}>
+            {/* CABECERA FIJA */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#000', padding: '15px 20px', color: 'white', position: 'sticky', top: 0, zIndex: 1000 }}>
                 <button onClick={() => navigate('/dashboard')} style={{ background: 'none', color: 'white', border: 'none', fontSize:'20px' }}>←</button>
                 <div style={{textAlign:'center'}}><div style={{fontSize:'14px', fontWeight:'bold'}}>{tournamentInfo?.name}</div></div>
@@ -182,6 +197,7 @@ const TournamentView = ({ user }) => {
             )}
 
             <div style={{ padding: '15px' }}>
+                {/* 1. CUADRO PLAYOFFS DINÁMICO */}
                 {!showTable && tournamentInfo?.type === 'campeonato' && teams.length === 8 && (
                     <div style={{ background: '#fff', padding: '15px', borderRadius: '15px', marginBottom: '30px', border: '1px solid #eee', boxShadow:'0 4px 10px rgba(0,0,0,0.05)' }}>
                         <h4 style={{ textAlign: 'center', margin: '0 0 10px 0', fontSize: '11px', color: '#666' }}>🏆 CUADRO DE ELIMINATORIAS</h4>
@@ -195,7 +211,7 @@ const TournamentView = ({ user }) => {
                                 ))}
                             </div>
                             <div style={{ flex: 1, display:'flex', flexDirection:'column', justifyContent:'space-around', fontSize:8, textAlign:'center', color:'#999' }}>
-                                {[0, 1].map(i => (<div key={i} style={{border:'1px dashed #ccc', padding:5, borderRadius:5}}><div>{sM[i] ? sM[i].team_a_name : getWinner(qM[i*2]).name}</div><div>{sM[i] ? sM[i].team_b_name : getWinner(qM[i*2+1]).name}</div></div>))}
+                                {[0, 1].map(i => (<div key={i} style={{border:'1px dashed #ccc', padding:5, borderRadius:5}}><div>{sM[i] ? sM[i].team_a_name : getWinnerName(qM[i*2])}</div><div>{sM[i] ? sM[i].team_b_name : getWinnerName(qM[i*2+1])}</div></div>))}
                             </div>
                             <div style={{ flex: 0.8, display:'flex', alignItems:'center' }}><div style={{ height:'60px', width:'100%', background:'#fff3cd', border:'2px solid #ffeeba', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10 }}>🏆</div></div>
                         </div>
@@ -222,18 +238,17 @@ const TournamentView = ({ user }) => {
                                     <option value="">Equipo...</option>
                                     {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                 </select>
-                                <button onClick={handleAddPlayer}>OK</button>
+                                <button onClick={handleAddPlayer} style={{padding:'4px 10px'}}>OK</button>
                             </div>
                         )}
 
                         {isAdmin && (
                             <div style={{marginBottom:20}}>
-                                {allGPlayed && qM.length === 0 && <button onClick={() => activatePhase('cuartos', [{a: standings[0].id, b: standings[7].id, field: 1}, {a: standings[1].id, b: standings[6].id, field: 2}, {a: standings[2].id, b: standings[5].id, field: 1}, {a: standings[3].id, b: standings[4].id, field: 2}])} style={{width:'100%', padding:15, background:'#28a745', color:'#fff', border:'none', borderRadius:10, fontWeight:'bold'}}>⚡ ACTIVAR CUARTOS</button>}
-                                {qM.length === 4 && qM.every(m=>m.played) && sM.length === 0 && <button onClick={() => activatePhase('semifinal', [{a: getWinner(qM[0]).id, b: getWinner(qM[3]).id, field: 1}, {a: getWinner(qM[1]).id, b: getWinner(qM[2]).id, field: 2}])} style={{width:'100%', padding:15, background:'#28a745', color:'#fff', border:'none', borderRadius:10, fontWeight:'bold'}}>⚡ ACTIVAR SEMIFINALES</button>}
-                                {sM.length === 2 && sM.every(m=>m.played) && fM.length === 0 && <button onClick={() => activatePhase('final', [{a: getWinner(sM[0]).id, b: getWinner(sM[1]).id, field: 1}])} style={{width:'100%', padding:15, background:'#28a745', color:'#fff', border:'none', borderRadius:10, fontWeight:'bold'}}>⚡ ACTIVAR GRAN FINAL</button>}
+                                {allGPlayed && qM.length === 0 && <button onClick={() => activatePhase('cuartos', [{a: standings[0].id, b: standings[7].id, field: 1}, {a: standings[1].id, b: standings[6].id, field: 2}, {a: standings[2].id, b: standings[5].id, field: 1}, {a: standings[3].id, b: standings[4].id, field: 2}])} style={{width:'100%', padding:15, background:'#28a745', color:'#fff', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer'}}>⚡ ACTIVAR CUARTOS</button>}
+                                {qM.length === 4 && qM.every(m=>m.played) && sM.length === 0 && <button onClick={() => activatePhase('semifinal', [{a: getWinnerId(qM[0]), b: getWinnerId(qM[3]), field: 1}, {a: getWinnerId(qM[1]), b: getWinnerId(qM[2]), field: 2}])} style={{width:'100%', padding:15, background:'#28a745', color:'#fff', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer'}}>⚡ ACTIVAR SEMIFINALES</button>}
+                                {sM.length === 2 && sM.every(m=>m.played) && fM.length === 0 && <button onClick={() => activatePhase('final', [{a: getWinnerId(sM[0]), b: getWinnerId(sM[1]), field: 1}])} style={{width:'100%', padding:15, background:'#28a745', color:'#fff', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer'}}>⚡ ACTIVAR GRAN FINAL</button>}
                             </div>
                         )}
-
                         <div style={{ background: '#333', color: 'white', padding: '10px', borderRadius: '8px', fontSize: '12px', marginBottom: '15px', textAlign:'center', fontWeight:'bold' }}>PARTIDOS</div>
                         {matches.map(m => <MatchCard key={m.id} m={m} />)}
                     </div>
