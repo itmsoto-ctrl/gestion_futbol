@@ -1,59 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const AdminPanel = ({ user, onLogout }) => {
     const [tournaments, setTournaments] = useState([]);
-    const [name, setName] = useState('');
-    const [type, setType] = useState('campeonato');
+    const navigate = useNavigate();
+    const API_URL = "https://gestionfutbol-production.up.railway.app";
 
     useEffect(() => {
-        fetchTournaments();
-    }, []);
-
-    const fetchTournaments = async () => {
-        const res = await axios.get('https://gestionfutbol-production.up.railway.app/tournaments');
-        setTournaments(res.data);
-    };
-
-    const handleCreate = async () => {
-        if (!name) return alert("Ponle un nombre");
-        await axios.post('https://gestionfutbol-production.up.railway.app/tournaments', { name, type });
-        setName('');
-        fetchTournaments();
-    };
+        axios.get(`${API_URL}/tournaments`).then(res => {
+            setTournaments(res.data);
+            // REDIRECCIÓN AUTOMÁTICA SI SOLO HAY UNO
+            if (res.data.length === 1) {
+                navigate(`/tournament/${res.data[0].id}`);
+            }
+        });
+    }, [navigate]);
 
     return (
         <div style={{ padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <h1>Panel de {user.role}</h1>
+                <h2>Panel de Torneos</h2>
                 <button onClick={onLogout}>Cerrar Sesión</button>
             </div>
-
-            {user.role === 'admin' && (
-                <div style={{ background: '#eee', padding: '15px', borderRadius: '8px' }}>
-                    <h3>Crear Nuevo Campeonato/Liga</h3>
-                    <input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del torneo" />
-                    <select onChange={e => setType(e.target.value)}>
-                        <option value="campeonato">Campeonato (30 min - 8 equipos)</option>
-                        <option value="liga">Liga (1h - 6 equipos)</option>
-                    </select>
-                    <button onClick={handleCreate}>Crear</button>
-                </div>
-            )}
-
-            <h3>Torneos Existentes</h3>
-            <div style={{ display: 'grid', gap: '10px' }}>
-                {tournaments.map(t => (
-                    <div key={t.id} style={{ padding: '10px', border: '1px solid #ccc' }}>
-                        <strong>{t.name}</strong> ({t.type})
-                        <button onClick={() => window.location.href=`/tournament/${t.id}`} style={{ marginLeft: '10px' }}>
-                            Entrar
-                        </button>
-                    </div>
-                ))}
-            </div>
+            {tournaments.map(t => (
+                <button key={t.id} onClick={() => navigate(`/tournament/${t.id}`)} style={{ display: 'block', width: '100%', padding: '15px', margin: '10px 0' }}>
+                    {t.name} ({t.type})
+                </button>
+            ))}
         </div>
     );
 };
-
 export default AdminPanel;
