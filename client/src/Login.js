@@ -26,7 +26,7 @@ const Login = ({ onLogin }) => {
                     <input type="password" placeholder="Contraseña" style={{ padding: '25px', fontSize: '20px', borderRadius: '15px', border: '1px solid #ddd', background:'#f9f9f9', outline:'none' }} onChange={e => setForm({...form, password: e.target.value})} />
                     <button type="submit" style={{ padding: '22px', background: '#007bff', color: '#fff', borderRadius: '15px', border: 'none', fontWeight: 'bold', fontSize: '22px', cursor:'pointer' }}>ENTRAR</button>
                 </form>
-                <div style={{ marginTop: '40px', fontSize: '12px', color: '#aaa' }}>v3.4 - Creado por <b>Daniel Martinez</b></div>
+                <div style={{ marginTop: '40px', fontSize: '12px', color: '#aaa' }}>v3.7 - Creado por <b>Daniel Martinez</b></div>
             </div>
         </div>
     );
