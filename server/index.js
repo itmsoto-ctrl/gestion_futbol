@@ -15,7 +15,7 @@ const db = mysql.createPool({
 
 const formatDate = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
 
-// --- LOGIN Y RUTAS DE CONSULTA ---
+// --- RUTAS BÁSICAS ---
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
     db.query('SELECT * FROM users WHERE username = ? AND password = ? AND active = 1', [username, password], (err, result) => {
@@ -35,10 +35,9 @@ app.get('/matches/:tId', (req, res) => {
 
 // --- ACCIONES ---
 app.put('/matches/:id', (req, res) => {
-    const { team_a_goals, team_b_goals, played, referee, match_date } = req.body;
-    const date = match_date ? match_date.replace('T', ' ').slice(0, 19) : null;
-    db.query('UPDATE matches SET team_a_goals=?, team_b_goals=?, played=?, referee=?, match_date=? WHERE id=?', 
-    [team_a_goals, team_b_goals, played, referee, date, req.params.id], (err) => res.send("OK"));
+    const { team_a_goals, team_b_goals, played } = req.body;
+    db.query('UPDATE matches SET team_a_goals=?, team_b_goals=?, played=? WHERE id=?', 
+    [team_a_goals, team_b_goals, played, req.params.id], (err) => res.send("OK"));
 });
 
 app.post('/add-player-goal', (req, res) => {
@@ -57,16 +56,16 @@ app.post('/remove-player-goal', (req, res) => {
     });
 });
 
-// --- RESET MAESTRO (TU LÓGICA SOLICITADA) ---
+// --- RESET MAESTRO SEGURO ---
 app.post('/reset-tournament/:id', (req, res) => {
     const tId = req.params.id;
-    // 1. Eliminar toda la tabla goals de este torneo
+    // 1. Borrar todos los goles (Pichichi)
     db.query('DELETE FROM goals WHERE match_id IN (SELECT id FROM matches WHERE tournament_id = ?)', [tId], () => {
-        // 2. Eliminar partidos que NO son phase grupo
+        // 2. Borrar partidos que NO sean de grupo
         db.query('DELETE FROM matches WHERE tournament_id = ? AND phase != "grupo"', [tId], () => {
-            // 3. Update de los phase grupo (played=0, goles=0)
+            // 3. Resetear los de grupo a cero
             db.query('UPDATE matches SET played = 0, team_a_goals = 0, team_b_goals = 0 WHERE tournament_id = ? AND phase = "grupo"', [tId], () => {
-                res.send("Reset Completo");
+                res.send("OK");
             });
         });
     });
@@ -76,17 +75,17 @@ app.post('/activate-phase/:id', (req, res) => {
     const tId = req.params.id;
     db.query('SELECT MAX(match_date) as last FROM matches WHERE tournament_id = ?', [tId], (err, r) => {
         let start = r[0].last ? new Date(new Date(r[0].last).getTime() + 30*60000) : new Date();
-        const matchesArr = req.body.pairings.map((p, i) => {
+        const mArr = req.body.pairings.map((p, i) => {
             let mt = new Date(start);
             if (req.body.phase === 'cuartos') { if(i === 2) mt.setMinutes(mt.getMinutes() + 30); if(i === 3) mt.setMinutes(mt.getMinutes() + 60); }
             return [tId, p.a, p.b, formatDate(mt), p.field, req.body.phase];
         });
-        db.query('INSERT INTO matches (tournament_id, team_a_id, team_b_id, match_date, field, phase) VALUES ?', [matchesArr], () => res.send("OK"));
+        db.query('INSERT INTO matches (tournament_id, team_a_id, team_b_id, match_date, field, phase) VALUES ?', [mArr], () => res.send("OK"));
     });
 });
 
 app.post('/players', (req, res) => {
-    db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], (err, result) => res.send(result));
+    db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], () => res.send("OK"));
 });
 
 app.get('/stats/:tId', (req, res) => {
@@ -96,4 +95,4 @@ app.get('/stats/:tId', (req, res) => {
     db.query(sqlG, [tId], (err, g) => { db.query(sqlP, [tId], (err2, p) => res.send({ goleadores: g || [], porteros: p || [] })); });
 });
 
-app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 Servidor v3.5"));
+app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.5 online"));
