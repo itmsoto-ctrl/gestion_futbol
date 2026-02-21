@@ -15,7 +15,7 @@ const db = mysql.createPool({
 
 const formatDate = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
 
-// --- RUTAS DE CONSULTA ---
+// --- LOGIN ---
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
     db.query('SELECT * FROM users WHERE username = ? AND password = ? AND active = 1', [username, password], (err, result) => {
@@ -23,9 +23,30 @@ app.post('/login', (req, res) => {
     });
 });
 app.get('/tournaments', (req, res) => { db.query('SELECT * FROM tournaments', (err, r) => res.send(r)); });
-app.get('/teams/:tId', (req, res) => { db.query('SELECT * FROM teams WHERE tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
-app.get('/players/:tId', (req, res) => { db.query('SELECT p.*, t.name as team_name FROM players p JOIN teams t ON p.team_id = t.id WHERE t.tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
-app.get('/goals/:tId', (req, res) => { db.query('SELECT g.* FROM goals g JOIN matches m ON g.match_id = m.id WHERE m.tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
+
+// --- RESET MAESTRO POR FASES ---
+app.post('/reset-tournament/:id', (req, res) => {
+    const tId = req.params.id;
+    const { target } = req.body; 
+
+    if (target === 'all') {
+        db.query('DELETE FROM goals WHERE match_id IN (SELECT id FROM matches WHERE tournament_id = ?)', [tId], () => {
+            db.query('DELETE FROM matches WHERE tournament_id = ? AND phase != "grupo"', [tId], () => {
+                db.query('UPDATE matches SET played = 0, team_a_goals = 0, team_b_goals = 0 WHERE tournament_id = ? AND phase = "grupo"', [tId], () => {
+                    res.send("Reset Todo OK");
+                });
+            });
+        });
+    } else {
+        const phaseName = target === 'semi' ? 'semifinal' : target;
+        db.query('DELETE FROM matches WHERE tournament_id = ? AND phase LIKE ?', [tId, `%${phaseName}%`], (err) => {
+            if (err) return res.status(500).send(err);
+            res.send("Reset Fase OK");
+        });
+    }
+});
+
+// --- PARTIDOS Y GOLES ---
 app.get('/matches/:tId', (req, res) => {
     const sql = `SELECT m.*, t1.name as team_a_name, t1.logo_url as team_a_logo, t2.name as team_b_name, t2.logo_url as team_b_logo 
                  FROM matches m LEFT JOIN teams t1 ON m.team_a_id = t1.id LEFT JOIN teams t2 ON m.team_b_id = t2.id 
@@ -33,7 +54,6 @@ app.get('/matches/:tId', (req, res) => {
     db.query(sql, [req.params.tId], (err, r) => res.send(r));
 });
 
-// --- ACCIONES ---
 app.put('/matches/:id', (req, res) => {
     const { team_a_goals, team_b_goals, played, referee, match_date } = req.body;
     const date = match_date ? match_date.replace('T', ' ').slice(0, 19) : null;
@@ -50,33 +70,11 @@ app.post('/add-player-goal', (req, res) => {
 
 app.post('/remove-player-goal', (req, res) => {
     const { match_id, player_id, team_id, team_side } = req.body;
-    db.query('DELETE FROM goals WHERE match_id = ? AND player_id = ? AND team_id = ? ORDER BY id DESC LIMIT 1', [match_id, player_id, team_id], (err, r) => {
-        if (r.affectedRows > 0) {
+    db.query('DELETE FROM goals WHERE match_id = ? AND player_id = ? AND team_id = ? ORDER BY id DESC LIMIT 1', [match_id, player_id, team_id], (err, result) => {
+        if (result && result.affectedRows > 0) {
             db.query(`UPDATE matches SET ${team_side} = CASE WHEN ${team_side} > 0 THEN ${team_side} - 1 ELSE 0 END WHERE id = ?`, [match_id], () => res.send("OK"));
         } else res.status(404).send("Error");
     });
-});
-
-// --- RESET MAESTRO MODULAR ---
-app.post('/reset-tournament/:id', (req, res) => {
-    const tId = req.params.id;
-    const { target } = req.body; // 'all', 'cuartos', 'semi', 'final'
-
-    if (target === 'all') {
-        db.query('DELETE FROM goals WHERE match_id IN (SELECT id FROM matches WHERE tournament_id = ?)', [tId], () => {
-            db.query('DELETE FROM matches WHERE tournament_id = ? AND phase != "grupo"', [tId], () => {
-                db.query('UPDATE matches SET played = 0, team_a_goals = 0, team_b_goals = 0 WHERE tournament_id = ?', [tId], () => {
-                    res.send("Reset Todo OK");
-                });
-            });
-        });
-    } else {
-        const phaseSearch = target === 'semi' ? 'semifinal' : target;
-        db.query('DELETE FROM matches WHERE tournament_id = ? AND phase LIKE ?', [tId, `%${phaseSearch}%`], (err) => {
-            if (err) return res.status(500).send(err);
-            res.send("Reset Fase OK");
-        });
-    }
 });
 
 app.post('/activate-phase/:id', (req, res) => {
@@ -92,10 +90,12 @@ app.post('/activate-phase/:id', (req, res) => {
     });
 });
 
-app.post('/players', (req, res) => {
-    db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], () => res.send("OK"));
-});
-
+// --- EQUIPOS, JUGADORES Y STATS ---
+app.get('/teams/:tId', (req, res) => { db.query('SELECT * FROM teams WHERE tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
+app.post('/teams', (req, res) => { db.query('INSERT INTO teams (tournament_id, name, logo_url, group_num) VALUES (?, ?, ?, ?)', [req.body.tournament_id, req.body.name, req.body.logo_url, req.body.group_num], (err, result) => res.send(result)); });
+app.get('/players/:tId', (req, res) => { db.query('SELECT p.*, t.name as team_name FROM players p JOIN teams t ON p.team_id = t.id WHERE t.tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
+app.post('/players', (req, res) => { db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], () => res.send("OK")); });
+app.get('/goals/:tId', (req, res) => { db.query('SELECT g.* FROM goals g JOIN matches m ON g.match_id = m.id WHERE m.tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
 app.get('/stats/:tId', (req, res) => {
     const tId = req.params.tId;
     const sqlG = `SELECT p.name, t.name as team_name, COUNT(g.id) as total FROM goals g JOIN players p ON g.player_id = p.id JOIN teams t ON g.team_id = t.id WHERE t.tournament_id = ? GROUP BY p.id, p.name, t.name ORDER BY total DESC LIMIT 10`;
@@ -103,4 +103,4 @@ app.get('/stats/:tId', (req, res) => {
     db.query(sqlG, [tId], (err, g) => { db.query(sqlP, [tId], (err2, p) => res.send({ goleadores: g || [], porteros: p || [] })); });
 });
 
-app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.5.3 ready"));
+app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.7 ready"));
