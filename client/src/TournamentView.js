@@ -30,7 +30,7 @@ const TournamentView = ({ user }) => {
 
     const loadData = useCallback(async () => {
         try {
-            const [resM, resT, resP, resS, resG, resTourneys] = await Promise.all([
+            const [resM, resT, resP, resS, resG, resTourneys] = await Promise.allSettled([
                 axios.get(`${API_URL}/matches/${id}`),
                 axios.get(`${API_URL}/teams/${id}`),
                 axios.get(`${API_URL}/players/${id}`),
@@ -38,17 +38,17 @@ const TournamentView = ({ user }) => {
                 axios.get(`${API_URL}/goals/${id}`),
                 axios.get(`${API_URL}/tournaments`)
             ]);
-            setMatches(resM.data || []);
-            setTeams(resT.data || []);
-            setPlayers(resP.data || []);
-            setStats(resS.data || { goleadores: [], porteros: [] });
-            setAllGoals(resG.data || []);
-            setTournamentInfo(resTourneys.data.find(t => t.id === parseInt(id)));
-            setLoading(false);
-        } catch (error) { 
-            console.error("Error cargando datos:", error); 
-            setLoading(false); 
-        }
+            
+            setMatches(resM.status === 'fulfilled' ? resM.value.data : []);
+            setTeams(resT.status === 'fulfilled' ? resT.value.data : []);
+            setPlayers(resP.status === 'fulfilled' ? resP.value.data : []);
+            setStats(resS.status === 'fulfilled' ? resS.value.data : { goleadores: [], porteros: [] });
+            setAllGoals(resG.status === 'fulfilled' ? resG.value.data : []);
+            if (resTourneys.status === 'fulfilled') {
+                setTournamentInfo(resTourneys.value.data.find(t => t.id === parseInt(id)));
+            }
+        } catch (error) { console.error("Error crítico:", error); }
+        finally { setLoading(false); }
     }, [id, API_URL]);
 
     useEffect(() => { loadData(); }, [loadData]);
@@ -72,9 +72,9 @@ const TournamentView = ({ user }) => {
             }
         });
         return Object.values(table).sort((a, b) => b.pts - a.pts || (b.gf - b.gc) - (a.gf - a.gc));
-    }, [matches, teams, tournamentInfo]);
+    }, [matches, teams]);
 
-    // Helpers seguros
+    // Helpers Seguros para evitar el crash (Pantalla en blanco)
     const getTeamByRank = (rank) => standings[rank - 1] || { name: `${rank}º Clasif.`, id: null };
     
     const getWinnerName = (m) => {
@@ -130,19 +130,18 @@ const TournamentView = ({ user }) => {
         const isExp = expandedMatchId === m.id;
         const isFinished = m.played === 1;
 
-        // Formateo estético de fecha (28/2) y hora (14:30)
         const renderDateTime = () => {
             if (!m.match_date) return "S/F";
-            const datePart = m.match_date.split(' ')[0]; // 2026-02-28
-            const timePart = m.match_date.split(' ')[1]; // 14:30:00
-            const [y, mon, d] = datePart.split('-');
-            return `${parseInt(d)}/${parseInt(mon)} ${timePart.slice(0, 5)}`;
+            const parts = m.match_date.split(' ');
+            if (parts.length < 2) return "S/F";
+            const [y, mon, d] = parts[0].split('-');
+            return `${parseInt(d)}/${parseInt(mon)} ${parts[1].slice(0, 5)}`;
         };
 
         return (
-            <div style={{ border: '1px solid #ddd', borderRadius: '15px', background: isFinished ? '#e8f5e9' : 'white', marginBottom: '15px', overflow:'hidden', boxShadow:'0 3px 6px rgba(0,0,0,0.05)' }}>
-                <div onClick={() => isAdmin && setExpandedMatchId(isExp ? null : m.id)}
-                     style={{ background: isFinished ? '#c8e6c9' : '#f8f9fa', padding: '12px 15px', fontSize: '13px', borderBottom: '1px solid #eee', display:'flex', justifyContent:'space-between', fontWeight:'bold', cursor:'pointer' }}>
+            <div onClick={() => isAdmin && setExpandedMatchId(isExp ? null : m.id)}
+                 style={{ border: '1px solid #ddd', borderRadius: '15px', background: isFinished ? '#e8f5e9' : 'white', marginBottom: '15px', overflow:'hidden', boxShadow:'0 3px 6px rgba(0,0,0,0.05)', cursor: isAdmin ? 'pointer' : 'default' }}>
+                <div style={{ background: isFinished ? '#c8e6c9' : '#f8f9fa', padding: '12px 15px', fontSize: '13px', borderBottom: '1px solid #eee', display:'flex', justifyContent:'space-between', fontWeight:'bold' }}>
                     <span>📅 {renderDateTime()}</span>
                     <span>🏟️ C{m.field} {m.referee && `| 👤 ${m.referee}`}</span>
                 </div>
@@ -161,7 +160,7 @@ const TournamentView = ({ user }) => {
                         })}
                     </div>
                     <div style={{ flex: '0 0 28%', textAlign: 'center', paddingTop: '10px' }}>
-                        <div style={{ fontSize: '32px', fontWeight: '900' }}>{m.team_a_goals} - {m.team_b_goals}</div>
+                        <div style={{ fontSize: '24px', fontWeight: '900', whiteSpace: 'nowrap' }}>{m.team_a_goals} - {m.team_b_goals}</div>
                         {isExp && isAdmin && (
                             <button onClick={(e) => { e.stopPropagation(); isFinished ? setEditingMatch({...m}) : axios.put(`${API_URL}/matches/${m.id}`, {...m, played:1}).then(()=>loadData()); }} style={{marginTop:20, padding:'10px 15px', background: isFinished ? '#ffc107' : '#28a745', color: isFinished ? '#000' : '#fff', border:'none', borderRadius:10, fontSize:12, fontWeight:'bold', width:'100%'}}>
                                 {isFinished ? '✏️ EDITAR' : '✅ FINALIZAR'}
@@ -175,7 +174,7 @@ const TournamentView = ({ user }) => {
                             const g = getGoalsInMatch(p.id, m.id);
                             return (
                                 <div key={p.id} style={{display:'flex', alignItems:'center', marginBottom:12}}>
-                                    <button onClick={(e) => { e.stopPropagation(); handleGoal(m.id, p.id, m.team_b_id, 'team_b_goals', 'remove'); }} style={{marginRight:8, color:'red', border:'none', background:'none', fontSize:30}}>-</button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleGoal(m.id, p.id, m.team_b_id, 'team_b_goals', 'remove'); }} style={{marginRight:8, color:'red', background:'none', border:'none', fontSize:30}}>-</button>
                                     <button onClick={(e) => { e.stopPropagation(); handleGoal(m.id, p.id, m.team_b_id, 'team_b_goals', 'add'); }} style={{padding:'16px 4px', flex:1, fontSize:13, fontWeight:'bold', borderRadius:10, background: g > 0 ? '#ffc107' : '#f0f4ff'}}> {p.name} {g > 0 ? `(${g})` : ''} ⚽</button>
                                 </div>
                             );
@@ -189,9 +188,8 @@ const TournamentView = ({ user }) => {
     const qM = matches.filter(m => m.phase.toLowerCase().includes('cuarto'));
     const sM = matches.filter(m => m.phase.toLowerCase().includes('semifinal'));
     const fM = matches.filter(m => m.phase.toLowerCase().includes('final'));
-    const allGPlayed = matches.filter(m=>m.phase.toLowerCase().includes('grupo')).length > 0 && matches.filter(m=>m.phase.toLowerCase().includes('grupo')).every(m=>m.played);
 
-    if (loading) return <div style={{ padding: '100px 0', textAlign: 'center' }}>v3.7.4 - Cargando...</div>;
+    if (loading) return <div style={{ padding: '100px 0', textAlign: 'center' }}>v3.7.5 - Cargando...</div>;
 
     return (
         <div style={{ padding: '0 0 50px 0', fontFamily: 'Arial', maxWidth: '600px', margin: 'auto', background: '#f8f9fa', minHeight: '100vh' }}>
@@ -203,10 +201,10 @@ const TournamentView = ({ user }) => {
                     {isAdmin && <button onClick={() => setShowActivateMenu(!showActivateMenu)} style={{background:'#28a745', color:'#fff', border:'none', padding:'8px 12px', borderRadius:8, fontSize:11, marginRight:5, fontWeight:'bold'}}>ACTIVAR ⚡</button>}
                     {isAdmin && <button onClick={() => setShowResetMenu(!showResetMenu)} style={{background:'#dc3545', color:'#fff', border:'none', padding:'8px 12px', borderRadius:8, fontSize:11, marginRight:5, fontWeight:'bold'}}>RESET ⚙️</button>}
                 </div>
-                <button onClick={() => setShowTable(!showTable)} style={{ background: '#007bff', color: 'white', border: 'none', padding: '8px 15px', borderRadius: 8, fontWeight:'bold' }}>{showTable ? '⚽' : '📊'}</button>
+                <button onClick={() => setShowTable(!showTable)} style={{ background: '#007bff', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '8px', fontSize: '12px', fontWeight:'bold' }}>{showTable ? '⚽' : '📊'}</button>
             </div>
 
-            {/* MENÚS DESPLEGABLES */}
+            {/* MENÚS */}
             {showResetMenu && (
                 <div style={{ background: '#fff', padding: 15, borderBottom: '2px solid #dc3545', display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
                     <button onClick={() => handleReset('all')} style={{ padding: 10, background: '#dc3545', color: '#fff', borderRadius: 5, fontSize: 10 }}>TODO</button>
@@ -230,12 +228,15 @@ const TournamentView = ({ user }) => {
                         <h4 style={{ textAlign: 'center', margin: '0 0 10px 0', fontSize: '11px', color: '#666' }}>🏆 CUADRO DE ELIMINATORIAS</h4>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '5px' }}>
                             <div style={{ flex: 1.2 }}>
-                                {[ [1,8], [2,7], [3,6], [4,5] ].map((pair, i) => (
-                                    <div key={i} style={{ background: '#f8f9fa', marginBottom: '5px', padding: '5px', borderRadius: '5px', border: '1px solid #eee', fontSize: '9px' }}>
-                                        <div style={{display:'flex', justifyContent:'space-between', color: qM[i] ? '#000' : '#007bff'}}><span style={{maxWidth:60, overflow:'hidden', whiteSpace:'nowrap'}}>{qM[i] ? qM[i].team_a_name : getTeamByRank(pair[0]).name}</span><b>{qM[i]?.team_a_goals ?? ''}</b></div>
-                                        <div style={{display:'flex', justifyContent:'space-between', color: qM[i] ? '#000' : '#007bff', borderTop:'1px solid #fff'}}><span style={{maxWidth:60, overflow:'hidden', whiteSpace:'nowrap'}}>{qM[i] ? qM[i].team_b_name : getTeamByRank(pair[1]).name}</span><b>{qM[i]?.team_b_goals ?? ''}</b></div>
-                                    </div>
-                                ))}
+                                {[ [1,8], [2,7], [3,6], [4,5] ].map((pair, i) => {
+                                    const dbM = qM[i];
+                                    return (
+                                        <div key={i} style={{ background: '#f8f9fa', marginBottom: '5px', padding: '5px', borderRadius: '5px', border: '1px solid #eee', fontSize: '9px' }}>
+                                            <div style={{display:'flex', justifyContent:'space-between', color: dbM ? '#000' : '#007bff'}}><span>{dbM ? dbM.team_a_name : getTeamByRank(pair[0]).name}</span><b>{dbM?.team_a_goals ?? ''}</b></div>
+                                            <div style={{display:'flex', justifyContent:'space-between', borderTop:'1px solid #fff', color: dbM ? '#000' : '#007bff'}}><span>{dbM ? dbM.team_b_name : getTeamByRank(pair[1]).name}</span><b>{dbM?.team_b_goals ?? ''}</b></div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                             <div style={{ flex: 1, display:'flex', flexDirection:'column', justifyContent:'space-around', fontSize:8, textAlign:'center', color:'#999' }}>
                                 {[0, 1].map(i => (<div key={i} style={{border:'1px dashed #ccc', padding:5, borderRadius:5}}><div>{sM[i] ? sM[i].team_a_name : getWinnerName(qM[i*2])}</div><div style={{borderTop:'1px solid #eee'}}>{sM[i] ? sM[i].team_b_name : getWinnerName(qM[i*2+1])}</div></div>))}
@@ -292,9 +293,7 @@ const TournamentView = ({ user }) => {
                 <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.85)', zIndex:2000, padding:20, display:'flex', alignItems:'center'}}>
                     <div style={{background:'#fff', width:'100%', padding:20, borderRadius:15}}>
                         <h4 style={{marginTop:0}}>Edición Manual</h4>
-                        <label style={{fontSize:11}}>Goles {editingMatch.team_a_name}:</label>
                         <input type="number" value={editingMatch.team_a_goals} onChange={e => setEditingMatch({...editingMatch, team_a_goals: parseInt(e.target.value)})} style={{width:'90%', padding:15, marginBottom:10, fontSize:18}} />
-                        <label style={{fontSize:11}}>Goles {editingMatch.team_b_name}:</label>
                         <input type="number" value={editingMatch.team_b_goals} onChange={e => setEditingMatch({...editingMatch, team_b_goals: parseInt(e.target.value)})} style={{width:'90%', padding:15, marginBottom:10, fontSize:18}} />
                         <button onClick={() => { axios.put(`${API_URL}/matches/${editingMatch.id}`, {...editingMatch, played: 0}).then(()=> {setEditingMatch(null); loadData();}) }} style={{width:'100%', padding:15, background:'green', color:'#fff', borderRadius:10, border:'none', fontWeight:'bold'}}>DESBLOQUEAR Y GUARDAR</button>
                         <button onClick={() => setEditingMatch(null)} style={{width:'100%', padding:12, background:'#eee', border:'none', borderRadius:10, marginTop:10, width:'100%'}}>CANCELAR</button>
