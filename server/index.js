@@ -35,11 +35,11 @@ app.post('/reset-tournament/:id', (req, res) => {
             });
         });
     } else {
-        db.query('DELETE FROM matches WHERE tournament_id = ? AND phase = ?', [tId, target], () => res.send("OK"));
+        db.query('DELETE FROM matches WHERE tournament_id = ? AND phase = ?', [tId, target], (err) => res.send("OK"));
     }
 });
 
-// --- ACTIVACIÓN DE FASES ---
+// --- ACTIVACIÓN DE FASES (Lógica de tiempos corregida v3.5.9) ---
 app.post('/activate-phase/:id', (req, res) => {
     const tId = req.params.id;
     const { phase, pairings } = req.body;
@@ -47,7 +47,11 @@ app.post('/activate-phase/:id', (req, res) => {
         let start = r[0].last ? new Date(new Date(r[0].last).getTime() + 30*60000) : new Date();
         const matchesArr = pairings.map((p, i) => {
             let mt = new Date(start);
-            if (phase === 'cuartos') { if(i === 2) mt.setMinutes(mt.getMinutes() + 30); if(i === 3) mt.setMinutes(mt.getMinutes() + 60); }
+            // i=0 (1v8), i=1 (2v7) -> start (17:30)
+            // i=2 (3v6), i=3 (4v5) -> start + 30min (18:00)
+            if (phase === 'cuartos' && i >= 2) { 
+                mt.setMinutes(mt.getMinutes() + 30); 
+            }
             return [tId, p.a, p.b, formatDate(mt), p.field, phase];
         });
         db.query('INSERT INTO matches (tournament_id, team_a_id, team_b_id, match_date, field, phase) VALUES ?', [matchesArr], (err) => {
@@ -72,7 +76,7 @@ app.put('/matches/:id', (req, res) => {
 app.post('/add-player-goal', (req, res) => {
     const { match_id, player_id, team_id, team_side } = req.body;
     db.query('INSERT INTO goals (match_id, player_id, team_id) VALUES (?, ?, ?)', [match_id, player_id, team_id], () => {
-        db.query(`UPDATE matches SET ${team_side} = ${team_side} + 1 WHERE id = ?`, [match_id], () => res.send("OK"));
+        db.query(`UPDATE matches SET ${team_side} = ${team_side} + 1, played = 1 WHERE id = ?`, [match_id], () => res.send("OK"));
     });
 });
 app.post('/remove-player-goal', (req, res) => {
@@ -84,7 +88,7 @@ app.post('/remove-player-goal', (req, res) => {
     });
 });
 
-// --- STATS ---
+// --- EQUIPOS, JUGADORES Y STATS ---
 app.get('/teams/:tId', (req, res) => { db.query('SELECT * FROM teams WHERE tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
 app.get('/players/:tId', (req, res) => { db.query('SELECT p.*, t.name as team_name FROM players p JOIN teams t ON p.team_id = t.id WHERE t.tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
 app.post('/players', (req, res) => { db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], () => res.send("OK")); });
@@ -96,4 +100,4 @@ app.get('/stats/:tId', (req, res) => {
     db.query(sqlG, [tId], (err, g) => { db.query(sqlP, [tId], (err2, p) => res.send({ goleadores: g || [], porteros: p || [] })); });
 });
 
-app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.7 ready"));
+app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.5.9 ready"));
