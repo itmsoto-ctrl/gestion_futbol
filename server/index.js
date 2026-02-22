@@ -15,13 +15,13 @@ const db = mysql.createPool({
 
 const formatDate = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
 
-// --- RUTAS DE CONSULTA ---
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
     db.query('SELECT * FROM users WHERE username = ? AND password = ? AND active = 1', [username, password], (err, result) => {
         if (result && result.length > 0) res.send(result[0]); else res.status(401).send("Error");
     });
 });
+
 app.get('/tournaments', (req, res) => { db.query('SELECT * FROM tournaments', (err, r) => res.send(r)); });
 app.get('/teams/:tId', (req, res) => { db.query('SELECT * FROM teams WHERE tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
 app.get('/players/:tId', (req, res) => { db.query('SELECT p.*, t.name as team_name FROM players p JOIN teams t ON p.team_id = t.id WHERE t.tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
@@ -34,7 +34,6 @@ app.get('/matches/:tId', (req, res) => {
     db.query(sql, [req.params.tId], (err, r) => res.send(r));
 });
 
-// --- ACCIONES DE PARTIDO ---
 app.put('/matches/:id', (req, res) => {
     const { team_a_goals, team_b_goals, played, referee, match_date } = req.body;
     const date = match_date ? match_date.replace('T', ' ').slice(0, 19) : null;
@@ -42,10 +41,12 @@ app.put('/matches/:id', (req, res) => {
     [team_a_goals, team_b_goals, played, referee, date, req.params.id], (err) => res.send("OK"));
 });
 
-// CORREGIDO: Ya NO pone played = 1 automáticamente
+// --- GOLES (v3.6): PROHIBIDO CAMBIAR 'PLAYED' ---
 app.post('/add-player-goal', (req, res) => {
     const { match_id, player_id, team_id, team_side } = req.body;
-    db.query('INSERT INTO goals (match_id, player_id, team_id) VALUES (?, ?, ?)', [match_id, player_id, team_id], () => {
+    db.query('INSERT INTO goals (match_id, player_id, team_id) VALUES (?, ?, ?)', [match_id, player_id, team_id], (err) => {
+        if (err) return res.status(500).send(err);
+        // Solo actualizamos el marcador, NUNCA el campo 'played'
         db.query(`UPDATE matches SET ${team_side} = ${team_side} + 1 WHERE id = ?`, [match_id], () => res.send("OK"));
     });
 });
@@ -53,7 +54,7 @@ app.post('/add-player-goal', (req, res) => {
 app.post('/remove-player-goal', (req, res) => {
     const { match_id, player_id, team_id, team_side } = req.body;
     db.query('DELETE FROM goals WHERE match_id = ? AND player_id = ? AND team_id = ? ORDER BY id DESC LIMIT 1', [match_id, player_id, team_id], (err, result) => {
-        if (result.affectedRows > 0) {
+        if (result && result.affectedRows > 0) {
             db.query(`UPDATE matches SET ${team_side} = CASE WHEN ${team_side} > 0 THEN ${team_side} - 1 ELSE 0 END WHERE id = ?`, [match_id], () => res.send("OK"));
         } else res.status(404).send("Error");
     });
@@ -66,12 +67,11 @@ app.post('/reset-tournament/:id', (req, res) => {
     if (target === 'all') {
         db.query('DELETE FROM goals WHERE match_id IN (SELECT id FROM matches WHERE tournament_id = ?)', [tId], () => {
             db.query('DELETE FROM matches WHERE tournament_id = ? AND phase != "grupo"', [tId], () => {
-                db.query('UPDATE matches SET played = 0, team_a_goals = 0, team_b_goals = 0 WHERE tournament_id = ?', [tId], () => res.send("OK"));
+                db.query('UPDATE matches SET played = 0, team_a_goals = 0, team_b_goals = 0 WHERE tournament_id = ? AND phase = "grupo"', [tId], () => res.send("OK"));
             });
         });
     } else {
-        const phaseSearch = target === 'semi' ? 'semifinal' : target;
-        db.query('DELETE FROM matches WHERE tournament_id = ? AND phase LIKE ?', [tId, `%${phaseSearch}%`], () => res.send("OK"));
+        db.query('DELETE FROM matches WHERE tournament_id = ? AND phase LIKE ?', [tId, `%${target}%`], () => res.send("OK"));
     }
 });
 
@@ -99,4 +99,4 @@ app.get('/stats/:tId', (req, res) => {
     db.query(sqlG, [tId], (err, g) => { db.query(sqlP, [tId], (err2, p) => res.send({ goleadores: g || [], porteros: p || [] })); });
 });
 
-app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.5.6 listo"));
+app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.6 lista"));
