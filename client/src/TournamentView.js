@@ -47,8 +47,8 @@ const TournamentView = ({ user }) => {
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    // --- CLASIFICACIÓN REAL-TIME ---
-    const standingsList = useMemo(() => {
+    // --- LÓGICA DE CLASIFICACIÓN REAL-TIME ---
+    const standings = useMemo(() => {
         let table = {};
         teams.forEach(t => { table[t.id] = { id: t.id, name: t.name, logo: t.logo_url, pts: 0, gf: 0, gc: 0, pj: 0 }; });
         matches.forEach(m => {
@@ -68,7 +68,8 @@ const TournamentView = ({ user }) => {
         return Object.values(table).sort((a, b) => b.pts - a.pts || (b.gf - b.gc) - (a.gf - a.gc));
     }, [matches, teams, tournamentInfo]);
 
-    const getTeamByRank = (rank) => standingsList[rank - 1] || { name: `${rank}º Clasif.`, id: null };
+    // Helpers
+    const getTeamByRank = (rank) => standings[rank - 1] || { name: `${rank}º Clasif.`, id: null };
     const getWinnerId = (m) => {
         if (!m || m.team_a_goals === m.team_b_goals) return null;
         return m.team_a_goals > m.team_b_goals ? m.team_a_id : m.team_b_id;
@@ -80,6 +81,13 @@ const TournamentView = ({ user }) => {
     const getGoalsInMatch = (pId, mId) => allGoals.filter(g => g.player_id === pId && g.match_id === mId).length;
 
     // --- ACCIONES ---
+    const handleAddPlayer = async () => {
+        if (!newPlayer.name || !newPlayer.team_id) return alert("Faltan datos del jugador");
+        await axios.post(`${API_URL}/players`, newPlayer);
+        setNewPlayer({ name: '', team_id: '', is_goalkeeper: false });
+        loadData();
+    };
+
     const handleGoal = async (mId, pId, tId, side, action) => {
         const url = action === 'add' ? '/add-player-goal' : '/remove-player-goal';
         await axios.post(`${API_URL}${url}`, { match_id: mId, player_id: pId, team_id: tId, team_side: side });
@@ -111,12 +119,10 @@ const TournamentView = ({ user }) => {
                 onClick={() => isAdmin && setExpandedMatchId(isExp ? null : m.id)}
                 style={{ border: '1px solid #ddd', borderRadius: '15px', background: isFinished ? '#e8f5e9' : 'white', marginBottom: '15px', overflow:'hidden', boxShadow:'0 3px 6px rgba(0,0,0,0.05)', cursor: isAdmin ? 'pointer' : 'default' }}
             >
-                {/* CABECERA */}
                 <div style={{ background: isFinished ? '#c8e6c9' : '#f8f9fa', padding: '12px 15px', fontSize: '13px', borderBottom: '1px solid #eee', display:'flex', justifyContent:'space-between', fontWeight:'bold' }}>
                     <span>📅 {m.match_date ? m.match_date.split(' ')[0].split('-').reverse().join('/') : ''} {m.match_date ? m.match_date.split(' ')[1]?.slice(0,5) : ''}</span>
                     <span>🏟️ C{m.field} {m.referee && `| 👤 ${m.referee}`}</span>
                 </div>
-                
                 <div style={{ display: 'flex', padding: '15px 5px', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                     <div style={{ flex: '1 1 35%', textAlign: 'center' }}>
                         <img src={m.team_a_logo || 'https://via.placeholder.com/40'} width="40" height="40" style={{borderRadius:'50%'}} alt="logo" />
@@ -163,7 +169,7 @@ const TournamentView = ({ user }) => {
     const fM = matches.filter(m => m.phase.toLowerCase().includes('final'));
     const allGPlayed = matches.filter(m=>m.phase.toLowerCase().includes('grupo')).length > 0 && matches.filter(m=>m.phase.toLowerCase().includes('grupo')).every(m=>m.played);
 
-    if (loading) return <div style={{ padding: '100px 0', textAlign: 'center' }}>Cargando v3.5.7...</div>;
+    if (loading) return <div style={{ padding: '100px 0', textAlign: 'center' }}>Cargando v3.5.8...</div>;
 
     return (
         <div style={{ padding: '0 0 50px 0', fontFamily: 'Arial', maxWidth: '600px', margin: 'auto', background: '#f8f9fa', minHeight: '100vh' }}>
