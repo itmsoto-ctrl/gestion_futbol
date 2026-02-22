@@ -5,18 +5,24 @@ import { useParams, useNavigate } from 'react-router-dom';
 const TournamentView = ({ user }) => {
     const { id } = useParams();
     const navigate = useNavigate();
+    
+    // ESTADOS DE DATOS
     const [matches, setMatches] = useState([]);
     const [teams, setTeams] = useState([]);
     const [players, setPlayers] = useState([]);
     const [allGoals, setAllGoals] = useState([]);
     const [stats, setStats] = useState({ goleadores: [], porteros: [] });
     const [tournamentInfo, setTournamentInfo] = useState(null);
+
+    // ESTADOS DE INTERFAZ
     const [showTable, setShowTable] = useState(false);
     const [editingMatch, setEditingMatch] = useState(null);
     const [loading, setLoading] = useState(true);
     const [expandedMatchId, setExpandedMatchId] = useState(null);
     const [showResetMenu, setShowResetMenu] = useState(false);
     const [showActivateMenu, setShowActivateMenu] = useState(false);
+
+    // FORMULARIO JUGADORES
     const [newPlayer, setNewPlayer] = useState({ name: '', team_id: '', is_goalkeeper: false });
 
     const isAdmin = user?.role === 'admin';
@@ -32,18 +38,22 @@ const TournamentView = ({ user }) => {
                 axios.get(`${API_URL}/goals/${id}`),
                 axios.get(`${API_URL}/tournaments`)
             ]);
+            
             if (resM.status === 'fulfilled') setMatches(resM.value.data || []);
             if (resT.status === 'fulfilled') setTeams(resT.value.data || []);
             if (resP.status === 'fulfilled') setPlayers(resP.value.data || []);
             if (resS.status === 'fulfilled') setStats(resS.value.data || { goleadores: [], porteros: [] });
             if (resG.status === 'fulfilled') setAllGoals(resG.value.data || []);
-            if (resTourneys.status === 'fulfilled') setTournamentInfo(resTourneys.value.data.find(t => t.id === parseInt(id)));
-        } catch (error) { console.error(error); }
+            if (resTourneys.status === 'fulfilled') {
+                setTournamentInfo(resTourneys.value.data.find(t => t.id === parseInt(id)));
+            }
+        } catch (error) { console.error("Error:", error); }
         finally { setLoading(false); }
     }, [id, API_URL]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
+    // --- CLASIFICACIÓN REAL-TIME ---
     const standings = useMemo(() => {
         let table = {};
         teams.forEach(t => { table[t.id] = { id: t.id, name: t.name, logo: t.logo_url, pts: 0, gf: 0, gc: 0, pj: 0 }; });
@@ -62,12 +72,14 @@ const TournamentView = ({ user }) => {
             }
         });
         return Object.values(table).sort((a, b) => b.pts - a.pts || (b.gf - b.gc) - (a.gf - a.gc));
-    }, [matches, teams, tournamentInfo]);
+    }, [matches, teams]);
 
     const getTeamByRank = (rank) => standings[rank - 1] || { name: `${rank}º Clasif.`, id: null };
     const getWinnerId = (m) => (!m || m.team_a_goals === m.team_b_goals) ? null : (m.team_a_goals > m.team_b_goals ? m.team_a_id : m.team_b_id);
+    const getWinnerName = (m) => (!m || !m.played) ? 'Winner...' : (m.team_a_goals > m.team_b_goals ? m.team_a_name : m.team_b_name);
     const getGoalsInMatch = (pId, mId) => allGoals.filter(g => g.player_id === pId && g.match_id === mId).length;
 
+    // --- ACCIONES ---
     const handleAddPlayer = async () => {
         if (!newPlayer.name || !newPlayer.team_id) return alert("Faltan datos");
         await axios.post(`${API_URL}/players`, newPlayer);
@@ -75,8 +87,7 @@ const TournamentView = ({ user }) => {
         loadData();
     };
 
-    const handleGoal = async (e, mId, pId, tId, side, action) => {
-        e.stopPropagation();
+    const handleGoal = async (mId, pId, tId, side, action) => {
         const url = action === 'add' ? '/add-player-goal' : '/remove-player-goal';
         await axios.post(`${API_URL}${url}`, { match_id: mId, player_id: pId, team_id: tId, team_side: side });
         loadData();
@@ -89,7 +100,7 @@ const TournamentView = ({ user }) => {
     };
 
     const handleActivate = async (phase) => {
-        if (window.prompt(`Activar ${phase}:`) !== "0209") return alert("Error");
+        if (window.prompt(`Activar ${phase}:`) !== "0209") return alert("Código incorrecto");
         let pairings = [];
         const qM = matches.filter(m => m.phase.toLowerCase().includes('cuarto'));
         const sM = matches.filter(m => m.phase.toLowerCase().includes('semifinal'));
@@ -108,13 +119,15 @@ const TournamentView = ({ user }) => {
     const MatchCard = ({ m }) => {
         const isExp = expandedMatchId === m.id;
         const isFin = m.played === 1;
+
         const renderDateTime = () => {
             if (!m.match_date) return "S/F";
-            const parts = m.match_date.replace('T', ' ').split(' ');
-            if (parts.length < 2) return "S/F";
-            const [y, mon, d] = parts[0].split('-');
-            return `${parseInt(d)}/${parseInt(mon)} ${parts[1].slice(0, 5)}`;
+            const dateStr = m.match_date.replace('T', ' '); 
+            const [datePart, timePart] = dateStr.split(' ');
+            const [y, mon, d] = datePart.split('-');
+            return `${parseInt(d)}/${parseInt(mon)} ${timePart.slice(0, 5)}`;
         };
+
         return (
             <div style={{ border: '1px solid #ddd', borderRadius: '15px', background: isFin ? '#e8f5e9' : 'white', marginBottom: '15px', overflow:'hidden', boxShadow:'0 3px 6px rgba(0,0,0,0.05)' }}>
                 <div onClick={() => isAdmin && setExpandedMatchId(isExp ? null : m.id)}
@@ -122,21 +135,25 @@ const TournamentView = ({ user }) => {
                     <span>📅 {renderDateTime()}</span>
                     <span>🏟️ C{m.field} {m.referee && `| 👤 ${m.referee}`}</span>
                 </div>
-                <div style={{ display: 'flex', padding: '20px 5px 10px 5px', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', padding: '15px 5px', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                     <div style={{ flex: '1 1 35%', textAlign: 'center' }}>
-                        <img src={m.team_a_logo || 'https://via.placeholder.com/40'} width="40" height="40" style={{borderRadius:'50%'}} alt="logo" />
+                        <img src={m.team_a_logo || 'https://via.placeholder.com/40'} width="40" height="40" style={{borderRadius:'50%', objectFit: 'cover'}} alt="logo" />
                         <div style={{ fontWeight: 'bold', fontSize: '12px', margin:'5px 0' }}>{m.team_a_name || '???'}</div>
                         {isExp && isAdmin && !isFin && players.filter(p => p.team_id === m.team_a_id).map(p => {
                             const g = getGoalsInMatch(p.id, m.id);
                             return (
-                                <button key={p.id} onClick={(e) => handleGoal(e, m.id, p.id, m.team_a_id, 'team_a_goals', 'add')} style={{padding:'14px 4px', width:'95%', fontSize:13, fontWeight:'bold', borderRadius:10, background: g > 0 ? '#ffc107' : '#f0f4ff', marginBottom:8, border:'1px solid #ccc'}}>
-                                    ⚽ {p.name} {g > 0 ? `(${g})` : ''}
-                                </button>
+                                <div key={p.id} style={{display:'flex', alignItems:'center', marginBottom:12}}>
+                                    <button onClick={(e) => { e.stopPropagation(); handleGoal(e, m.id, p.id, m.team_a_id, 'team_a_goals', 'add'); }} 
+                                            style={{padding:'16px 4px', flex:1, fontSize:13, fontWeight:'bold', borderRadius:10, background: g > 0 ? '#ffc107' : '#f0f4ff', border:'1px solid #ccd'}}>
+                                        ⚽ {p.name} {g > 0 ? `(${g})` : ''}
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleGoal(e, m.id, p.id, m.team_a_id, 'team_a_goals', 'remove'); }} style={{marginLeft:8, color:'red', background:'none', border:'none', fontSize:30}}>-</button>
+                                </div>
                             );
                         })}
                     </div>
                     <div style={{ flex: '0 0 28%', textAlign: 'center', paddingTop: '10px' }}>
-                        <div style={{ fontSize: '32px', fontWeight: '900' }}>{m.team_a_goals} - {m.team_b_goals}</div>
+                        <div style={{ fontSize: '32px', fontWeight: '900', whiteSpace:'nowrap' }}>{m.team_a_goals} - {m.team_b_goals}</div>
                         {isExp && isAdmin && (
                             <button onClick={(e) => { e.stopPropagation(); isFin ? setEditingMatch({...m}) : axios.put(`${API_URL}/matches/${m.id}`, {...m, played:1}).then(()=>loadData()); }} style={{marginTop:20, padding:'10px 15px', background: isFin ? '#ffc107' : '#28a745', color: isFin ? '#000' : '#fff', border:'none', borderRadius:10, fontSize:12, fontWeight:'bold', width:'100%' }}>
                                 {isFin ? '✏️ EDITAR' : '✅ FINALIZAR'}
@@ -144,14 +161,18 @@ const TournamentView = ({ user }) => {
                         )}
                     </div>
                     <div style={{ flex: '1 1 35%', textAlign: 'center' }}>
-                        <img src={m.team_b_logo || 'https://via.placeholder.com/40'} width="40" height="40" style={{borderRadius:'50%'}} alt="logo" />
+                        <img src={m.team_b_logo || 'https://via.placeholder.com/40'} width="40" height="40" style={{borderRadius:'50%', objectFit: 'cover'}} alt="logo" />
                         <div style={{ fontWeight: 'bold', fontSize: '12px', margin:'5px 0' }}>{m.team_b_name || '???'}</div>
                         {isExp && isAdmin && !isFin && players.filter(p => p.team_id === m.team_b_id).map(p => {
                             const g = getGoalsInMatch(p.id, m.id);
                             return (
-                                <button key={p.id} onClick={(e) => handleGoal(e, m.id, p.id, m.team_b_id, 'team_b_goals', 'add')} style={{padding:'14px 4px', width:'95%', fontSize:13, fontWeight:'bold', borderRadius:10, background: g > 0 ? '#ffc107' : '#f0f4ff', marginBottom:8, border:'1px solid #ccc'}}>
-                                    {p.name} {g > 0 ? `(${g})` : ''} ⚽
-                                </button>
+                                <div key={p.id} style={{display:'flex', alignItems:'center', marginBottom:12}}>
+                                    <button onClick={(e) => { e.stopPropagation(); handleGoal(e, m.id, p.id, m.team_b_id, 'team_b_goals', 'remove'); }} style={{marginRight:8, color:'red', background:'none', border:'none', fontSize:30}}>-</button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleGoal(e, m.id, p.id, m.team_b_id, 'team_b_goals', 'add'); }} 
+                                            style={{padding:'16px 4px', flex:1, fontSize:13, fontWeight:'bold', borderRadius:10, background: g > 0 ? '#ffc107' : '#f0f4ff', border:'1px solid #ccd'}}>
+                                        {p.name} {g > 0 ? `(${g})` : ''} ⚽
+                                    </button>
+                                </div>
                             );
                         })}
                     </div>
@@ -164,12 +185,14 @@ const TournamentView = ({ user }) => {
     const sM = matches.filter(m => m.phase.toLowerCase().includes('semifinal'));
     const fM = matches.filter(m => m.phase.toLowerCase().includes('final'));
 
-    if (loading) return <div style={{ padding: '100px 0', textAlign: 'center' }}>v3.8.2 - Cargando...</div>;
+    if (loading) return <div style={{ padding: '100px 0', textAlign: 'center' }}>Cargando v3.8.3...</div>;
 
     return (
         <div style={{ padding: '0 0 50px 0', fontFamily: 'Arial', maxWidth: '600px', margin: 'auto', background: '#f8f9fa', minHeight: '100vh' }}>
+            {/* CABECERA */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#000', padding: '15px 20px', color: 'white', position: 'sticky', top: 0, zIndex: 1000 }}>
-                <button onClick={() => navigate('/dashboard')} style={{ background: 'none', color: 'white', border: 'none', fontSize:'24px' }}>←</button>
+                <button onClick={() => navigate('/dashboard')} style={{ background: 'none', color: 'white', border: 'none', fontSize:'20px' }}>←</button>
+                <div style={{textAlign:'center'}}><div style={{fontSize:'14px', fontWeight:'bold'}}>{tournamentInfo?.name}</div></div>
                 <div>
                     {isAdmin && <button onClick={() => setShowActivateMenu(!showActivateMenu)} style={{background:'#28a745', color:'#fff', border:'none', padding:'8px 12px', borderRadius:8, fontSize:11, marginRight:5, fontWeight:'bold'}}>ACTIVAR ⚡</button>}
                     {isAdmin && <button onClick={() => setShowResetMenu(!showResetMenu)} style={{background:'#dc3545', color:'#fff', border:'none', padding:'8px 12px', borderRadius:8, fontSize:11, marginRight:5, fontWeight:'bold'}}>RESET ⚙️</button>}
@@ -194,6 +217,7 @@ const TournamentView = ({ user }) => {
             )}
 
             <div style={{ padding: '15px' }}>
+                {/* 🏆 CUADRO DE PLAYOFFS DINÁMICO */}
                 {!showTable && tournamentInfo?.type === 'campeonato' && teams.length === 8 && (
                     <div style={{ background: '#fff', padding: '15px', borderRadius: '15px', marginBottom: '30px', border: '1px solid #eee', boxShadow:'0 4px 10px rgba(0,0,0,0.05)' }}>
                         <h4 style={{ textAlign: 'center', margin: '0 0 10px 0', fontSize: '11px', color: '#666' }}>🏆 CUADRO DE ELIMINATORIAS</h4>
@@ -208,17 +232,17 @@ const TournamentView = ({ user }) => {
                             </div>
                             <div style={{ flex: 1, display:'flex', flexDirection:'column', justifyContent:'space-around', fontSize:8, textAlign:'center', color:'#999' }}>
                                 <div style={{border:'1px dashed #ccc', padding:5, borderRadius:5, marginBottom:5}}>
-                                    <div>{sM[0] ? sM[0].team_a_name : 'Winner...'}</div>
-                                    <div style={{borderTop:'1px solid #eee'}}>{sM[0] ? sM[0].team_b_name : 'Winner...'}</div>
+                                    <div>{sM[0] ? sM[0].team_a_name : getWinnerName(qM[0])}</div>
+                                    <div style={{borderTop:'1px solid #eee'}}>{sM[0] ? sM[0].team_b_name : getWinnerName(qM[3])}</div>
                                 </div>
                                 <div style={{border:'1px dashed #ccc', padding:5, borderRadius:5}}>
-                                    <div>{sM[1] ? sM[1].team_a_name : 'Winner...'}</div>
-                                    <div style={{borderTop:'1px solid #eee'}}>{sM[1] ? sM[1].team_b_name : 'Winner...'}</div>
+                                    <div>{sM[1] ? sM[1].team_a_name : getWinnerName(qM[1])}</div>
+                                    <div style={{borderTop:'1px solid #eee'}}>{sM[1] ? sM[1].team_b_name : getWinnerName(qM[2])}</div>
                                 </div>
                             </div>
                             <div style={{ flex: 0.8, display:'flex', alignItems:'center' }}>
                                 <div style={{ height:'60px', width:'100%', background:'#fff3cd', border:'2px solid #ffeeba', borderRadius:'8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontSize:8, textAlign:'center' }}>
-                                    {/* LÓGICA ESTRICTA: SOLO MUESTRA SI EXISTE EL PARTIDO EN DB Y TIENE EQUIPO ASIGNADO */}
+                                    {/* LÓGICA ESTRICTA FINAL: SOLO SI EL REGISTRO EXISTE CON EQUIPOS ASIGNADOS */}
                                     <b>{(fM.length > 0 && fM[0].team_a_id) ? fM[0].team_a_name : 'Finalista 1'}</b>
                                     <div style={{fontSize:12, fontWeight:900}}>vs</div>
                                     <b>{(fM.length > 0 && fM[0].team_b_id) ? fM[0].team_b_name : 'Finalista 2'}</b>
@@ -257,7 +281,7 @@ const TournamentView = ({ user }) => {
                 )}
                 
                 {/* ESTADÍSTICAS */}
-                <div style={{ marginTop: '50px', background: 'white', padding: '20px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
+                <div style={{ marginTop: '50px', background: 'white', padding: '20px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
                     <h4 style={{margin: '0 0 15px 0', borderLeft: '5px solid #ffc107', paddingLeft: 10}}>🏆 Pichichi</h4>
                     {stats.goleadores.map((g, i) => <div key={i} style={{fontSize:13, padding:'10px 0', borderBottom:'1px solid #f1f1f1', display:'flex', justifyContent:'space-between'}}><span>{i+1}. {g.name} ({g.team_name})</span><b>{g.total} ⚽</b></div>)}
                     <h4 style={{margin: '30px 0 15px 0', borderLeft: '5px solid #0dcaf0', paddingLeft: 10}}>🧤 Zamora</h4>
