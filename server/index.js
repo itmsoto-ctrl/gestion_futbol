@@ -30,7 +30,7 @@ app.post('/reset-tournament/:id', (req, res) => {
     if (target === 'all') {
         db.query('DELETE FROM goals WHERE match_id IN (SELECT id FROM matches WHERE tournament_id = ?)', [tId], () => {
             db.query('DELETE FROM matches WHERE tournament_id = ? AND phase != "grupo"', [tId], () => {
-                db.query('UPDATE matches SET played = 0, team_a_goals = 0, team_b_goals = 0 WHERE tournament_id = ?', [tId], () => res.send("OK"));
+                db.query('UPDATE matches SET played = 0, team_a_goals = 0, team_b_goals = 0 WHERE tournament_id = ? AND phase = "grupo"', [tId], () => res.send("OK"));
             });
         });
     } else {
@@ -70,21 +70,26 @@ app.post('/remove-player-goal', (req, res) => {
 
 app.post('/activate-phase/:id', (req, res) => {
     const tId = req.params.id;
+    const { phase, pairings } = req.body;
     db.query('SELECT MAX(match_date) as last FROM matches WHERE tournament_id = ?', [tId], (err, r) => {
         let start = r[0].last ? new Date(new Date(r[0].last).getTime() + 30*60000) : new Date();
-        const matchesArr = req.body.pairings.map((p, i) => {
+        const matchesArr = pairings.map((p, i) => {
             let mt = new Date(start);
-            if (req.body.phase === 'cuartos') { if(i === 2 || i === 3) mt.setMinutes(mt.getMinutes() + 30); }
-            return [tId, p.a, p.b, formatDate(mt), p.field, req.body.phase];
+            if (phase === 'cuartos' && i >= 2) mt.setMinutes(mt.getMinutes() + 30);
+            return [tId, p.a, p.b, formatDate(mt), p.field, phase];
         });
-        db.query('INSERT INTO matches (tournament_id, team_a_id, team_b_id, match_date, field, phase) VALUES ?', [matchesArr], (errIns) => res.send("OK"));
+        db.query('INSERT INTO matches (tournament_id, team_a_id, team_b_id, match_date, field, phase) VALUES ?', [matchesArr], (errIns) => {
+            if (errIns) return res.status(500).send(errIns.message);
+            res.send("OK");
+        });
     });
 });
 
 app.get('/teams/:tId', (req, res) => { db.query('SELECT * FROM teams WHERE tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
 app.get('/players/:tId', (req, res) => { db.query('SELECT p.*, t.name as team_name FROM players p JOIN teams t ON p.team_id = t.id WHERE t.tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
-app.post('/players', (req, res) => { db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], () => res.send("OK")); });
-app.get('/goals/:tId', (req, res) => { db.query('SELECT g.* FROM goals g JOIN matches m ON g.match_id = m.id WHERE m.tournament_id = ?', [req.params.tId], (err, r) => res.send(r || [])); });
+app.post('/players', (req, res) => {
+    db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], () => res.send("OK"));
+});
 app.get('/stats/:tId', (req, res) => {
     const tId = req.params.tId;
     const sqlG = `SELECT p.name, t.name as team_name, COUNT(g.id) as total FROM goals g JOIN players p ON g.player_id = p.id JOIN teams t ON g.team_id = t.id WHERE t.tournament_id = ? GROUP BY p.id, p.name, t.name ORDER BY total DESC LIMIT 10`;
@@ -92,4 +97,4 @@ app.get('/stats/:tId', (req, res) => {
     db.query(sqlG, [tId], (err, g) => { db.query(sqlP, [tId], (err2, p) => res.send({ goleadores: g || [], porteros: p || [] })); });
 });
 
-app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.8.0 ready"));
+app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.8.2 ready"));
