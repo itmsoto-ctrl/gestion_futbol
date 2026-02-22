@@ -15,17 +15,25 @@ const db = mysql.createPool({
 
 const formatDate = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
 
+// --- RUTAS BÁSICAS ---
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
     db.query('SELECT * FROM users WHERE username = ? AND password = ? AND active = 1', [username, password], (err, result) => {
         if (result && result.length > 0) res.send(result[0]); else res.status(401).send("Error");
     });
 });
-
 app.get('/tournaments', (req, res) => { db.query('SELECT * FROM tournaments', (err, r) => res.send(r)); });
+app.post('/tournaments', (req, res) => {
+    db.query('INSERT INTO tournaments (name, type, status) VALUES (?, ?, "registro")', [req.body.name, req.body.type], (err, result) => res.send({ id: result.insertId }));
+});
 app.get('/teams/:tId', (req, res) => { db.query('SELECT * FROM teams WHERE tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
+app.post('/teams', (req, res) => { db.query('INSERT INTO teams (tournament_id, name, logo_url, group_num) VALUES (?, ?, ?, ?)', [req.body.tournament_id, req.body.name, req.body.logo_url, req.body.group_num], (err, result) => res.send(result)); });
+app.delete('/teams/:id', (req, res) => { db.query('DELETE FROM teams WHERE id = ?', [req.params.id], (err) => res.send("OK")); });
 app.get('/players/:tId', (req, res) => { db.query('SELECT p.*, t.name as team_name FROM players p JOIN teams t ON p.team_id = t.id WHERE t.tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
+app.post('/players', (req, res) => { db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], () => res.send("OK")); });
 app.get('/goals/:tId', (req, res) => { db.query('SELECT g.* FROM goals g JOIN matches m ON g.match_id = m.id WHERE m.tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
+
+// --- PARTIDOS ---
 app.get('/matches/:tId', (req, res) => {
     const sql = `SELECT m.*, t1.name as team_a_name, t1.logo_url as team_a_logo, t2.name as team_b_name, t2.logo_url as team_b_logo 
                  FROM matches m LEFT JOIN teams t1 ON m.team_a_id = t1.id LEFT JOIN teams t2 ON m.team_b_id = t2.id 
@@ -49,14 +57,14 @@ app.post('/add-player-goal', (req, res) => {
 
 app.post('/remove-player-goal', (req, res) => {
     const { match_id, player_id, team_id, team_side } = req.body;
-    db.query('DELETE FROM goals WHERE match_id = ? AND player_id = ? AND team_id = ? ORDER BY id DESC LIMIT 1', [match_id, player_id, team_id], (err, r) => {
-        if (r.affectedRows > 0) {
+    db.query('DELETE FROM goals WHERE match_id = ? AND player_id = ? AND team_id = ? ORDER BY id DESC LIMIT 1', [match_id, player_id, team_id], (err, result) => {
+        if (result.affectedRows > 0) {
             db.query(`UPDATE matches SET ${team_side} = CASE WHEN ${team_side} > 0 THEN ${team_side} - 1 ELSE 0 END WHERE id = ?`, [match_id], () => res.send("OK"));
         } else res.status(404).send("Error");
     });
 });
 
-// RESET MAESTRO SEGURO (3 pasos)
+// --- RESET MAESTRO (LOS 3 PASOS) ---
 app.post('/reset-tournament/:id', (req, res) => {
     const tId = req.params.id;
     db.query('DELETE FROM goals WHERE match_id IN (SELECT id FROM matches WHERE tournament_id = ?)', [tId], () => {
@@ -68,21 +76,38 @@ app.post('/reset-tournament/:id', (req, res) => {
     });
 });
 
+// --- GENERADORES ---
+app.post('/generate-schedule/:id', (req, res) => {
+    const tId = parseInt(req.params.id); const { startTime } = req.body;
+    db.query('SELECT * FROM teams WHERE tournament_id = ?', [tId], (err, teams) => {
+        const g1 = teams.filter(t => t.group_num == 1); const g2 = teams.filter(t => t.group_num == 2);
+        if (g1.length !== 4 || g2.length !== 4) return res.status(400).send("Grupos incompletos");
+        const p = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]]; let m = []; let start = new Date(startTime);
+        for (let i = 0; i < 3; i++) {
+            const time = formatDate(new Date(start.getTime() + (i * 30 * 60000)));
+            m.push([tId, g1[p[i*2][0]].id, g1[p[i*2][1]].id, time, 1, 'grupo']);
+            m.push([tId, g1[p[i*2+1][0]].id, g1[p[i*2+1][1]].id, time, 2, 'grupo']);
+        }
+        for (let i = 0; i < 3; i++) {
+            const time = formatDate(new Date(start.getTime() + ((i + 3) * 30 * 60000)));
+            m.push([tId, g2[p[i*2][0]].id, g2[p[i*2][1]].id, time, 1, 'grupo']);
+            m.push([tId, g2[p[i*2+1][0]].id, g2[p[i*2+1][1]].id, time, 2, 'grupo']);
+        }
+        db.query("INSERT INTO matches (tournament_id, team_a_id, team_b_id, match_date, field, phase) VALUES ?", [m], (errIns) => res.send("OK"));
+    });
+});
+
 app.post('/activate-phase/:id', (req, res) => {
     const tId = req.params.id;
     db.query('SELECT MAX(match_date) as last FROM matches WHERE tournament_id = ?', [tId], (err, r) => {
         let start = r[0].last ? new Date(new Date(r[0].last).getTime() + 30*60000) : new Date();
-        const mArr = req.body.pairings.map((p, i) => {
+        const matchesArr = req.body.pairings.map((p, i) => {
             let mt = new Date(start);
             if (req.body.phase === 'cuartos') { if(i === 2) mt.setMinutes(mt.getMinutes() + 30); if(i === 3) mt.setMinutes(mt.getMinutes() + 60); }
             return [tId, p.a, p.b, formatDate(mt), p.field, req.body.phase];
         });
-        db.query('INSERT INTO matches (tournament_id, team_a_id, team_b_id, match_date, field, phase) VALUES ?', [mArr], () => res.send("OK"));
+        db.query('INSERT INTO matches (tournament_id, team_a_id, team_b_id, match_date, field, phase) VALUES ?', [matchesArr], () => res.send("OK"));
     });
-});
-
-app.post('/players', (req, res) => {
-    db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], () => res.send("OK"));
 });
 
 app.get('/stats/:tId', (req, res) => {
@@ -92,4 +117,4 @@ app.get('/stats/:tId', (req, res) => {
     db.query(sqlG, [tId], (err, g) => { db.query(sqlP, [tId], (err2, p) => res.send({ goleadores: g || [], porteros: p || [] })); });
 });
 
-app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.5.4 ready"));
+app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.5.5 ready"));
