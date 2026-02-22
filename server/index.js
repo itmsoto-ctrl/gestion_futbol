@@ -24,6 +24,7 @@ app.post('/login', (req, res) => {
 
 app.get('/tournaments', (req, res) => { db.query('SELECT * FROM tournaments', (err, r) => res.send(r)); });
 
+// --- RESET MAESTRO MODULAR (v3.7.9) ---
 app.post('/reset-tournament/:id', (req, res) => {
     const tId = req.params.id;
     const { target } = req.body; 
@@ -38,6 +39,7 @@ app.post('/reset-tournament/:id', (req, res) => {
     }
 });
 
+// --- PARTIDOS Y GOLES (CORREGIDO: NO FINALIZA PARTIDO) ---
 app.get('/matches/:tId', (req, res) => {
     const sql = `SELECT m.*, t1.name as team_a_name, t1.logo_url as team_a_logo, t2.name as team_b_name, t2.logo_url as team_b_logo 
                  FROM matches m LEFT JOIN teams t1 ON m.team_a_id = t1.id LEFT JOIN teams t2 ON m.team_b_id = t2.id 
@@ -55,14 +57,15 @@ app.put('/matches/:id', (req, res) => {
 app.post('/add-player-goal', (req, res) => {
     const { match_id, player_id, team_id, team_side } = req.body;
     db.query('INSERT INTO goals (match_id, player_id, team_id) VALUES (?, ?, ?)', [match_id, player_id, team_id], () => {
-        db.query(`UPDATE matches SET ${team_side} = ${team_side} + 1, played = 1 WHERE id = ?`, [match_id], () => res.send("OK"));
+        // AQUÍ ESTABA EL ERROR: He quitado el 'played = 1'
+        db.query(`UPDATE matches SET ${team_side} = ${team_side} + 1 WHERE id = ?`, [match_id], () => res.send("OK"));
     });
 });
 
 app.post('/remove-player-goal', (req, res) => {
     const { match_id, player_id, team_id, team_side } = req.body;
-    db.query('DELETE FROM goals WHERE match_id = ? AND player_id = ? AND team_id = ? ORDER BY id DESC LIMIT 1', [match_id, player_id, team_id], (err, r) => {
-        if (r.affectedRows > 0) {
+    db.query('DELETE FROM goals WHERE match_id = ? AND player_id = ? AND team_id = ? ORDER BY id DESC LIMIT 1', [match_id, player_id, team_id], (err, result) => {
+        if (result && result.affectedRows > 0) {
             db.query(`UPDATE matches SET ${team_side} = CASE WHEN ${team_side} > 0 THEN ${team_side} - 1 ELSE 0 END WHERE id = ?`, [match_id], () => res.send("OK"));
         } else res.status(404).send("Error");
     });
@@ -75,10 +78,10 @@ app.post('/activate-phase/:id', (req, res) => {
         let start = r[0].last ? new Date(new Date(r[0].last).getTime() + 30*60000) : new Date();
         const matchesArr = pairings.map((p, i) => {
             let mt = new Date(start);
-            if (phase === 'cuartos') { if(i === 2) mt.setMinutes(mt.getMinutes() + 30); if(i === 3) mt.setMinutes(mt.getMinutes() + 60); }
+            if (phase === 'cuartos' && i >= 2) mt.setMinutes(mt.getMinutes() + 30);
             return [tId, p.a, p.b, formatDate(mt), p.field, phase];
         });
-        db.query('INSERT INTO matches (tournament_id, team_a_id, team_b_id, match_date, field, phase) VALUES ?', [matchesArr], () => res.send("OK"));
+        db.query('INSERT INTO matches (tournament_id, team_a_id, team_b_id, match_date, field, phase) VALUES ?', [matchesArr], (errIns) => res.send("OK"));
     });
 });
 
@@ -94,4 +97,4 @@ app.get('/stats/:tId', (req, res) => {
     db.query(sqlG, [tId], (err, g) => { db.query(sqlP, [tId], (err2, p) => res.send({ goleadores: g || [], porteros: p || [] })); });
 });
 
-app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.7.7 ready"));
+app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.7.9 ready"));
