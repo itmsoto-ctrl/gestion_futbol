@@ -24,6 +24,7 @@ app.post('/login', (req, res) => {
 
 app.get('/tournaments', (req, res) => { db.query('SELECT * FROM tournaments', (err, r) => res.send(r)); });
 
+// --- RESET MAESTRO MODULAR ---
 app.post('/reset-tournament/:id', (req, res) => {
     const tId = req.params.id;
     const { target } = req.body; 
@@ -70,12 +71,13 @@ app.post('/remove-player-goal', (req, res) => {
 
 app.post('/activate-phase/:id', (req, res) => {
     const tId = req.params.id;
+    const { phase, pairings } = req.body;
     db.query('SELECT MAX(match_date) as last FROM matches WHERE tournament_id = ?', [tId], (err, r) => {
         let start = r[0].last ? new Date(new Date(r[0].last).getTime() + 30*60000) : new Date();
-        const matchesArr = req.body.pairings.map((p, i) => {
+        const matchesArr = pairings.map((p, i) => {
             let mt = new Date(start);
-            if (req.body.phase === 'cuartos') { if(i === 2 || i === 3) mt.setMinutes(mt.getMinutes() + 30); }
-            return [tId, p.a, p.b, formatDate(mt), p.field, req.body.phase];
+            if (phase === 'cuartos' && (i === 2 || i === 3)) mt.setMinutes(mt.getMinutes() + 30);
+            return [tId, p.a, p.b, formatDate(mt), p.field, phase];
         });
         db.query('INSERT INTO matches (tournament_id, team_a_id, team_b_id, match_date, field, phase) VALUES ?', [matchesArr], (errIns) => res.send("OK"));
     });
@@ -92,4 +94,4 @@ app.get('/stats/:tId', (req, res) => {
     db.query(sqlG, [tId], (err, g) => { db.query(sqlP, [tId], (err2, p) => res.send({ goleadores: g || [], porteros: p || [] })); });
 });
 
-app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.8.0 ready"));
+app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.9 ready"));
