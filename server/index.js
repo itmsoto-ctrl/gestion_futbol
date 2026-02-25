@@ -24,7 +24,7 @@ app.post('/login', (req, res) => {
 
 app.get('/tournaments', (req, res) => { db.query('SELECT * FROM tournaments', (err, r) => res.send(r)); });
 
-// --- RESET MAESTRO MODULAR ---
+// --- RESET MAESTRO MODULAR (Búsqueda estricta) ---
 app.post('/reset-tournament/:id', (req, res) => {
     const tId = req.params.id;
     const { target } = req.body; 
@@ -35,7 +35,8 @@ app.post('/reset-tournament/:id', (req, res) => {
             });
         });
     } else {
-        db.query('DELETE FROM matches WHERE tournament_id = ? AND phase = ?', [tId, target], () => res.send("OK"));
+        // Aquí usamos comparación exacta (=) en lugar de LIKE para no borrar semis al querer borrar la final
+        db.query('DELETE FROM matches WHERE tournament_id = ? AND phase = ?', [tId, target], (err) => res.send("OK"));
     }
 });
 
@@ -94,4 +95,4 @@ app.get('/stats/:tId', (req, res) => {
     db.query(sqlG, [tId], (err, g) => { db.query(sqlP, [tId], (err2, p) => res.send({ goleadores: g || [], porteros: p || [] })); });
 });
 
-app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.9 ready"));
+app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.9.3 ready"));

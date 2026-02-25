@@ -47,19 +47,20 @@ const TournamentView = ({ user }) => {
             if (resTourneys.status === 'fulfilled') {
                 setTournamentInfo(resTourneys.value.data.find(t => t.id === parseInt(id)));
             }
-        } catch (error) { console.error(error); }
+        } catch (error) { console.error("Error:", error); }
         finally { setLoading(false); }
     }, [id, API_URL]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    // --- LÓGICA DE CLASIFICACIÓN ---
+    // --- LÓGICA DE CLASIFICACIÓN REAL-TIME ---
     const standings = useMemo(() => {
         let table = {};
         teams.forEach(t => { table[t.id] = { id: t.id, name: t.name, logo: t.logo_url, pts: 0, gf: 0, gc: 0, pj: 0 }; });
         matches.forEach(m => {
             const ph = m.phase?.toLowerCase() || '';
-            if (m.played && (ph.includes('grupo') || ph.includes('liga'))) {
+            // BÚSQUEDA ESTRICTA: Evita que 'semifinal' sea detectada como 'final'
+            if (m.played && (ph === 'grupo' || ph === 'liga')) {
                 const tA = table[m.team_a_id]; const tB = table[m.team_b_id];
                 if (tA && tB) {
                     tA.pj++; tB.pj++;
@@ -72,8 +73,9 @@ const TournamentView = ({ user }) => {
             }
         });
         return Object.values(table).sort((a, b) => b.pts - a.pts || (b.gf - b.gc) - (a.gf - a.gc));
-    }, [matches, teams]);
+    }, [matches, teams, tournamentInfo]);
 
+    // Helpers
     const getTeamByRank = (rank) => standings[rank - 1] || { name: `${rank}º Clasif.`, id: null };
     const getWinnerId = (m) => (!m || m.team_a_goals === m.team_b_goals) ? null : (m.team_a_goals > m.team_b_goals ? m.team_a_id : m.team_b_id);
     const getWinnerName = (m) => (!m || !m.played || !m.team_a_name) ? '???' : (m.team_a_goals > m.team_b_goals ? m.team_a_name : m.team_b_name);
@@ -88,7 +90,7 @@ const TournamentView = ({ user }) => {
     };
 
     const handleGoal = async (e, mId, pId, tId, side, action) => {
-        e.stopPropagation(); // IMPORTANTE: EVITA QUE LA CAJA SE CIERRE
+        e.stopPropagation();
         const url = action === 'add' ? '/add-player-goal' : '/remove-player-goal';
         await axios.post(`${API_URL}${url}`, { match_id: mId, player_id: pId, team_id: tId, team_side: side });
         loadData();
@@ -101,10 +103,10 @@ const TournamentView = ({ user }) => {
     };
 
     const handleActivate = async (phase) => {
-        if (window.prompt(`Activar ${phase}:`) !== "0209") return alert("Error");
+        if (window.prompt(`Activar ${phase}:`) !== "0209") return alert("Código incorrecto");
         let pairings = [];
-        const qM = matches.filter(m => m.phase.toLowerCase().includes('cuarto'));
-        const sM = matches.filter(m => m.phase.toLowerCase().includes('semifinal'));
+        const qM = matches.filter(m => m.phase === 'cuartos');
+        const sM = matches.filter(m => m.phase === 'semifinal');
         if (phase === 'cuartos') pairings = [{a: standings[0]?.id, b: standings[7]?.id, field: 1}, {a: standings[1]?.id, b: standings[6]?.id, field: 2}, {a: standings[2]?.id, b: standings[5]?.id, field: 1}, {a: standings[3]?.id, b: standings[4]?.id, field: 2}];
         else if (phase === 'semifinal') pairings = [{a: getWinnerId(qM[0]), b: getWinnerId(qM[3]), field: 1}, {a: getWinnerId(qM[1]), b: getWinnerId(qM[2]), field: 2}];
         else if (phase === 'final') pairings = [{a: getWinnerId(sM[0]), b: getWinnerId(sM[1]), field: 1}];
@@ -117,9 +119,9 @@ const TournamentView = ({ user }) => {
         setEditingMatch(null); loadData();
     };
 
-    // --- MÓDULO BANNER GRAN FINAL ---
+    // --- MÓDULO BANNER GRAN FINAL (Búsqueda Estricta) ---
     const FinalStatusBanner = () => {
-        const finalMatch = matches.find(m => m.phase.toLowerCase().includes('final'));
+        const finalMatch = matches.find(m => m.phase === 'final'); // Búsqueda estricta
         return (
             <div style={{
                 background: 'linear-gradient(135deg, #1a1a1a 0%, #333 100%)',
@@ -167,11 +169,7 @@ const TournamentView = ({ user }) => {
             const parts = m.match_date.replace('T', ' ').split(' ');
             if (parts.length < 2) return "S/F";
             const [y, mon, d] = parts[0].split('-');
-            return (
-                <span style={{ fontSize: '16px' }}>
-                    {parseInt(d)}/{parseInt(mon)} <b style={{ marginLeft: '5px' }}>{parts[1].slice(0, 5)}</b>
-                </span>
-            );
+            return `${parseInt(d)}/${parseInt(mon)} ${parts[1].slice(0, 5)}`;
         };
 
         return (
@@ -179,20 +177,20 @@ const TournamentView = ({ user }) => {
                 onClick={() => isAdmin && setExpandedMatchId(isExp ? null : m.id)}
                 style={{ border: '1px solid #ddd', borderRadius: '15px', background: isFin ? '#e8f5e9' : 'white', marginBottom: '15px', overflow:'hidden', boxShadow:'0 3px 6px rgba(0,0,0,0.05)', cursor: isAdmin ? 'pointer' : 'default' }}
             >
-                <div style={{ background: isFin ? '#c8e6c9' : '#f8f9fa', padding: '12px 15px', color: '#333', borderBottom: '1px solid #eee', display:'flex', justifyContent:'space-between', alignItems: 'center' }}>
+                <div style={{ background: isFin ? '#c8e6c9' : '#f8f9fa', padding: '12px 15px', fontSize: '15px', borderBottom: '1px solid #eee', display:'flex', justifyContent:'space-between', fontWeight:'bold', cursor:'pointer' }}>
                     <span>📅 {renderDateTime()}</span>
-                    <span style={{ fontSize: '13px', fontWeight: 'bold' }}>🏟️ C{m.field} {m.referee && `| 👤 ${m.referee}`}</span>
+                    <span>🏟️ C{m.field} {m.referee && `| 👤 ${m.referee}`}</span>
                 </div>
-                <div style={{ display: 'flex', padding: '20px 5px', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', padding: '20px 5px 10px 5px', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                     <div style={{ flex: '1 1 35%', textAlign: 'center' }}>
                         <img src={m.team_a_logo || 'https://via.placeholder.com/40'} width="40" height="40" style={{borderRadius:'50%', objectFit: 'cover'}} alt="logo" />
-                        <div style={{ fontWeight: 'bold', fontSize: '13px', margin:'5px 0' }}>{m.team_a_name || '???'}</div>
+                        <div style={{ fontWeight: 'bold', fontSize: '12px', margin:'5px 0' }}>{m.team_a_name || '???'}</div>
                         {isExp && isAdmin && !isFin && players.filter(p => p.team_id === m.team_a_id).map(p => {
                             const g = getGoalsInMatch(p.id, m.id);
                             return (
-                                <div key={p.id} style={{display:'flex', alignItems:'center', justifyContent:'center', marginBottom: 10}}>
-                                    <button onClick={(e) => handleGoal(e, m.id, p.id, m.team_a_id, 'team_a_goals', 'add')} style={{padding:'14px 4px', flex: 1, fontSize:13, fontWeight:'bold', borderRadius:10, background: g > 0 ? '#ffc107' : '#f0f4ff', border:'1px solid #ccd'}}>⚽ {p.name} {g > 0 ? `(${g})` : ''}</button>
-                                    <button onClick={(e) => handleGoal(e, m.id, p.id, m.team_a_id, 'team_a_goals', 'remove')} style={{marginLeft:5, color:'red', background:'none', border:'none', fontSize:25}}>×</button>
+                                <div key={p.id} style={{display:'flex', alignItems:'center', justifyContent:'center', marginBottom: 12}}>
+                                    <button onClick={(e) => handleGoal(e, m.id, p.id, m.team_a_id, 'team_a_goals', 'add')} style={{padding:'14px 4px', flex:1, fontSize:13, fontWeight:'bold', borderRadius:10, background: g > 0 ? '#ffc107' : '#f0f4ff', border:'1px solid #ccd'}}>⚽ {p.name} {g > 0 ? `(${g})` : ''}</button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleGoal(e, m.id, p.id, m.team_a_id, 'team_a_goals', 'remove'); }} style={{marginLeft:8, color:'red', background:'none', border:'none', fontSize:30}}>-</button>
                                 </div>
                             );
                         })}
@@ -211,9 +209,9 @@ const TournamentView = ({ user }) => {
                         {isExp && isAdmin && !isFin && players.filter(p => p.team_id === m.team_b_id).map(p => {
                             const g = getGoalsInMatch(p.id, m.id);
                             return (
-                                <div key={p.id} style={{display:'flex', alignItems:'center', justifyContent:'center', marginBottom: 10}}>
-                                    <button onClick={(e) => handleGoal(e, m.id, p.id, m.team_b_id, 'team_b_goals', 'remove')} style={{marginRight:5, color:'red', background:'none', border:'none', fontSize:25}}>×</button>
-                                    <button onClick={(e) => handleGoal(e, m.id, p.id, m.team_b_id, 'team_b_goals', 'add')} style={{padding:'14px 4px', flex:1, fontSize:13, fontWeight:'bold', borderRadius:10, background: g > 0 ? '#ffc107' : '#f0f4ff', border:'1px solid #ccd'}}>{p.name} {g > 0 ? `(${g})` : ''} ⚽</button>
+                                <div key={p.id} style={{display:'flex', alignItems:'center', justifyContent:'center', marginBottom: 12}}>
+                                    <button onClick={(e) => handleGoal(e, m.id, p.id, m.team_b_id, 'team_b_goals', 'remove')} style={{marginRight:8, color:'red', background:'none', border:'none', fontSize:30}}>-</button>
+                                    <button onClick={(e) => handleGoal(e, m.id, p.id, m.team_b_id, 'team_b_goals', 'add')} style={{padding:'16px 4px', flex:1, fontSize:13, fontWeight:'bold', borderRadius:10, background: g > 0 ? '#ffc107' : '#f0f4ff', border:'1px solid #ccd'}}> {p.name} {g > 0 ? `(${g})` : ''} ⚽</button>
                                 </div>
                             );
                         })}
@@ -223,11 +221,11 @@ const TournamentView = ({ user }) => {
         );
     };
 
-    const qM = matches.filter(m => m.phase.toLowerCase().includes('cuarto'));
-    const sM = matches.filter(m => m.phase.toLowerCase().includes('semifinal'));
-    const fM = matches.filter(m => m.phase.toLowerCase().includes('final'));
+    const qM = matches.filter(m => m.phase === 'cuartos');
+    const sM = matches.filter(m => m.phase === 'semifinal');
+    const fM = matches.filter(m => m.phase === 'final');
 
-    if (loading) return <div style={{ padding: '100px 0', textAlign: 'center' }}>Cargando v3.9.2...</div>;
+    if (loading) return <div style={{ padding: '100px 0', textAlign: 'center' }}>v3.9.3 - Cargando sistema...</div>;
 
     return (
         <div style={{ padding: '0 0 50px 0', fontFamily: 'Arial', maxWidth: '600px', margin: 'auto', background: '#f8f9fa', minHeight: '100vh' }}>
@@ -239,7 +237,7 @@ const TournamentView = ({ user }) => {
                     {isAdmin && <button onClick={() => setShowActivateMenu(!showActivateMenu)} style={{background:'#28a745', color:'#fff', border:'none', padding:'8px 12px', borderRadius:8, fontSize:11, marginRight:5, fontWeight:'bold'}}>ACT ⚡</button>}
                     {isAdmin && <button onClick={() => setShowResetMenu(!showResetMenu)} style={{background:'#dc3545', color:'#fff', border:'none', padding:'8px 12px', borderRadius:8, fontSize:11, marginRight:5, fontWeight:'bold'}}>RES ⚙️</button>}
                 </div>
-                <button onClick={() => setShowTable(!showTable)} style={{ background: '#007bff', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '8px', fontWeight:'bold' }}>{showTable ? '⚽' : '📊'}</button>
+                <button onClick={() => setShowTable(!showTable)} style={{ background: '#007bff', color: 'white', border: 'none', padding: '8px 15px', borderRadius: 8, fontWeight:'bold' }}>{showTable ? '⚽' : '📊'}</button>
             </div>
 
             {showResetMenu && (
@@ -259,8 +257,7 @@ const TournamentView = ({ user }) => {
             )}
 
             <div style={{ padding: '15px' }}>
-                
-                {/* 🏆 BANNER GRAN FINAL (SÓLO SI ES CAMPEONATO) */}
+                {/* 🏆 BANNER GRAN FINAL */}
                 {!showTable && tournamentInfo?.type === 'campeonato' && <FinalStatusBanner />}
 
                 {/* 🏆 CUADRO DE PLAYOFFS DINÁMICO */}
@@ -288,9 +285,10 @@ const TournamentView = ({ user }) => {
                             </div>
                             <div style={{ flex: 0.8, display:'flex', alignItems:'center' }}>
                                 <div style={{ height:'60px', width:'100%', background:'#fff3cd', border:'2px solid #ffeeba', borderRadius:'8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontSize:8, textAlign:'center' }}>
-                                    <b>Finalista 1</b>
+                                    {/* LÓGICA ESTRICTA FINAL: SOLO SI EXISTE EL PARTIDO EN DB Y TIENE EQUIPO ASIGNADO */}
+                                    <b>{(fM.length > 0 && fM[0].team_a_id) ? fM[0].team_a_name : 'Finalista 1'}</b>
                                     <div style={{fontSize:12, fontWeight:900}}>vs</div>
-                                    <b>Finalista 2</b>
+                                    <b>{(fM.length > 0 && fM[0].team_b_id) ? fM[0].team_b_name : 'Finalista 2'}</b>
                                 </div>
                             </div>
                         </div>
