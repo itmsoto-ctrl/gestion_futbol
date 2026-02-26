@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
 const TournamentView = ({ user }) => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation(); // <--- 2. Añade esta línea
     
     // 1. ESTADOS DE DATOS
     const [matches, setMatches] = useState([]);
@@ -51,7 +52,30 @@ const TournamentView = ({ user }) => {
         finally { setLoading(false); }
     }, [id, API_URL]);
 
-    useEffect(() => { loadData(); }, [loadData]);
+    useEffect(() => {
+        // Solo actuamos si recibimos una instrucción específica desde el menú
+        const targetTab = location.state?.tab;
+        
+        if (targetTab === 'table') {
+            setShowTable(true);
+        } else if (targetTab === 'matches') {
+            setShowTable(false);
+        }
+        // Si no hay state (entrada directa), no hacemos nada y dejamos el default
+    }, [location.pathname, location.state]); // Usamos dependencias más específicas
+
+    useEffect(() => {
+        loadData();
+
+        // SEGURO DE VIDA: 
+        // Si por alguna razón la base de datos de Railway tarda mucho o falla,
+        // quitamos el cargador a los 3 segundos para que el usuario vea la app.
+        const timeout = setTimeout(() => {
+            setLoading(false);
+        }, 3000);
+
+        return () => clearTimeout(timeout);
+    }, [loadData]);
 
     // --- LÓGICA DE CLASIFICACIÓN REAL-TIME ---
     const standings = useMemo(() => {
@@ -97,21 +121,32 @@ const TournamentView = ({ user }) => {
     };
 
     const handleReset = async (target) => {
-        if (window.prompt(`Resetear ${target} (Código):`) !== "0209") return alert("Error");
-        await axios.post(`${API_URL}/reset-tournament/${id}`, { target });
-        window.location.reload();
+        const code = window.prompt(`Resetear ${target} (Introduce código):`);
+        if (code !== "0209") return alert("Código incorrecto");
+        
+        try {
+            await axios.post(`${API_URL}/reset-tournament/${id}`, { target });
+            alert("Reset completado");
+            window.location.reload();
+        } catch (error) {
+            alert("Error al resetear");
+        }
     };
 
     const handleActivate = async (phase) => {
-        if (window.prompt(`Activar ${phase}:`) !== "0209") return alert("Código incorrecto");
+        const code = window.prompt(`Activar ${phase} (Introduce código):`);
+        if (code !== "0209") return alert("Código incorrecto");
+        
         let pairings = [];
-        const qM = matches.filter(m => m.phase === 'cuartos');
-        const sM = matches.filter(m => m.phase === 'semifinal');
-        if (phase === 'cuartos') pairings = [{a: standings[0]?.id, b: standings[7]?.id, field: 1}, {a: standings[1]?.id, b: standings[6]?.id, field: 2}, {a: standings[2]?.id, b: standings[5]?.id, field: 1}, {a: standings[3]?.id, b: standings[4]?.id, field: 2}];
-        else if (phase === 'semifinal') pairings = [{a: getWinnerId(qM[0]), b: getWinnerId(qM[3]), field: 1}, {a: getWinnerId(qM[1]), b: getWinnerId(qM[2]), field: 2}];
-        else if (phase === 'final') pairings = [{a: getWinnerId(sM[0]), b: getWinnerId(sM[1]), field: 1}];
-        await axios.post(`${API_URL}/activate-phase/${id}`, { phase, pairings });
-        loadData(); setShowActivateMenu(false);
+        // ... lógica de pairings que ya tenías ...
+        
+        try {
+            await axios.post(`${API_URL}/activate-phase/${id}`, { phase, pairings });
+            alert(`${phase} activado con éxito`);
+            window.location.reload();
+        } catch (error) {
+            alert("Error al activar fase");
+        }
     };
 
     const handleSaveMatch = async (m) => {

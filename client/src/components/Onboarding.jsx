@@ -1,0 +1,205 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import FutCard from './FutCard';
+import { ChevronLeft, Save, Loader2, Info, CheckCircle2 } from 'lucide-react';
+
+const API_URL = "https://gestionfutbol-production.up.railway.app";
+
+const Onboarding = ({ onComplete, editPlayer }) => {
+  const [step, setStep] = useState(1);
+  const [teams, setTeams] = useState([]);
+  const [players, setPlayers] = useState([]);
+  const [selectedTeam, setSelectedTeam] = useState(null);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [customData, setCustomData] = useState({ name: '', position: 'DC', dorsal: '' });
+  const [loading, setLoading] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    if (editPlayer) {
+      setSelectedPlayer(editPlayer);
+      setSelectedTeam({ 
+        id: editPlayer.team_id, 
+        name: editPlayer.team_name, 
+        logo_url: editPlayer.team_logo 
+      });
+      setCustomData({ 
+        name: editPlayer.name, 
+        position: editPlayer.position, 
+        dorsal: editPlayer.dorsal 
+      });
+      setStep(3);
+      setLoading(false);
+    } else {
+      axios.get(`${API_URL}/tournaments`).then(res => {
+        if (res.data.length > 0) {
+          const tId = res.data[res.data.length - 1].id;
+          axios.get(`${API_URL}/teams/${tId}`).then(resT => {
+            setTeams(resT.data);
+            setLoading(false);
+          });
+        }
+      }).catch(() => setLoading(false));
+    }
+  }, [editPlayer]);
+  
+  // ... resto del archivo que te pasé antes (asegúrate de no copiar textos sueltos)
+
+  const selectTeam = async (team) => {
+    setSelectedTeam(team);
+    setLoading(true);
+    const resP = await axios.get(`${API_URL}/players/${team.tournament_id || 1}`);
+    const teamPlayers = resP.data.filter(p => p.team_id === team.id);
+    setPlayers(teamPlayers);
+    setStep(2);
+    setLoading(false);
+  };
+
+  const handleSelectPlayer = (p) => {
+    setSelectedPlayer(p);
+    setCustomData({ ...customData, name: p.name });
+    setStep(3);
+  };
+
+  const finalize = () => {
+    // Si estamos editando, no hace falta mostrar la bienvenida otra vez
+    if (editPlayer) {
+      startApp();
+    } else {
+      setShowWelcome(true);
+    }
+  };
+
+  const startApp = () => {
+    const finalIdentity = {
+      ...selectedPlayer,
+      name: customData.name,
+      position: customData.position,
+      dorsal: customData.dorsal,
+      team_id: selectedTeam.id,
+      team_name: selectedTeam.name,
+      team_logo: selectedTeam.logo_url,
+      rating: 60,
+      stats: { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 }
+    };
+    // localStorage.setItem('my_player', JSON.stringify(finalIdentity)); // Descomentar para producción
+    onComplete(finalIdentity);
+  };
+
+  if (loading) return (
+    <div className="fixed inset-0 bg-zinc-950 flex flex-col items-center justify-center">
+      <Loader2 className="text-fut-gold animate-spin w-12 h-12 mb-4" />
+      <p className="text-fut-gold font-bold uppercase tracking-widest text-xs tracking-[0.3em]">Cargando...</p>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-[2000] bg-zinc-950 flex flex-col items-center justify-center p-6 overflow-y-auto">
+      
+      {step === 1 && (
+        <div className="w-full max-w-md animate-in fade-in duration-500">
+          <h2 className="text-fut-gold text-center text-2xl font-black mb-8 uppercase italic tracking-widest">
+            Selecciona <span className="text-white block text-3xl">tu equipo</span>
+          </h2>
+          <div className="grid grid-cols-2 gap-4">
+            {teams.map(team => (
+              <button key={team.id} onClick={() => selectTeam(team)} className="bg-zinc-900 border-2 border-zinc-800 p-4 rounded-2xl flex flex-col items-center active:scale-95 transition-all hover:border-fut-gold">
+                <img src={team.logo_url || 'https://via.placeholder.com/50'} className="w-14 h-14 object-contain mb-3" alt="" />
+                <span className="text-[10px] font-black uppercase text-zinc-400 text-center">{team.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="w-full flex flex-col items-center animate-in slide-in-from-right">
+          <button onClick={() => setStep(1)} className="absolute top-8 left-6 text-zinc-500 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest">
+            <ChevronLeft size={16}/> Volver
+          </button>
+          <h2 className="text-fut-gold text-center text-xl font-black mb-10 uppercase italic mt-10 tracking-tighter">Busca tu nombre</h2>
+          <div className="flex overflow-x-auto w-full gap-2 pb-10 snap-x no-scrollbar">
+            {players.map(p => (
+              <div key={p.id} onClick={() => handleSelectPlayer(p)} className="snap-center shrink-0 active:scale-95">
+              <FutCard player={{ ...p, rating: 60 }} size="medium" view="selection" /> {/* <--- AÑADE view="selection" */}
+            </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="w-full max-w-sm flex flex-col items-center animate-in zoom-in pb-10">
+          {!editPlayer && (
+            <button onClick={() => setStep(2)} className="absolute top-8 left-6 text-zinc-500 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest">
+              <ChevronLeft size={16}/> Volver
+            </button>
+          )}
+
+          <div className="drop-shadow-[0_20px_40px_rgba(212,175,55,0.3)]">
+            <FutCard player={{ ...selectedPlayer, name: customData.name, position: customData.position, rating: 60 }} />
+            view="selection"
+            size="medium"
+          </div>
+          
+          <div className="bg-zinc-900 w-full p-6 rounded-[35px] mt-8 border-t-2 border-fut-gold/50 shadow-2xl space-y-5">
+            <div>
+              <label className="text-[10px] text-fut-gold uppercase font-black block mb-2 ml-1">Nombre en la carta</label>
+              <input 
+                type="text" 
+                value={customData.name} 
+                onChange={e => setCustomData({...customData, name: e.target.value.toUpperCase()})}
+                className="w-full bg-zinc-800 border-2 border-zinc-700 focus:border-fut-gold rounded-2xl p-4 text-lg font-black text-white uppercase outline-none"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] text-zinc-500 uppercase font-black block mb-2 ml-1">Posición</label>
+                <select value={customData.position} onChange={e => setCustomData({...customData, position: e.target.value})} className="w-full bg-zinc-800 border-2 border-zinc-700 rounded-2xl p-4 text-sm font-black text-fut-gold appearance-none uppercase outline-none">
+                  {['PO','DFC','LI','LD','MC','MCO','DC','ED','EI'].map(pos => <option key={pos} value={pos}>{pos}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-zinc-500 uppercase font-black block mb-2 ml-1">Dorsal</label>
+                <input type="number" placeholder="00" value={customData.dorsal} onChange={e => setCustomData({...customData, dorsal: e.target.value})} className="w-full bg-zinc-800 border-2 border-zinc-700 rounded-2xl p-4 text-sm font-black text-white outline-none" />
+              </div>
+            </div>
+            <button onClick={finalize} className="w-full bg-fut-gold text-black font-black py-5 rounded-2xl mt-2 flex items-center justify-center gap-2 uppercase tracking-tighter shadow-lg active:scale-95 transition-all">
+              <Save size={18} /> {editPlayer ? 'Guardar Cambios' : 'Reclamar Identidad'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showWelcome && (
+        <div className="fixed inset-0 z-[3000] bg-black/95 flex items-center justify-center p-6 backdrop-blur-md animate-in fade-in">
+          <div className="bg-zinc-900 border-2 border-fut-gold w-full max-w-sm rounded-[40px] p-8 text-center shadow-[0_0_50px_rgba(212,175,55,0.2)]">
+            <div className="w-20 h-20 bg-fut-gold rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <Info size={40} className="text-black" />
+            </div>
+            <h2 className="text-white text-2xl font-black uppercase italic tracking-tighter mb-2 leading-none">¡Bienvenido al <br/> Torneo!</h2>
+            <p className="text-fut-gold font-bold text-sm mb-6 uppercase tracking-widest">Inauguración: 28/02</p>
+            
+            <div className="text-left space-y-4 mb-8">
+                <div className="bg-zinc-800/50 p-4 rounded-2xl border border-zinc-700">
+                    <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-3">Parámetros de Evolución:</p>
+                    <ul className="text-xs space-y-2 text-zinc-300 font-bold">
+                        <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-fut-gold"/> Partidos disputados</li>
+                        <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-fut-gold"/> Resultado del partido</li>
+                        <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-fut-gold"/> Goles anotados</li>
+                        <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-fut-gold"/> Puntos Votación MVP</li>
+                    </ul>
+                </div>
+            </div>
+
+            <button onClick={startApp} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase tracking-tighter text-sm shadow-xl active:scale-95 transition-all">
+                ¡A jugar!
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Onboarding;
