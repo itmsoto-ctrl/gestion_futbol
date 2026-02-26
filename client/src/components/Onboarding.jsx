@@ -4,34 +4,6 @@ import FutCard from './FutCard';
 import { ChevronLeft, Save, Loader2, Info, CheckCircle2 } from 'lucide-react';
 
 
-// Al principio del Onboarding.jsx añadir este step
-{step === 0 && (
-  <div className="w-full max-w-sm text-center animate-in fade-in zoom-in duration-500">
-    <div className="bg-zinc-900 p-8 rounded-[40px] border-2 border-fut-gold shadow-2xl">
-      <Trophy className="mx-auto text-fut-gold w-16 h-16 mb-6" />
-      <h2 className="text-white text-2xl font-black uppercase italic mb-8">¿Eres jugador <br/> del torneo?</h2>
-      <div className="space-y-4">
-        <button onClick={() => setStep(1)} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase tracking-tighter shadow-lg active:scale-95 transition-all">SÍ, QUIERO MI TARJETA</button>
-        <button onClick={() => setStep(-1)} className="w-full bg-zinc-800 text-zinc-400 font-bold py-4 rounded-2xl uppercase text-sm active:scale-95 transition-all">NO, SOY ESPECTADOR</button>
-      </div>
-    </div>
-  </div>
-)}
-
-{step === -1 && (
-  <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-6 z-[4000]">
-    <div className="bg-zinc-900 border-2 border-fut-gold p-8 rounded-[40px] text-center max-w-sm">
-      <Info size={48} className="text-fut-gold mx-auto mb-4" />
-      <p className="text-white font-bold mb-6">Has indicado que no eres jugador. Podrás seguir resultados, clasificaciones y votar al MVP.</p>
-      <button onClick={() => {
-        localStorage.setItem('is_guest', 'true');
-        onComplete({ name: 'ESPECTADOR', isGuest: true });
-      }} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase">CONTINUAR</button>
-    </div>
-  </div>
-)}
-
-
 const API_URL = "https://gestionfutbol-production.up.railway.app";
 
 const Onboarding = ({ onComplete, editPlayer }) => {
@@ -125,6 +97,32 @@ const Onboarding = ({ onComplete, editPlayer }) => {
   return (
     <div className="fixed inset-0 z-[2000] bg-zinc-950 flex flex-col items-center justify-center p-6 overflow-y-auto">
       
+      {step === 0 && (
+  <div className="w-full max-w-sm text-center animate-in fade-in zoom-in duration-500">
+    <div className="bg-zinc-900 p-8 rounded-[40px] border-2 border-fut-gold shadow-2xl">
+      <Trophy className="mx-auto text-fut-gold w-16 h-16 mb-6" />
+      <h2 className="text-white text-2xl font-black uppercase italic mb-8">¿Eres jugador <br/> del torneo?</h2>
+      <div className="space-y-4">
+        <button onClick={() => setStep(1)} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase tracking-tighter shadow-lg active:scale-95 transition-all">SÍ, QUIERO MI TARJETA</button>
+        <button onClick={() => setStep(-1)} className="w-full bg-zinc-800 text-zinc-400 font-bold py-4 rounded-2xl uppercase text-sm active:scale-95 transition-all">NO, SOY ESPECTADOR</button>
+      </div>
+    </div>
+  </div>
+)}
+
+{step === -1 && (
+  <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-6 z-[4000]">
+    <div className="bg-zinc-900 border-2 border-fut-gold p-8 rounded-[40px] text-center max-w-sm">
+      <Info size={48} className="text-fut-gold mx-auto mb-4" />
+      <p className="text-white font-bold mb-6">Has indicado que no eres jugador. Podrás seguir resultados, clasificaciones y votar al MVP.</p>
+      <button onClick={() => {
+        localStorage.setItem('is_guest', 'true');
+        onComplete({ name: 'ESPECTADOR', isGuest: true });
+      }} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase">CONTINUAR</button>
+    </div>
+  </div>
+)}
+
       {step === 1 && (
         <div className="w-full max-w-md animate-in fade-in duration-500">
           <h2 className="text-fut-gold text-center text-2xl font-black mb-8 uppercase italic tracking-widest">
