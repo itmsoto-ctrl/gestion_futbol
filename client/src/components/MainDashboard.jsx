@@ -47,23 +47,24 @@ const MainDashboard = ({ player, onEdit, onLogout }) => {
   }, [player]);
 
   const menuItems = [
-    { id: 'calendar', label: 'Calendario', icon: <Calendar />, action: () => navigate(`/tournament/${tId}`, { state: { tab: 'matches' } }) },
-    { id: 'standings', label: 'Posiciones', icon: <Table />, action: () => navigate(`/tournament/${tId}`, { state: { tab: 'table' } }) },
+    { id: 'calendar', label: 'Calendario', icon: <Calendar />, action: () => goTo('matches') },
+    { id: 'standings', label: 'Posiciones', icon: <Table />, action: () => goTo('table') },
     { id: 'players', label: 'Jugadores', icon: <Users />, action: () => {} },
-    { id: 'mvp', label: 'Votación MVP', icon: <Trophy />, action: () => navigate('/vote-mvp'), active: isMvpVotingActive },
-    { id: 'team_week', label: '11 Ideal', icon: <LayoutPanelTop />, action: () => {} },
+    { id: 'mvp_podium', label: 'PODIO MVP', icon: <Trophy />, action: () => navigate('/mvp-podium') }, // NUEVO BOTÓN
+    { id: 'mvp_vote', label: 'VOTACIÓN', icon: <Send />, action: () => navigate('/vote-mvp'), active: isMvpVotingActive },
     { id: 'logout', label: 'Salir', icon: <LogOut />, action: onLogout },
   ];
 
   return (
-    <div className={`h-[100dvh] flex flex-col overflow-hidden ${bgColor}`}>
-      {/* CABECERA */}
-      <div onClick={onEdit} className="pt-14 pb-4 flex flex-col items-center relative cursor-pointer active:scale-95 transition-all">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-[#f4f1e6]">
+      {/* CABECERA:bg-gen si es Guest o Admin */}
+      <div className="pt-14 pb-4 flex flex-col items-center relative">
         <div className="h-[160px] flex items-center justify-center scale-[0.52]">
-          <FutCard player={livePlayer} view="dashboard" />
+          <FutCard player={player} isGuest={player?.isGuest || isAdmin} view="dashboard" />
         </div>
-        <div className="text-center -mt-2">
-          <h2 className="text-zinc-900 text-xl font-black uppercase italic tracking-tighter leading-none">{livePlayer?.name}</h2>
+        <h2 className="text-zinc-900 text-xl font-black uppercase italic mt-[-10px]">
+            {isAdmin ? "ADMINISTRADOR" : (player?.isGuest ? "ESPECTADOR" : player?.name)}
+        </h2>
           <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.2em] mt-1 opacity-60">{livePlayer?.team_name}</p>
         </div>
       </div>

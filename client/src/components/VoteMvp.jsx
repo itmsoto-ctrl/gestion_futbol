@@ -26,6 +26,11 @@ const VoteMvp = ({ myPlayer }) => {
       try {
         setLoading(true);
         const resT = await axios.get(`${API_URL}/tournaments`);
+        // Dentro de useEffect de loadMatches
+const timeLeft = new Date(m.voting_ends_at) - new Date();
+if (timeLeft <= 0) {
+    // Si el tiempo se acabó, no mostrar este partido para votar
+}
         if (resT.data.length > 0) {
           const tId = resT.data[resT.data.length - 1].id;
           setActiveTid(tId);

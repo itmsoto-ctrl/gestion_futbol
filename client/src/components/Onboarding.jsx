@@ -7,7 +7,7 @@ import { ChevronLeft, Save, Loader2, Info, CheckCircle2 } from 'lucide-react';
 const API_URL = "https://gestionfutbol-production.up.railway.app";
 
 const Onboarding = ({ onComplete, editPlayer }) => {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [teams, setTeams] = useState([]);
   const [players, setPlayers] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -15,6 +15,7 @@ const Onboarding = ({ onComplete, editPlayer }) => {
   const [customData, setCustomData] = useState({ name: '', position: 'DC', dorsal: '' });
   const [loading, setLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
+ 
 
   useEffect(() => {
     if (editPlayer) {
