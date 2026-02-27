@@ -1,0 +1,1567 @@
+
+--- START OF FILE ./server/index.js ---
+require('dotenv').config();
+const express = require('express');
+const mysql = require('mysql2');
+const cors = require('cors');
+const app = express();
+app.use(cors()); app.use(express.json());
+
+const db = mysql.createPool({
+    host: process.env.MYSQLHOST,
+    user: process.env.MYSQLUSER,
+    password: process.env.MYSQLPASSWORD,
+    database: process.env.MYSQLDATABASE,
+    port: process.env.MYSQLPORT || 3306
+});
+
+const formatDate = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
+
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    db.query('SELECT * FROM users WHERE username = ? AND password = ? AND active = 1', [username, password], (err, result) => {
+        if (result && result.length > 0) res.send(result[0]); else res.status(401).send("Error");
+    });
+});
+
+app.get('/tournaments', (req, res) => { db.query('SELECT * FROM tournaments', (err, r) => res.send(r)); });
+
+// --- RESET MAESTRO MODULAR (Búsqueda estricta) ---
+app.post('/reset-tournament/:id', (req, res) => {
+    const tId = req.params.id;
+    const { target } = req.body; 
+    if (target === 'all') {
+        db.query('DELETE FROM goals WHERE match_id IN (SELECT id FROM matches WHERE tournament_id = ?)', [tId], () => {
+            db.query('DELETE FROM matches WHERE tournament_id = ? AND phase != "grupo"', [tId], () => {
+                db.query('UPDATE matches SET played = 0, team_a_goals = 0, team_b_goals = 0 WHERE tournament_id = ?', [tId], () => res.send("OK"));
+            });
+        });
+    } else {
+        // Aquí usamos comparación exacta (=) en lugar de LIKE para no borrar semis al querer borrar la final
+        db.query('DELETE FROM matches WHERE tournament_id = ? AND phase = ?', [tId, target], (err) => res.send("OK"));
+    }
+});
+
+app.get('/matches/:tId', (req, res) => {
+    const sql = `SELECT m.*, t1.name as team_a_name, t1.logo_url as team_a_logo, t2.name as team_b_name, t2.logo_url as team_b_logo 
+                 FROM matches m LEFT JOIN teams t1 ON m.team_a_id = t1.id LEFT JOIN teams t2 ON m.team_b_id = t2.id 
+                 WHERE m.tournament_id = ? ORDER BY m.match_date ASC, m.id ASC`;
+    db.query(sql, [req.params.tId], (err, r) => res.send(r));
+});
+
+app.put('/matches/:id', (req, res) => {
+    const { team_a_goals, team_b_goals, played, referee, match_date } = req.body;
+    const date = match_date ? match_date.replace('T', ' ').slice(0, 19) : null;
+    db.query('UPDATE matches SET team_a_goals=?, team_b_goals=?, played=?, referee=?, match_date=? WHERE id=?', 
+    [team_a_goals, team_b_goals, played, referee, date, req.params.id], (err) => res.send("OK"));
+});
+
+app.post('/add-player-goal', (req, res) => {
+    const { match_id, player_id, team_id, team_side } = req.body;
+    db.query('INSERT INTO goals (match_id, player_id, team_id) VALUES (?, ?, ?)', [match_id, player_id, team_id], () => {
+        db.query(`UPDATE matches SET ${team_side} = ${team_side} + 1 WHERE id = ?`, [match_id], () => res.send("OK"));
+    });
+});
+
+app.post('/remove-player-goal', (req, res) => {
+    const { match_id, player_id, team_id, team_side } = req.body;
+    db.query('DELETE FROM goals WHERE match_id = ? AND player_id = ? AND team_id = ? ORDER BY id DESC LIMIT 1', [match_id, player_id, team_id], (err, result) => {
+        if (result && result.affectedRows > 0) {
+            db.query(`UPDATE matches SET ${team_side} = CASE WHEN ${team_side} > 0 THEN ${team_side} - 1 ELSE 0 END WHERE id = ?`, [match_id], () => res.send("OK"));
+        } else res.status(404).send("Error");
+    });
+});
+
+app.post('/activate-phase/:id', (req, res) => {
+    const tId = req.params.id;
+    const { phase, pairings } = req.body;
+    db.query('SELECT MAX(match_date) as last FROM matches WHERE tournament_id = ?', [tId], (err, r) => {
+        let start = r[0].last ? new Date(new Date(r[0].last).getTime() + 30*60000) : new Date();
+        const matchesArr = pairings.map((p, i) => {
+            let mt = new Date(start);
+            if (phase === 'cuartos' && (i === 2 || i === 3)) mt.setMinutes(mt.getMinutes() + 30);
+            return [tId, p.a, p.b, formatDate(mt), p.field, phase];
+        });
+        db.query('INSERT INTO matches (tournament_id, team_a_id, team_b_id, match_date, field, phase) VALUES ?', [matchesArr], (errIns) => res.send("OK"));
+    });
+});
+
+app.get('/teams/:tId', (req, res) => { db.query('SELECT * FROM teams WHERE tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
+app.get('/players/:tId', (req, res) => { db.query('SELECT p.*, t.name as team_name FROM players p JOIN teams t ON p.team_id = t.id WHERE t.tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
+app.post('/players', (req, res) => { db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], () => res.send("OK")); });
+app.get('/goals/:tId', (req, res) => { db.query('SELECT g.* FROM goals g JOIN matches m ON g.match_id = m.id WHERE m.tournament_id = ?', [req.params.tId], (err, r) => res.send(r || [])); });
+app.get('/stats/:tId', (req, res) => {
+    const tId = req.params.tId;
+    const sqlG = `SELECT p.name, t.name as team_name, COUNT(g.id) as total FROM goals g JOIN players p ON g.player_id = p.id JOIN teams t ON g.team_id = t.id WHERE t.tournament_id = ? GROUP BY p.id, p.name, t.name ORDER BY total DESC LIMIT 10`;
+    const sqlP = `SELECT p.name, t.name as team_name, (SELECT COUNT(*) FROM goals g2 JOIN matches m ON g2.match_id = m.id WHERE (m.team_a_id = t.id OR m.team_b_id = t.id) AND g2.team_id != t.id) as against FROM players p JOIN teams t ON p.team_id = t.id WHERE t.tournament_id = ? AND p.is_goalkeeper = 1 GROUP BY p.id, p.name, t.name ORDER BY against ASC LIMIT 10`;
+    db.query(sqlG, [tId], (err, g) => { db.query(sqlP, [tId], (err2, p) => res.send({ goleadores: g || [], porteros: p || [] })); });
+});
+// RUTA PARA GUARDAR VOTOS MVP
+// RUTA PARA GUARDAR LOS VOTOS EN RAILWAY
+app.post('/submit-votes', (req, res) => {
+    const { match_id, voter_id, votes } = req.body; 
+
+    if (!match_id || !voter_id || !votes || votes.length < 5) {
+        return res.status(400).send("Faltan datos o votos incompletos");
+    }
+
+    // 1. Verificamos si este usuario ya votó en este partido
+    const checkSql = 'SELECT * FROM votes WHERE match_id = ? AND voter_id = ?';
+    db.query(checkSql, [match_id, voter_id], (err, results) => {
+        if (err) return res.status(500).send(err);
+        if (results.length > 0) return res.status(400).send("Ya has votado en este partido");
+
+        // 2. Preparamos los datos para insertar (Array de Arrays)
+        const values = votes.map(v => [match_id, voter_id, v.player_id, v.points]);
+
+        // 3. Insertamos los 5 votos de una sola vez
+        const sql = 'INSERT INTO votes (match_id, voter_id, player_id, points) VALUES ?';
+        db.query(sql, [values], (err, result) => {
+            if (err) {
+                console.error("Error MySQL:", err);
+                return res.status(500).send(err);
+            }
+            res.send("¡Votación guardada con éxito!");
+        });
+    });
+});
+
+// RUTA PARA OBTENER EL RATING ACTUALIZADO DE UN JUGADOR
+app.get('/player-rating/:id', (req, res) => {
+    const playerId = req.params.id;
+    // Fórmula: 60 base + puntos de votos
+    const sql = `
+        SELECT p.*, 
+        (60 + COALESCE(SUM(v.points), 0)) as current_rating 
+        FROM players p 
+        LEFT JOIN votes v ON p.id = v.player_id 
+        WHERE p.id = ?
+    `;
+    db.query(sql, [playerId], (err, result) => {
+        if (err) return res.status(500).send(err);
+        res.json(result[0]);
+    });
+});
+
+// --- RUTA PARA GUARDAR VOTOS MVP (Añadir a index.js en el server) ---
+app.post('/submit-votes', (req, res) => {
+    const { match_id, voter_id, votes } = req.body; 
+
+    // Validación de seguridad
+    if (!match_id || !voter_id || !votes || votes.length < 5) {
+        return res.status(400).send("Datos incompletos para la votación");
+    }
+
+    // 1. Verificamos si este jugador ya votó en este partido
+    const checkSql = 'SELECT * FROM votes WHERE match_id = ? AND voter_id = ?';
+    db.query(checkSql, [match_id, voter_id], (err, results) => {
+        if (err) return res.status(500).send("Error en la base de datos");
+        
+        if (results.length > 0) {
+            return res.status(400).send("Lo sentimos, ya has votado en este partido anteriormente.");
+        }
+
+        // 2. Preparamos los datos (MySQL espera un Array de Arrays para el insert masivo)
+        const values = votes.map(v => [
+            match_id, 
+            voter_id, 
+            v.player_id, 
+            v.points
+        ]);
+
+        // 3. Insertamos los 5 votos de una sola vez
+        const sql = 'INSERT INTO votes (match_id, voter_id, player_id, points) VALUES ?';
+        
+        db.query(sql, [values], (err, result) => {
+            if (err) {
+                console.error("Error al insertar votos:", err);
+                return res.status(500).send("Fallo al registrar los votos");
+            }
+            res.send("¡Votos registrados correctamente!");
+        });
+    });
+});
+
+app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.9.3 ready"));
+--- END OF FILE ./server/index.js ---
+
+--- START OF FILE ./server/package.json ---
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "Backend para gestion de futbol",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "mysql2": "^3.9.2"
+  }
+}
+
+--- END OF FILE ./server/package.json ---
+
+--- START OF FILE ./client/tailwind.config.js ---
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+    content: [
+      "./src/**/*.{js,jsx,ts,tsx}",
+    ],
+    theme: {
+      extend: {
+        colors: {
+          'fut-gold': '#d4af37',
+          'fut-dark': '#1a1a1a',
+        },
+      },
+    },
+    plugins: [],
+  }
+--- END OF FILE ./client/tailwind.config.js ---
+
+--- START OF FILE ./client/package.json ---
+{
+  "name": "client",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^13.5.0",
+    "autoprefixer": "^10.4.20",
+    "axios": "^1.13.5",
+    "framer-motion": "^12.34.3",
+    "lucide-react": "^0.574.0",
+    "postcss": "^8.4.49",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.13.0",
+    "react-scripts": "5.0.1",
+    "tailwindcss": "^3.4.17",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
+
+--- END OF FILE ./client/package.json ---
+
+--- START OF FILE ./client/postcss.config.js ---
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+
+--- END OF FILE ./client/postcss.config.js ---
+
+--- START OF FILE ./client/src/TournamentView.js ---
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import axios from 'axios';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+
+const TournamentView = ({ user }) => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const location = useLocation(); // <--- 2. Añade esta línea
+    
+    // 1. ESTADOS DE DATOS
+    const [matches, setMatches] = useState([]);
+    const [teams, setTeams] = useState([]);
+    const [players, setPlayers] = useState([]);
+    const [allGoals, setAllGoals] = useState([]);
+    const [stats, setStats] = useState({ goleadores: [], porteros: [] });
+    const [tournamentInfo, setTournamentInfo] = useState(null);
+
+    // 2. ESTADOS DE INTERFAZ
+    const [showTable, setShowTable] = useState(false);
+    const [editingMatch, setEditingMatch] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [expandedMatchId, setExpandedMatchId] = useState(null);
+    const [showResetMenu, setShowResetMenu] = useState(false);
+    const [showActivateMenu, setShowActivateMenu] = useState(false);
+
+    // 3. FORMULARIO JUGADORES
+    const [newPlayer, setNewPlayer] = useState({ name: '', team_id: '', is_goalkeeper: false });
+
+    const isAdmin = user?.role === 'admin';
+    const API_URL = "https://gestionfutbol-production.up.railway.app";
+
+    const loadData = useCallback(async () => {
+        try {
+            const [resM, resT, resP, resS, resG, resTourneys] = await Promise.allSettled([
+                axios.get(`${API_URL}/matches/${id}`),
+                axios.get(`${API_URL}/teams/${id}`),
+                axios.get(`${API_URL}/players/${id}`),
+                axios.get(`${API_URL}/stats/${id}`),
+                axios.get(`${API_URL}/goals/${id}`),
+                axios.get(`${API_URL}/tournaments`)
+            ]);
+            
+            if (resM.status === 'fulfilled') setMatches(resM.value.data || []);
+            if (resT.status === 'fulfilled') setTeams(resT.value.data || []);
+            if (resP.status === 'fulfilled') setPlayers(resP.value.data || []);
+            if (resS.status === 'fulfilled') setStats(resS.value.data || { goleadores: [], porteros: [] });
+            if (resG.status === 'fulfilled') setAllGoals(resG.value.data || []);
+            if (resTourneys.status === 'fulfilled') {
+                setTournamentInfo(resTourneys.value.data.find(t => t.id === parseInt(id)));
+            }
+        } catch (error) { console.error("Error:", error); }
+        finally { setLoading(false); }
+    }, [id, API_URL]);
+
+    useEffect(() => {
+        // Solo actuamos si recibimos una instrucción específica desde el menú
+        const targetTab = location.state?.tab;
+        
+        if (targetTab === 'table') {
+            setShowTable(true);
+        } else if (targetTab === 'matches') {
+            setShowTable(false);
+        }
+        // Si no hay state (entrada directa), no hacemos nada y dejamos el default
+    }, [location.pathname, location.state]); // Usamos dependencias más específicas
+
+    useEffect(() => {
+        loadData();
+
+        // SEGURO DE VIDA: 
+        // Si por alguna razón la base de datos de Railway tarda mucho o falla,
+        // quitamos el cargador a los 3 segundos para que el usuario vea la app.
+        const timeout = setTimeout(() => {
+            setLoading(false);
+        }, 3000);
+
+        return () => clearTimeout(timeout);
+    }, [loadData]);
+
+    // --- LÓGICA DE CLASIFICACIÓN REAL-TIME ---
+    const standings = useMemo(() => {
+        let table = {};
+        teams.forEach(t => { table[t.id] = { id: t.id, name: t.name, logo: t.logo_url, pts: 0, gf: 0, gc: 0, pj: 0 }; });
+        matches.forEach(m => {
+            const ph = m.phase?.toLowerCase() || '';
+            // BÚSQUEDA ESTRICTA: Evita que 'semifinal' sea detectada como 'final'
+            if (m.played && (ph === 'grupo' || ph === 'liga')) {
+                const tA = table[m.team_a_id]; const tB = table[m.team_b_id];
+                if (tA && tB) {
+                    tA.pj++; tB.pj++;
+                    tA.gf += m.team_a_goals; tA.gc += m.team_b_goals;
+                    tB.gf += m.team_b_goals; tB.gc += m.team_a_goals;
+                    if (m.team_a_goals > m.team_b_goals) tA.pts += 2;
+                    else if (m.team_a_goals < m.team_b_goals) tB.pts += 2;
+                    else { tA.pts += 1; tB.pts += 1; }
+                }
+            }
+        });
+        return Object.values(table).sort((a, b) => b.pts - a.pts || (b.gf - b.gc) - (a.gf - a.gc));
+    }, [matches, teams, tournamentInfo]);
+
+    // Helpers
+    const getTeamByRank = (rank) => standings[rank - 1] || { name: `${rank}º Clasif.`, id: null };
+    const getWinnerId = (m) => (!m || m.team_a_goals === m.team_b_goals) ? null : (m.team_a_goals > m.team_b_goals ? m.team_a_id : m.team_b_id);
+    const getWinnerName = (m) => (!m || !m.played || !m.team_a_name) ? '???' : (m.team_a_goals > m.team_b_goals ? m.team_a_name : m.team_b_name);
+    const getGoalsInMatch = (pId, mId) => allGoals.filter(g => g.player_id === pId && g.match_id === mId).length;
+
+    // --- ACCIONES ---
+    const handleAddPlayer = async () => {
+        if (!newPlayer.name || !newPlayer.team_id) return alert("Faltan datos");
+        await axios.post(`${API_URL}/players`, newPlayer);
+        setNewPlayer({ name: '', team_id: '', is_goalkeeper: false });
+        loadData();
+    };
+
+    const handleGoal = async (e, mId, pId, tId, side, action) => {
+        e.stopPropagation();
+        const url = action === 'add' ? '/add-player-goal' : '/remove-player-goal';
+        await axios.post(`${API_URL}${url}`, { match_id: mId, player_id: pId, team_id: tId, team_side: side });
+        loadData();
+    };
+
+    const handleReset = async (target) => {
+        const code = window.prompt(`Resetear ${target} (Introduce código):`);
+        if (code !== "0209") return alert("Código incorrecto");
+        
+        try {
+            await axios.post(`${API_URL}/reset-tournament/${id}`, { target });
+            alert("Reset completado");
+            window.location.reload();
+        } catch (error) {
+            alert("Error al resetear");
+        }
+    };
+
+    const handleActivate = async (phase) => {
+        const code = window.prompt(`Activar ${phase} (Introduce código):`);
+        if (code !== "0209") return alert("Código incorrecto");
+        
+        let pairings = [];
+        // ... lógica de pairings que ya tenías ...
+        
+        try {
+            await axios.post(`${API_URL}/activate-phase/${id}`, { phase, pairings });
+            alert(`${phase} activado con éxito`);
+            window.location.reload();
+        } catch (error) {
+            alert("Error al activar fase");
+        }
+    };
+
+    const handleSaveMatch = async (m) => {
+        await axios.put(`${API_URL}/matches/${m.id}`, {...m, played: 0});
+        setEditingMatch(null); loadData();
+    };
+
+    // --- MÓDULO BANNER GRAN FINAL (Búsqueda Estricta) ---
+    const FinalStatusBanner = () => {
+        const finalMatch = matches.find(m => m.phase === 'final'); // Búsqueda estricta
+        return (
+            <div style={{
+                background: 'linear-gradient(135deg, #1a1a1a 0%, #333 100%)',
+                padding: '20px 10px',
+                borderRadius: '15px',
+                marginBottom: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-around',
+                color: '#fff',
+                border: '3px solid #d4af37',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+                textAlign: 'center'
+            }}>
+                <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '10px', color: '#d4af37', fontWeight: 'bold', marginBottom: '5px' }}>FINALISTA 1</div>
+                    <div style={{ fontSize: '16px', fontWeight: '900', textTransform: 'uppercase' }}>
+                        {finalMatch?.team_a_name ? finalMatch.team_a_name : 'FINALISTA 1'}
+                    </div>
+                </div>
+                <div style={{ flex: 0.4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <span style={{ fontSize: '40px' }}>🏆</span>
+                    {finalMatch && (
+                        <div style={{ background: '#d4af37', color: '#000', padding: '2px 12px', borderRadius: '6px', fontWeight: '900', fontSize: '22px', marginTop: '5px' }}>
+                            {finalMatch.team_a_goals} - {finalMatch.team_b_goals}
+                        </div>
+                    )}
+                </div>
+                <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '10px', color: '#d4af37', fontWeight: 'bold', marginBottom: '5px' }}>FINALISTA 2</div>
+                    <div style={{ fontSize: '16px', fontWeight: '900', textTransform: 'uppercase' }}>
+                        {finalMatch?.team_b_name ? finalMatch.team_b_name : 'FINALISTA 2'}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const MatchCard = ({ m }) => {
+        const isExp = expandedMatchId === m.id;
+        const isFin = m.played === 1;
+
+        const renderDateTime = () => {
+            if (!m.match_date) return "S/F";
+            const parts = m.match_date.replace('T', ' ').split(' ');
+            if (parts.length < 2) return "S/F";
+            const [y, mon, d] = parts[0].split('-');
+            return `${parseInt(d)}/${parseInt(mon)} ${parts[1].slice(0, 5)}`;
+        };
+
+        return (
+            <div 
+                onClick={() => isAdmin && setExpandedMatchId(isExp ? null : m.id)}
+                style={{ border: '1px solid #ddd', borderRadius: '15px', background: isFin ? '#e8f5e9' : 'white', marginBottom: '15px', overflow:'hidden', boxShadow:'0 3px 6px rgba(0,0,0,0.05)', cursor: isAdmin ? 'pointer' : 'default' }}
+            >
+                <div style={{ background: isFin ? '#c8e6c9' : '#f8f9fa', padding: '12px 15px', fontSize: '15px', borderBottom: '1px solid #eee', display:'flex', justifyContent:'space-between', fontWeight:'bold', cursor:'pointer' }}>
+                    <span>📅 {renderDateTime()}</span>
+                    <span>🏟️ C{m.field} {m.referee && `| 👤 ${m.referee}`}</span>
+                </div>
+                <div style={{ display: 'flex', padding: '20px 5px 10px 5px', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                    <div style={{ flex: '1 1 35%', textAlign: 'center' }}>
+                        <img src={m.team_a_logo || 'https://via.placeholder.com/40'} width="40" height="40" style={{borderRadius:'50%', objectFit: 'cover'}} alt="logo" />
+                        <div style={{ fontWeight: 'bold', fontSize: '12px', margin:'5px 0' }}>{m.team_a_name || '???'}</div>
+                        {isExp && isAdmin && !isFin && players.filter(p => p.team_id === m.team_a_id).map(p => {
+                            const g = getGoalsInMatch(p.id, m.id);
+                            return (
+                                <div key={p.id} style={{display:'flex', alignItems:'center', justifyContent:'center', marginBottom: 12}}>
+                                    <button onClick={(e) => handleGoal(e, m.id, p.id, m.team_a_id, 'team_a_goals', 'add')} style={{padding:'14px 4px', flex:1, fontSize:13, fontWeight:'bold', borderRadius:10, background: g > 0 ? '#ffc107' : '#f0f4ff', border:'1px solid #ccd'}}>⚽ {p.name} {g > 0 ? `(${g})` : ''}</button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleGoal(e, m.id, p.id, m.team_a_id, 'team_a_goals', 'remove'); }} style={{marginLeft:8, color:'red', background:'none', border:'none', fontSize:30}}>-</button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div style={{ flex: '0 0 28%', textAlign: 'center', paddingTop: '10px' }}>
+                        <div style={{ fontSize: '32px', fontWeight: '900', whiteSpace:'nowrap' }}>{m.team_a_goals} - {m.team_b_goals}</div>
+                        {isExp && isAdmin && (
+                            <button onClick={(e) => { e.stopPropagation(); isFin ? setEditingMatch({...m}) : axios.put(`${API_URL}/matches/${m.id}`, {...m, played:1}).then(()=>loadData()); }} style={{marginTop:20, padding:'10px 15px', background: isFin ? '#ffc107' : '#28a745', color: isFin ? '#000' : '#fff', border:'none', borderRadius:10, fontSize:12, fontWeight:'bold', width:'100%' }}>
+                                {isFin ? '✏️ EDITAR' : '✅ FINALIZAR'}
+                            </button>
+                        )}
+                    </div>
+                    <div style={{ flex: '1 1 35%', textAlign: 'center' }}>
+                        <img src={m.team_b_logo || 'https://via.placeholder.com/40'} width="40" height="40" style={{borderRadius:'50%', objectFit: 'cover'}} alt="logo" />
+                        <div style={{ fontWeight: 'bold', fontSize: '12px', margin:'5px 0' }}>{m.team_b_name || '???'}</div>
+                        {isExp && isAdmin && !isFin && players.filter(p => p.team_id === m.team_b_id).map(p => {
+                            const g = getGoalsInMatch(p.id, m.id);
+                            return (
+                                <div key={p.id} style={{display:'flex', alignItems:'center', justifyContent:'center', marginBottom: 12}}>
+                                    <button onClick={(e) => handleGoal(e, m.id, p.id, m.team_b_id, 'team_b_goals', 'remove')} style={{marginRight:8, color:'red', background:'none', border:'none', fontSize:30}}>-</button>
+                                    <button onClick={(e) => handleGoal(e, m.id, p.id, m.team_b_id, 'team_b_goals', 'add')} style={{padding:'16px 4px', flex:1, fontSize:13, fontWeight:'bold', borderRadius:10, background: g > 0 ? '#ffc107' : '#f0f4ff', border:'1px solid #ccd'}}> {p.name} {g > 0 ? `(${g})` : ''} ⚽</button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const qM = matches.filter(m => m.phase === 'cuartos');
+    const sM = matches.filter(m => m.phase === 'semifinal');
+    const fM = matches.filter(m => m.phase === 'final');
+
+    if (loading) return <div style={{ padding: '100px 0', textAlign: 'center' }}>v3.9.3 - Cargando sistema...</div>;
+
+    return (
+        <div style={{ padding: '0 0 50px 0', fontFamily: 'Arial', maxWidth: '600px', margin: 'auto', background: '#f8f9fa', minHeight: '100vh' }}>
+            {/* CABECERA FIJA */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#000', padding: '15px 20px', color: 'white', position: 'sticky', top: 0, zIndex: 1000 }}>
+                <button onClick={() => navigate('/dashboard')} style={{ background: 'none', color: 'white', border: 'none', fontSize:'24px' }}>←</button>
+                <div style={{textAlign:'center'}}><div style={{fontSize:'14px', fontWeight:'bold'}}>{tournamentInfo?.name}</div></div>
+                <div>
+                    {isAdmin && <button onClick={() => setShowActivateMenu(!showActivateMenu)} style={{background:'#28a745', color:'#fff', border:'none', padding:'8px 12px', borderRadius:8, fontSize:11, marginRight:5, fontWeight:'bold'}}>ACT ⚡</button>}
+                    {isAdmin && <button onClick={() => setShowResetMenu(!showResetMenu)} style={{background:'#dc3545', color:'#fff', border:'none', padding:'8px 12px', borderRadius:8, fontSize:11, marginRight:5, fontWeight:'bold'}}>RES ⚙️</button>}
+                </div>
+                <button onClick={() => setShowTable(!showTable)} style={{ background: '#007bff', color: 'white', border: 'none', padding: '8px 15px', borderRadius: 8, fontWeight:'bold' }}>{showTable ? '⚽' : '📊'}</button>
+            </div>
+
+            {showResetMenu && (
+                <div style={{ background: '#fff', padding: 15, borderBottom: '2px solid #dc3545', display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+                    <button onClick={() => handleReset('all')} style={{ padding: 10, background: '#dc3545', color: '#fff', borderRadius: 5, border:'none', fontSize:10 }}>TODO</button>
+                    <button onClick={() => handleReset('cuartos')} style={{ padding: 10, background: '#333', color: '#fff', borderRadius: 5, border:'none', fontSize:10 }}>CUARTOS</button>
+                    <button onClick={() => handleReset('semifinal')} style={{ padding: 10, background: '#333', color: '#fff', borderRadius: 5, border:'none', fontSize:10 }}>SEMIS</button>
+                    <button onClick={() => handleReset('final')} style={{ padding: 10, background: '#333', color: '#fff', borderRadius: 5, border:'none', fontSize:10 }}>FINAL</button>
+                </div>
+            )}
+            {showActivateMenu && (
+                <div style={{ background: '#fff', padding: 15, borderBottom: '2px solid #28a745', display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+                    <button onClick={() => handleActivate('cuartos')} style={{ padding: 10, background: '#28a745', color: '#fff', borderRadius: 5, border:'none', fontSize:10 }}>ACTIVAR CUARTOS</button>
+                    <button onClick={() => handleActivate('semifinal')} style={{ padding: 10, background: '#28a745', color: '#fff', borderRadius: 5, border:'none', fontSize:10 }}>ACTIVAR SEMIS</button>
+                    <button onClick={() => handleActivate('final')} style={{ padding: 10, background: '#28a745', color: '#fff', borderRadius: 5, border:'none', fontSize:10 }}>ACTIVAR FINAL</button>
+                </div>
+            )}
+
+            <div style={{ padding: '15px' }}>
+                {/* 🏆 BANNER GRAN FINAL */}
+                {!showTable && tournamentInfo?.type === 'campeonato' && <FinalStatusBanner />}
+
+                {/* 🏆 CUADRO DE PLAYOFFS DINÁMICO */}
+                {!showTable && tournamentInfo?.type === 'campeonato' && teams.length === 8 && (
+                    <div style={{ background: '#fff', padding: '15px', borderRadius: '15px', marginBottom: '30px', border: '1px solid #eee', boxShadow:'0 4px 10px rgba(0,0,0,0.05)' }}>
+                        <h4 style={{ textAlign: 'center', margin: '0 0 10px 0', fontSize: '11px', color: '#666' }}>🏆 CUADRO DE ELIMINATORIAS</h4>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '5px' }}>
+                            <div style={{ flex: 1.2 }}>
+                                {[ [1,8], [2,7], [3,6], [4,5] ].map((pair, i) => (
+                                    <div key={i} style={{ background: '#f8f9fa', marginBottom: '5px', padding: '5px', borderRadius: '5px', border: '1px solid #eee', fontSize: '9px' }}>
+                                        <div style={{display:'flex', justifyContent:'space-between', color: qM[i] ? '#000' : '#007bff'}}><span>{qM[i] ? qM[i].team_a_name : getTeamByRank(pair[0]).name}</span><b>{qM[i]?.team_a_goals ?? ''}</b></div>
+                                        <div style={{display:'flex', justifyContent:'space-between', color: qM[i] ? '#000' : '#007bff', borderTop:'1px solid #fff'}}><span>{qM[i] ? qM[i].team_b_name : getTeamByRank(pair[1]).name}</span><b>{qM[i]?.team_b_goals ?? ''}</b></div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div style={{ flex: 1, display:'flex', flexDirection:'column', justifyContent:'space-around', fontSize:8, textAlign:'center', color:'#999' }}>
+                                <div style={{border:'1px dashed #ccc', padding:5, borderRadius:5, marginBottom:5}}>
+                                    <div>{sM[0] ? sM[0].team_a_name : getWinnerName(qM[0])}</div>
+                                    <div style={{borderTop:'1px solid #eee'}}>{sM[0] ? sM[0].team_b_name : getWinnerName(qM[3])}</div>
+                                </div>
+                                <div style={{border:'1px dashed #ccc', padding:5, borderRadius:5}}>
+                                    <div>{sM[1] ? sM[1].team_a_name : getWinnerName(qM[1])}</div>
+                                    <div style={{borderTop:'1px solid #eee'}}>{sM[1] ? sM[1].team_b_name : getWinnerName(qM[2])}</div>
+                                </div>
+                            </div>
+                            <div style={{ flex: 0.8, display:'flex', alignItems:'center' }}>
+                                <div style={{ height:'60px', width:'100%', background:'#fff3cd', border:'2px solid #ffeeba', borderRadius:'8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontSize:8, textAlign:'center' }}>
+                                    {/* LÓGICA ESTRICTA FINAL: SOLO SI EXISTE EL PARTIDO EN DB Y TIENE EQUIPO ASIGNADO */}
+                                    <b>{(fM.length > 0 && fM[0].team_a_id) ? fM[0].team_a_name : 'Finalista 1'}</b>
+                                    <div style={{fontSize:12, fontWeight:900}}>vs</div>
+                                    <b>{(fM.length > 0 && fM[0].team_b_id) ? fM[0].team_b_name : 'Finalista 2'}</b>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showTable ? (
+                    <div style={{ background: 'white', padding: '15px', borderRadius: '15px' }}>
+                        <h3>📊 Clasificación</h3>
+                        <table width="100%" style={{ fontSize: '13px' }}>
+                            <thead><tr style={{textAlign:'left', color:'#888', borderBottom:'2px solid #eee'}}><th>POS</th><th>EQUIPO</th><th>PTS</th><th>GF</th></tr></thead>
+                            <tbody>{standings.map((t, i) => (
+                                <tr key={t.id} style={{ borderBottom: '1px solid #f8f9fa' }}><td style={{padding:'15px 0'}}>{i + 1}</td><td>{t.name}</td><td style={{fontWeight:'bold', color:'#007bff'}}>{t.pts}</td><td>{t.gf}</td></tr>
+                            ))}</tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div>
+                        {isAdmin && teams.length > 0 && (
+                            <div style={{ background: '#e3f2fd', padding: '12px', borderRadius: '10px', marginBottom: '20px', fontSize: '12px', border:'1px solid #b2dbff' }}>
+                                <b>Añadir Jugador: </b>
+                                <input placeholder="Nombre" value={newPlayer.name} onChange={e => setNewPlayer({...newPlayer, name: e.target.value})} style={{width:'80px', padding:4}} />
+                                <select value={newPlayer.team_id} onChange={e => setNewPlayer({...newPlayer, team_id: e.target.value})} style={{padding:4}}>
+                                    <option value="">Equipo...</option>
+                                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </select>
+                                <button onClick={handleAddPlayer} style={{padding:'4px 10px', background:'#007bff', color:'#fff', border:'none', borderRadius:4}}>OK</button>
+                            </div>
+                        )}
+                        <div style={{ background: '#333', color: 'white', padding: '10px', borderRadius: '8px', fontSize: '12px', marginBottom: '15px', textAlign:'center', fontWeight:'bold' }}>PARTIDOS</div>
+                        {matches.map(m => <MatchCard key={m.id} m={m} />)}
+                    </div>
+                )}
+                
+                {/* ESTADÍSTICAS */}
+                <div style={{ marginTop: '50px', background: 'white', padding: '20px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
+                    <h4 style={{margin: '0 0 15px 0', borderLeft: '5px solid #ffc107', paddingLeft: 10}}>🏆 Pichichi</h4>
+                    {stats.goleadores.map((g, i) => <div key={i} style={{fontSize:13, padding:'10px 0', borderBottom:'1px solid #f1f1f1', display:'flex', justifyContent:'space-between'}}><span>{i+1}. {g.name} ({g.team_name})</span><b>{g.total} ⚽</b></div>)}
+                    <h4 style={{margin: '30px 0 15px 0', borderLeft: '5px solid #0dcaf0', paddingLeft: 10}}>🧤 Zamora</h4>
+                    {stats.porteros.map((p, i) => <div key={i} style={{fontSize:13, padding:'10px 0', borderBottom:'1px solid #f1f1f1', display:'flex', justifyContent:'space-between'}}><span>{i+1}. {p.name} ({p.team_name})</span><b style={{color:'red'}}>{p.against} 🥅</b></div>)}
+                </div>
+            </div>
+
+            {editingMatch && (
+                <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.85)', zIndex:2000, padding:20, display:'flex', alignItems:'center'}}>
+                    <div style={{background:'#fff', width:'100%', padding:20, borderRadius:15}}>
+                        <h4 style={{marginTop:0}}>Edición Manual</h4>
+                        <label style={{fontSize:11}}>Goles {editingMatch.team_a_name}:</label>
+                        <input type="number" value={editingMatch.team_a_goals} onChange={e => setEditingMatch({...editingMatch, team_a_goals: parseInt(e.target.value)})} style={{width:'90%', padding:15, marginBottom:10, fontSize:18}} />
+                        <label style={{fontSize:11}}>Goles {editingMatch.team_b_name}:</label>
+                        <input type="number" value={editingMatch.team_b_goals} onChange={e => setEditingMatch({...editingMatch, team_b_goals: parseInt(e.target.value)})} style={{width:'90%', padding:15, marginBottom:10, fontSize:18}} />
+                        <button onClick={() => { axios.put(`${API_URL}/matches/${editingMatch.id}`, {...editingMatch, played: 0}).then(()=> {setEditingMatch(null); loadData();}) }} style={{width:'100%', padding:15, background:'green', color:'#fff', borderRadius:10, border:'none', fontWeight:'bold'}}>DESBLOQUEAR Y GUARDAR</button>
+                        <button onClick={() => setEditingMatch(null)} style={{width:'100%', padding:12, background:'#eee', border:'none', borderRadius:10, marginTop:10, width:'100%'}}>CANCELAR</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+export default TournamentView;
+
+--- END OF FILE ./client/src/TournamentView.js ---
+
+--- START OF FILE ./client/src/AdminPanel.js ---
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+
+const AdminPanel = ({ user, onLogout }) => {
+    const [tournaments, setTournaments] = useState([]);
+    const [name, setName] = useState('');
+    const [type, setType] = useState('campeonato');
+    const navigate = useNavigate();
+    const API_URL = "https://gestionfutbol-production.up.railway.app";
+
+    useEffect(() => {
+        axios.get(`${API_URL}/tournaments`).then(res => setTournaments(res.data));
+    }, []);
+
+    const handleCreate = async () => {
+        if (!name) return alert("Nombre obligatorio");
+        await axios.post(`${API_URL}/tournaments`, { name, type });
+        window.location.reload();
+    };
+
+    return (
+        <div style={{ padding: '20px', fontFamily: 'Arial', maxWidth: '500px', margin: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2>Mis Torneos</h2>
+                <button onClick={onLogout} style={{ padding: '5px 10px' }}>Cerrar</button>
+            </div>
+            
+            {user.role === 'admin' && (
+                <div style={{ background: '#eee', padding: '15px', borderRadius: '10px', marginBottom: '20px' }}>
+                    <h4>Crear Nuevo Torneo</h4>
+                    <input placeholder="Nombre" onChange={e => setName(e.target.value)} style={{ width: '90%', padding: '10px', marginBottom: '10px' }} />
+                    <select onChange={e => setType(e.target.value)} style={{ width: '97%', padding: '10px', marginBottom: '10px' }}>
+                        <option value="campeonato">Campeonato (8 eq)</option>
+                        <option value="liga">Liga (6 eq)</option>
+                    </select>
+                    <button onClick={handleCreate} style={{ width: '100%', padding: '10px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '5px' }}>CREAR</button>
+                </div>
+            )}
+
+            {tournaments.map(t => (
+                <div key={t.id} onClick={() => navigate(`/tournament/${t.id}`)} style={{ padding: '20px', background: '#fff', border: '1px solid #ddd', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
+                    {t.name} ({t.type.toUpperCase()})
+                </div>
+            ))}
+        </div>
+    );
+};
+export default AdminPanel;
+--- END OF FILE ./client/src/AdminPanel.js ---
+
+--- START OF FILE ./client/src/index.js ---
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import './index.css'; // <--- ¿TIENES ESTA LÍNEA EXACTAMENTE ASÍ?
+import App from './App';
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+--- END OF FILE ./client/src/index.js ---
+
+--- START OF FILE ./client/src/index.css ---
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+--- END OF FILE ./client/src/index.css ---
+
+--- START OF FILE ./client/src/serviceWorkerRegistration.js ---
+export function register() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/serviceWorker.js').catch(err => console.log(err));
+    });
+  }
+}
+--- END OF FILE ./client/src/serviceWorkerRegistration.js ---
+
+--- START OF FILE ./client/src/components/Onboarding.jsx ---
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import FutCard from './FutCard';
+import { ChevronLeft, Save, Loader2, Info, CheckCircle2, Trophy } from 'lucide-react';
+
+const API_URL = "https://gestionfutbol-production.up.railway.app";
+
+const Onboarding = ({ onComplete, editPlayer }) => {
+  const [step, setStep] = useState(0);
+  const [teams, setTeams] = useState([]);
+  const [players, setPlayers] = useState([]);
+  const [selectedTeam, setSelectedTeam] = useState(null);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [customData, setCustomData] = useState({ name: '', position: 'DC', dorsal: '' });
+  const [loading, setLoading] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    if (editPlayer) {
+      setSelectedPlayer(editPlayer);
+      setSelectedTeam({ 
+        id: editPlayer.team_id, 
+        name: editPlayer.team_name, 
+        logo_url: editPlayer.team_logo 
+      });
+      setCustomData({ 
+        name: editPlayer.name, 
+        position: editPlayer.position, 
+        dorsal: editPlayer.dorsal 
+      });
+      setStep(3);
+      setLoading(false);
+    } else {
+      axios.get(`${API_URL}/tournaments`).then(res => {
+        if (res.data.length > 0) {
+          const tId = res.data[res.data.length - 1].id;
+          axios.get(`${API_URL}/teams/${tId}`).then(resT => {
+            setTeams(resT.data);
+            setLoading(false);
+          });
+        }
+      }).catch(() => setLoading(false));
+    }
+  }, [editPlayer]);
+
+  const selectTeam = async (team) => {
+    setSelectedTeam(team);
+    setLoading(true);
+    const resP = await axios.get(`${API_URL}/players/${team.tournament_id || 1}`);
+    const teamPlayers = resP.data.filter(p => p.team_id === team.id);
+    setPlayers(teamPlayers);
+    setStep(2);
+    setLoading(false);
+  };
+
+  const handleSelectPlayer = (p) => {
+    setSelectedPlayer(p);
+    setCustomData({ ...customData, name: p.name });
+    setStep(3);
+  };
+
+  const finalize = () => {
+    if (editPlayer) {
+      startApp();
+    } else {
+      setShowWelcome(true);
+    }
+  };
+
+  const startApp = () => {
+    const finalIdentity = {
+      ...selectedPlayer,
+      name: customData.name,
+      position: customData.position,
+      dorsal: customData.dorsal,
+      team_id: selectedTeam.id,
+      team_name: selectedTeam.name,
+      team_logo: selectedTeam.logo_url,
+      rating: 60,
+      stats: { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 }
+    };
+    // Al finalizar, guardamos en el navegador
+    localStorage.setItem('my_player', JSON.stringify(finalIdentity));
+    onComplete(finalIdentity);
+  };
+
+  if (loading) return (
+    <div className="fixed inset-0 bg-zinc-950 flex flex-col items-center justify-center text-fut-gold font-bold uppercase animate-pulse">
+      <Loader2 className="animate-spin mb-4" size={40} />
+      Sincronizando...
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-[2000] bg-zinc-950 flex flex-col items-center justify-center p-6 overflow-y-auto">
+      
+      {/* PASO 0: ELECCIÓN INICIAL */}
+      {step === 0 && (
+        <div className="w-full max-w-sm text-center animate-in fade-in zoom-in duration-500">
+          <div className="bg-zinc-900 p-8 rounded-[40px] border-2 border-fut-gold shadow-2xl">
+            <Trophy className="mx-auto text-fut-gold w-16 h-16 mb-6" />
+            <h2 className="text-white text-2xl font-black uppercase italic mb-8 leading-tight">¿Eres jugador <br/> del torneo?</h2>
+            <div className="space-y-4">
+              <button onClick={() => setStep(1)} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase shadow-lg active:scale-95 transition-all">SÍ, QUIERO MI TARJETA</button>
+              <button onClick={() => setStep(-1)} className="w-full bg-zinc-800 text-zinc-400 font-bold py-4 rounded-2xl uppercase text-sm active:scale-95 transition-all">NO, SOY ESPECTADOR</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODO ESPECTADOR */}
+      {step === -1 && (
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-6 z-[4000]">
+          <div className="bg-zinc-900 border-2 border-fut-gold p-8 rounded-[40px] text-center max-w-sm">
+            <Info size={48} className="text-fut-gold mx-auto mb-4" />
+            <p className="text-white font-bold mb-6">Podrás seguir resultados, clasificaciones y votar al MVP como invitado.</p>
+            <button onClick={() => {
+              localStorage.setItem('is_guest', 'true');
+              onComplete({ name: 'ESPECTADOR', isGuest: true, id: 9999 });
+            }} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase">CONTINUAR</button>
+          </div>
+        </div>
+      )}
+
+      {/* PASO 1: SELECCIONAR EQUIPO */}
+      {step === 1 && (
+        <div className="w-full max-w-md animate-in fade-in duration-500">
+          <h2 className="text-fut-gold text-center text-2xl font-black mb-8 uppercase italic tracking-widest leading-none">
+            Selecciona <span className="text-white block text-3xl mt-1">tu equipo</span>
+          </h2>
+          <div className="grid grid-cols-2 gap-4">
+            {teams.map(team => (
+              <button key={team.id} onClick={() => selectTeam(team)} className="bg-zinc-900 border-2 border-zinc-800 p-4 rounded-2xl flex flex-col items-center active:scale-95 transition-all hover:border-fut-gold">
+                <img src={team.logo_url || 'https://via.placeholder.com/50'} className="w-14 h-14 object-contain mb-3" alt="" />
+                <span className="text-[10px] font-black uppercase text-zinc-400 text-center">{team.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* PASO 2: BUSCAR JUGADOR */}
+      {step === 2 && (
+        <div className="w-full flex flex-col items-center animate-in slide-in-from-right">
+          <button onClick={() => setStep(1)} className="absolute top-8 left-6 text-zinc-500 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest">
+            <ChevronLeft size={16}/> Volver
+          </button>
+          <h2 className="text-fut-gold text-center text-xl font-black mb-10 uppercase italic mt-10 tracking-tighter">Busca tu nombre</h2>
+          <div className="flex overflow-x-auto w-full gap-2 pb-10 snap-x no-scrollbar">
+            {players.map(p => (
+              <div key={p.id} onClick={() => handleSelectPlayer(p)} className="snap-center shrink-0 active:scale-95">
+                <FutCard player={{ ...p, rating: 60 }} size="medium" view="selection" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* PASO 3: PERSONALIZACIÓN */}
+      {step === 3 && (
+        <div className="w-full max-w-sm flex flex-col items-center animate-in zoom-in pb-10">
+          {!editPlayer && (
+            <button onClick={() => setStep(2)} className="absolute top-8 left-6 text-zinc-500 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest">
+              <ChevronLeft size={16}/> Volver
+            </button>
+          )}
+
+          <div className="drop-shadow-[0_20px_40px_rgba(212,175,55,0.3)]">
+            {/* CORREGIDO: Las props ahora están dentro de la etiqueta */}
+            <FutCard 
+               player={{ ...selectedPlayer, name: customData.name, position: customData.position, rating: 60 }} 
+               view="selection" 
+               size="large" 
+            />
+          </div>
+          
+          <div className="bg-zinc-900 w-full p-6 rounded-[35px] mt-8 border-t-2 border-fut-gold/50 shadow-2xl space-y-5">
+            <div>
+              <label className="text-[10px] text-fut-gold uppercase font-black block mb-2 ml-1">Nombre en la carta</label>
+              <input 
+                type="text" 
+                value={customData.name} 
+                onChange={e => setCustomData({...customData, name: e.target.value.toUpperCase()})}
+                className="w-full bg-zinc-800 border-2 border-zinc-700 focus:border-fut-gold rounded-2xl p-4 text-lg font-black text-white uppercase outline-none"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] text-zinc-500 uppercase font-black block mb-2 ml-1">Posición</label>
+                <select value={customData.position} onChange={e => setCustomData({...customData, position: e.target.value})} className="w-full bg-zinc-800 border-2 border-zinc-700 rounded-2xl p-4 text-sm font-black text-fut-gold appearance-none uppercase outline-none">
+                  {['PO','DFC','LI','LD','MC','MCO','DC','ED','EI'].map(pos => <option key={pos} value={pos}>{pos}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-zinc-500 uppercase font-black block mb-2 ml-1">Dorsal</label>
+                <input type="number" placeholder="00" value={customData.dorsal} onChange={e => setCustomData({...customData, dorsal: e.target.value})} className="w-full bg-zinc-800 border-2 border-zinc-700 rounded-2xl p-4 text-sm font-black text-white outline-none" />
+              </div>
+            </div>
+            <button onClick={finalize} className="w-full bg-fut-gold text-black font-black py-5 rounded-2xl mt-2 flex items-center justify-center gap-2 uppercase tracking-tighter shadow-lg active:scale-95 transition-all">
+              <Save size={18} /> {editPlayer ? 'Guardar Cambios' : 'Reclamar Identidad'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE BIENVENIDA */}
+      {showWelcome && (
+        <div className="fixed inset-0 z-[3000] bg-black/95 flex items-center justify-center p-6 backdrop-blur-md animate-in fade-in">
+          <div className="bg-zinc-900 border-2 border-fut-gold w-full max-w-sm rounded-[40px] p-8 text-center shadow-[0_0_50px_rgba(212,175,55,0.2)]">
+            <div className="w-20 h-20 bg-fut-gold rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <Info size={40} className="text-black" />
+            </div>
+            <h2 className="text-white text-2xl font-black uppercase italic tracking-tighter mb-2 leading-none">¡Bienvenido al <br/> Torneo!</h2>
+            <p className="text-fut-gold font-bold text-sm mb-6 uppercase tracking-widest">Inauguración: 28/02</p>
+            
+            <div className="text-left space-y-4 mb-8">
+                <div className="bg-zinc-800/50 p-4 rounded-2xl border border-zinc-700">
+                    <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-3 italic">Evolución por:</p>
+                    <ul className="text-xs space-y-2 text-zinc-300 font-bold">
+                        <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-fut-gold"/> Partidos disputados</li>
+                        <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-fut-gold"/> Resultado del partido</li>
+                        <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-fut-gold"/> Goles anotados</li>
+                        <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-fut-gold"/> Puntos Votación MVP</li>
+                    </ul>
+                </div>
+            </div>
+
+            <button onClick={startApp} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase tracking-tighter text-sm shadow-xl active:scale-95 transition-all">
+                ¡Entendido!
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Onboarding;
+--- END OF FILE ./client/src/components/Onboarding.jsx ---
+
+--- START OF FILE ./client/src/components/FutCard.jsx ---
+import React from 'react';
+
+const FutCard = ({ player, size = "large", view = "dashboard" }) => {
+  if (!player) return null;
+
+  // Lógica de rareza según puntuación
+  const getCardImage = (rating) => {
+    if (rating >= 92) return '/leyenda.png';
+    if (rating >= 75) return '/oro.png';
+    if (rating >= 65) return '/plata.png';
+    return '/bronce.png';
+  };
+
+  const getPos = () => {
+    if (view === 'voting') return { nombre: "top-[260px]", stats: "top-[298px]" };
+    if (view === 'selection') return { nombre: "top-[285px]", stats: "top-[345px]" };
+    return { nombre: "top-[265px]", stats: "top-[345px]" };
+  };
+
+  const pos = getPos();
+  const scales = { small: "scale-[0.4] -m-24", medium: "scale-[0.7] -m-10", large: "scale-100" };
+
+  const StatLine = ({ label, value }) => (
+    <div className="flex items-center gap-1">
+      <span className="text-zinc-800 font-black text-xl w-7">{value || 60}</span>
+      <span className="text-zinc-700 font-bold text-[10px] uppercase opacity-70">{label}</span>
+    </div>
+  );
+
+  return (
+    <div className={`relative inline-block left-[20px] ${scales[size]} transition-all duration-500`}>
+      <img src={getCardImage(player.rating)} alt="Card" className="w-[350px] h-auto drop-shadow-2xl" />
+
+      {/* RATING */}
+      <div className="absolute top-[68px] left-[70px] text-zinc-800 text-5xl font-black italic tracking-tighter">
+        {player.rating || 60}
+      </div>
+
+      {/* POSICIÓN */}
+      <div className="absolute top-[120px] left-[80px] text-zinc-800 text-xl font-bold uppercase">
+        {player.position || 'PO'}
+      </div>
+
+      {/* NOMBRE JUGADOR */}
+      <div className={`absolute ${pos.nombre} left-0 w-full text-center px-4`}>
+        <span className="text-zinc-900 text-2xl font-black uppercase tracking-tighter truncate block italic">{player.name}</span>
+      </div>
+
+      {/* STATS IZQUIERDA */}
+      <div className={`absolute ${pos.stats} left-[58px] text-left leading-[65px]`}>
+        <StatLine label="RIT" value={player.stats?.pac} />
+        <StatLine label="TIR" value={player.stats?.sho} />
+        <StatLine label="PAS" value={player.stats?.pas} />
+      </div>
+
+      {/* STATS DERECHA */}
+      <div className={`absolute ${pos.stats} left-[182px] text-left leading-[55px]`}>
+        <StatLine label="REG" value={player.stats?.dri} />
+        <StatLine label="DEF" value={player.stats?.def} />
+        <StatLine label="FIS" value={player.stats?.phy} />
+      </div>
+    </div>
+  );
+};
+
+export default FutCard;
+--- END OF FILE ./client/src/components/FutCard.jsx ---
+
+--- START OF FILE ./client/src/components/VoteMvp.jsx ---
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import FutCard from './FutCard';
+// Añadimos Trash2 a la lista de importación
+import { Trophy, ChevronLeft, Loader2, CheckCircle2, Trash2 } from 'lucide-react';
+
+const API_URL = "https://gestionfutbol-production.up.railway.app";
+
+const VoteMvp = ({ myPlayer }) => {
+  const navigate = useNavigate();
+  const [matches, setMatches] = useState([]);
+  const [selectedMatch, setSelectedMatch] = useState(null);
+  const [players, setPlayers] = useState([]);
+  const [allGoals, setAllGoals] = useState([]);
+  const [allMatches, setAllMatches] = useState([]);
+  const [votes, setVotes] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTid, setActiveTid] = useState(null);
+
+  const pointsSystem = [5, 4, 3, 2, 1];
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        // 1. Buscamos el ID del torneo
+        const resT = await axios.get(`${API_URL}/tournaments`);
+        
+        if (resT.data.length > 0) {
+          const tId = resT.data[resT.data.length - 1].id;
+          setActiveTid(tId);
+
+          // 2. Descargamos partidos y goles
+          const [resM, resG] = await Promise.all([
+            axios.get(`${API_URL}/matches/${tId}`),
+            axios.get(`${API_URL}/goals/${tId}`)
+          ]);
+          
+          setAllMatches(resM.data || []);
+          setAllGoals(resG.data || []);
+
+          // 3. FILTRO INTELIGENTE (Aquí es donde va tu lógica del tiempo)
+          const now = new Date();
+          const finished = resM.data.filter(m => {
+            const estaJugado = (m.played == 1 || m.played == true);
+            
+            // Si quieres activar el límite de tiempo, usa estas líneas:
+            // const tiempoRestante = new Date(m.voting_ends_at) - now;
+            // return estaJugado && tiempoRestante > 0;
+            
+            // De momento, para el torneo, mostramos todos los finalizados:
+            return estaJugado; 
+          }).sort((a, b) => b.id - a.id);
+          
+          setMatches(finished);
+        }
+      } catch (e) { 
+        console.error("Error cargando datos de votación:", e); 
+      } finally { 
+        setLoading(false); 
+      }
+    };
+    loadData();
+  }, []);
+
+  // DISPARADOR AUTOMÁTICO: Cuando llega a 5 votos, envía solo.
+  useEffect(() => {
+    if (Object.keys(votes).length === 5 && !isSubmitting) {
+      const timer = setTimeout(() => {
+        autoConfirmVotes();
+      }, 600); // Pequeño delay para que el usuario vea la última moneda marcarse
+      return () => clearTimeout(timer);
+    }
+  }, [votes]);
+
+  const calculateRating = (p) => {
+    const goals = allGoals.filter(g => g.player_id === p.id).length;
+    const pMatches = allMatches.filter(m => m.played == 1 && (m.team_a_id === p.team_id || m.team_b_id === p.team_id));
+    const wins = pMatches.filter(m => (m.team_a_id === p.team_id ? m.team_a_goals > m.team_b_goals : m.team_b_goals > m.team_a_goals)).length;
+    
+    let rating = 65 + (pMatches.length * 4) + (goals * 4) + (wins * 3);
+    rating = Math.min(Math.max(rating, 65), 99);
+
+    return {
+      ...p,
+      name: p.name.toUpperCase(),
+      rating: rating,
+      stats: { 
+        pac: Math.min(rating + 2, 99), 
+        sho: Math.min(60 + (goals * 12), 99), 
+        pas: Math.min(65 + (pMatches.length * 3), 99), 
+        dri: Math.min(rating - 1, 99), 
+        def: 55, 
+        phy: 75 
+      }
+    };
+  };
+
+  const selectMatch = async (match) => {
+    setSelectedMatch(match);
+    setLoading(true);
+    try {
+        const resP = await axios.get(`${API_URL}/players/${match.tournament_id}`);
+        const eligible = resP.data
+          .filter(p => (p.team_id === match.team_a_id || p.team_id === match.team_b_id) && p.id !== myPlayer?.id)
+          .map(p => calculateRating(p));
+        setPlayers(eligible);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  };
+
+  const handleVote = (playerId, pts) => {
+    const newVotes = { ...votes };
+    Object.keys(newVotes).forEach(id => { if (newVotes[id] === pts) delete newVotes[id]; });
+    newVotes[playerId] = pts;
+    setVotes(newVotes);
+  };
+
+  const autoConfirmVotes = async () => {
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        match_id: parseInt(selectedMatch.id), // Forzamos número
+        voter_id: parseInt(myPlayer.id),     // Forzamos número
+        votes: Object.keys(votes).map(id => ({ 
+          player_id: parseInt(id), 
+          points: parseInt(votes[id]) 
+        }))
+      };
+
+      // Llamada al backend
+      const response = await axios.post(`${API_URL}/submit-votes`, payload);
+      
+      // Si todo va bien, esperamos 2 segundos viendo la pantalla de éxito
+      setTimeout(() => navigate('/home'), 2000);
+      
+    } catch (e) {
+      // Si el servidor devuelve un error, lo mostramos limpio (sin HTML)
+      const errorMsg = e.response?.data || "Error de conexión con el servidor";
+      alert(errorMsg);
+      setIsSubmitting(false);
+      setVotes({}); // Reseteamos los votos para que pueda volver a intentar
+    }
+  };
+
+  if (loading) return <div className="h-screen bg-black flex items-center justify-center text-fut-gold font-black animate-pulse">SINCRONIZANDO ESTADIO...</div>;
+
+  return (
+    <div className="h-[100dvh] bg-zinc-950 text-white flex flex-col overflow-hidden font-sans">
+      
+      {/* HEADER */}
+      <div className="bg-zinc-900 pt-12 pb-4 px-6 flex items-center justify-between border-b border-fut-gold/20 shadow-xl">
+        <button onClick={() => selectedMatch ? setSelectedMatch(null) : navigate('/home')} className="text-zinc-400">
+          <ChevronLeft size={30}/>
+        </button>
+        <h1 className="text-xs font-black uppercase italic tracking-widest text-fut-gold">
+            {selectedMatch ? 'Puntuación Cracks' : 'Elegir Partido'}
+        </h1>
+        <Trophy size={22} className="text-fut-gold" />
+      </div>
+
+      {/* BARRA DE MONEDAS (PROGRESO) */}
+      {selectedMatch && (
+        <div className="bg-zinc-900/90 p-4 flex flex-col items-center border-b border-zinc-800 shadow-lg">
+           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-3">
+              Reparte las 5 monedas para finalizar
+           </p>
+           <div className="flex gap-3">
+              {pointsSystem.map(p => (
+                <div 
+                  key={p} 
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black transition-all duration-500 ${
+                    Object.values(votes).includes(p) 
+                    ? 'bg-zinc-800 text-zinc-600 scale-90 opacity-40' 
+                    : 'bg-fut-gold text-black shadow-[0_0_15px_rgba(212,175,55,0.4)] animate-pulse'
+                  }`}
+                >
+                  {p}
+                </div>
+              ))}
+           </div>
+        </div>
+      )}
+
+      {/* PANTALLA DE ÉXITO (AUTO-ENVÍO) */}
+      {isSubmitting && (
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center animate-in fade-in duration-500">
+            <div className="w-24 h-24 bg-fut-gold rounded-full flex items-center justify-center shadow-[0_0_60px_rgba(212,175,55,0.6)] mb-8 animate-bounce">
+                <CheckCircle2 size={64} className="text-black" />
+            </div>
+            <h2 className="text-fut-gold text-3xl font-black uppercase italic tracking-tighter text-center px-10">
+                ¡Votación <br/> Guardada!
+            </h2>
+            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.4em] mt-4 animate-pulse">
+                Actualizando Clasificaciones
+            </p>
+        </div>
+      )}
+
+      {!selectedMatch ? (
+        /* VISTA LISTA PARTIDOS */
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {matches.map(m => (
+            <button key={m.id} onClick={() => selectMatch(m)} className="w-full bg-zinc-900 border-2 border-zinc-800 p-6 rounded-[40px] flex flex-col items-center gap-2 active:scale-95 transition-all shadow-xl">
+               <span className="text-[10px] text-fut-gold font-black uppercase tracking-widest italic opacity-70">CAMPO {m.field} • FINALIZADO</span>
+               <div className="flex items-center gap-4 text-base font-black uppercase italic text-white">
+                  <span>{m.team_a_name}</span>
+                  <span className="text-zinc-600 text-xs font-bold">VS</span>
+                  <span>{m.team_b_name}</span>
+               </div>
+               <div className="mt-2 bg-zinc-800 px-5 py-1.5 rounded-full text-xs font-black text-white italic border border-zinc-700">
+                  {m.team_a_goals} - {m.team_b_goals}
+               </div>
+            </button>
+          ))}
+          {matches.length === 0 && <p className="text-center text-zinc-600 py-20 font-black uppercase text-xs">No hay partidos para votar.</p>}
+        </div>
+      ) : (
+        /* VISTA SLIDER JUGADORES */
+        <div className="flex-1 flex flex-col justify-center bg-zinc-950">
+            <div className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar w-full h-[540px] items-center">
+                {players.map(p => (
+                    <div key={p.id} className="snap-center shrink-0 w-[94%] mx-[3%] h-[490px] bg-[#f4f1e6] border-2 border-white rounded-[65px] flex items-center p-2 relative shadow-[0_30px_60px_rgba(0,0,0,0.5)] overflow-hidden">
+                        
+                        {/* CARTA GIGANTE */}
+                        <div className="flex-1 flex justify-center scale-[0.88] origin-center -ml-16">
+                            <FutCard player={p} view="voting" />
+                        </div>
+
+                        {/* BOTONES CÍRCULOS (BLANCO Y NEGRO) */}
+                        <div className="w-20 flex flex-col items-center justify-center gap-3 pr-4 z-10">
+                            {pointsSystem.map(pts => (
+                                <button
+                                    key={pts}
+                                    onClick={() => handleVote(p.id, pts)}
+                                    className={`w-12 h-12 rounded-full text-sm font-black transition-all flex items-center justify-center border-2 shadow-sm ${
+                                      votes[p.id] === pts 
+                                      ? 'bg-zinc-900 text-white border-zinc-900 scale-110 shadow-xl' 
+                                      : 'bg-white text-zinc-800 border-zinc-200 active:bg-zinc-100'
+                                    }`}
+                                >{pts}</button>
+                            ))}
+                            {/* BOTÓN PAPELERA (CORREGIDO) */}
+                            {votes[p.id] && (
+                                <button 
+                                  onClick={() => { const nv = {...votes}; delete nv[p.id]; setVotes(nv); }} 
+                                  className="w-12 h-12 bg-red-600 text-white rounded-full flex items-center justify-center border-2 border-red-500 shadow-md active:scale-90"
+                                >
+                                  <Trash2 size={20} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* INDICADOR VOTO (DORADO) */}
+                        {votes[p.id] && (
+                            <div className="absolute top-10 right-10 bg-fut-gold text-black w-14 h-14 rounded-full flex flex-col items-center justify-center font-black shadow-2xl border-4 border-[#f4f1e6] animate-in zoom-in">
+                                <span className="text-[8px] leading-none opacity-70">PUNTOS</span>
+                                <span className="text-2xl leading-none">{votes[p.id]}</span>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+            <p className="text-center text-zinc-600 text-[10px] font-black uppercase tracking-[0.3em] mb-4 animate-pulse italic">
+                ← DESLIZA PARA REPARTIR MONEDAS →
+            </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default VoteMvp;
+--- END OF FILE ./client/src/components/VoteMvp.jsx ---
+
+--- START OF FILE ./client/src/components/MainDashboard.jsx ---
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+// He añadido Send e isAdmin (simulado) para que no marque error
+import { Calendar, Table, Trophy, LogOut, Users, Send } from 'lucide-react'; 
+import FutCard from './FutCard';
+
+const API_URL = "https://gestionfutbol-production.up.railway.app";
+
+const MainDashboard = ({ player, onEdit, onLogout }) => {
+  const navigate = useNavigate();
+  const [tId, setTId] = useState(1);
+  const [livePlayer, setLivePlayer] = useState(player); 
+  const isMvpVotingActive = true;
+  const isAdmin = player?.role === 'admin'; // Definimos isAdmin
+
+  const goTo = (path) => navigate(`/${path}`); // Definimos goTo
+
+  useEffect(() => {
+    const fetchLiveStats = async () => {
+      try {
+        const resT = await axios.get(`${API_URL}/tournaments`);
+        if (resT.data.length > 0) {
+          const currentTid = resT.data[resT.data.length - 1].id;
+          setTId(currentTid);
+          const [resM, resG] = await Promise.all([
+            axios.get(`${API_URL}/matches/${currentTid}`),
+            axios.get(`${API_URL}/goals/${currentTid}`)
+          ]);
+          const goals = resG.data.filter(g => g.player_id === player?.id).length;
+          const pMatches = resM.data.filter(m => (m.played == 1) && (m.team_a_id === player?.team_id || m.team_b_id === player?.team_id));
+          const wins = pMatches.filter(m => (m.team_a_id === player?.team_id ? m.team_a_goals > m.team_b_goals : m.team_b_goals > m.team_a_goals)).length;
+
+          let rating = 65 + (pMatches.length * 4) + (goals * 4) + (wins * 3);
+          rating = Math.min(Math.max(rating, 65), 99);
+
+          setLivePlayer({
+            ...player,
+            rating: rating,
+            stats: {
+              pac: Math.min(rating + 2, 99), sho: Math.min(60 + (goals * 12), 99),
+              pas: Math.min(65 + (pMatches.length * 3), 99), dri: Math.min(rating - 1, 99),
+              def: 55, phy: 75
+            }
+          });
+        }
+      } catch (e) { console.error(e); }
+    };
+    if (player && !player.isGuest) fetchLiveStats();
+  }, [player]);
+
+  const menuItems = [
+    { id: 'calendar', label: 'Calendario', icon: <Calendar />, action: () => goTo('matches') },
+    { id: 'standings', label: 'Posiciones', icon: <Table />, action: () => goTo('table') },
+    { id: 'players', label: 'Jugadores', icon: <Users />, action: () => {} },
+    { id: 'mvp_podium', label: 'PODIO MVP', icon: <Trophy />, action: () => navigate('/mvp-podium') },
+    { id: 'mvp_vote', label: 'VOTACIÓN', icon: <Send />, action: () => navigate('/vote-mvp'), active: isMvpVotingActive },
+    { id: 'logout', label: 'Salir', icon: <LogOut />, action: onLogout },
+  ];
+
+  return (
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-[#f4f1e6]">
+      {/* CABECERA */}
+      <div className="pt-14 pb-4 flex flex-col items-center relative">
+        <div className="h-[160px] flex items-center justify-center scale-[0.52]">
+          <FutCard player={livePlayer} isGuest={player?.isGuest || isAdmin} view="dashboard" />
+        </div>
+        <h2 className="text-zinc-900 text-xl font-black uppercase italic mt-[-10px]">
+            {isAdmin ? "ADMINISTRADOR" : (player?.isGuest ? "ESPECTADOR" : player?.name)}
+        </h2>
+        <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.2em] mt-1 opacity-60">
+            {livePlayer?.team_name}
+        </p>
+      </div>
+
+      {/* GRID DE BOTONES NARANJA OSCURO */}
+      <div className="flex-1 grid grid-cols-2 grid-rows-3 gap-4 p-6 content-center">
+        {menuItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={item.action}
+            className="relative bg-orange-800 rounded-[28px] flex flex-col items-center justify-center gap-2 py-5 shadow-[0_15px_30px_rgba(154,52,18,0.3)] active:scale-90 transition-all overflow-hidden"
+          >
+            <div className="absolute left-0 top-6 bottom-6 w-1 bg-white rounded-r-full shadow-[2px_0_10px_white]"></div>
+            {item.active && (
+              <span className="absolute top-4 right-5 flex h-2 w-2">
+                <span className="animate-ping absolute h-full w-full rounded-full bg-white opacity-75"></span>
+                <span className="relative rounded-full h-2 w-2 bg-white shadow-sm"></span>
+              </span>
+            )}
+            <div className="p-2 bg-white/10 rounded-xl">
+              {React.cloneElement(item.icon, { size: 24, className: "text-white" })}
+            </div>
+            <span className="text-[12px] font-black text-white uppercase italic tracking-wider">{item.label}</span>
+          </button>
+        ))}
+      </div>
+      <div className="pb-6 text-center opacity-30 tracking-[0.4em] text-[8px] font-black uppercase text-zinc-500">Fut Torneo 2026</div>
+    </div>
+  );
+};
+
+export default MainDashboard;
+
+--- END OF FILE ./client/src/components/MainDashboard.jsx ---
+
+--- START OF FILE ./client/src/Login.js ---
+import React, { useState } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+
+const Login = ({ onLogin }) => {
+    const [form, setForm] = useState({ username: '', password: '' });
+    const navigate = useNavigate();
+    const API_URL = "https://gestionfutbol-production.up.railway.app";
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const res = await axios.post(`${API_URL}/login`, form);
+            onLogin(res.data);
+            navigate('/dashboard');
+        } catch (error) { alert("Error"); }
+    };
+
+    return (
+        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: '#f0f2f5', padding: '20px' }}>
+            <div style={{ background: '#fff', padding: '40px 20px', borderRadius: '30px', boxShadow: '0 15px 35px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
+                <div style={{ fontSize: '80px' }}>🏆</div>
+                <h2 style={{ marginBottom: '30px', color: '#333' }}>Gestión de Fútbol</h2>
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    <input type="text" placeholder="Usuario" style={{ padding: '22px', fontSize: '18px', borderRadius: '15px', border: '1px solid #ddd', background:'#f9f9f9' }} onChange={e => setForm({...form, username: e.target.value})} />
+                    <input type="password" placeholder="Contraseña" style={{ padding: '22px', fontSize: '18px', borderRadius: '15px', border: '1px solid #ddd', background:'#f9f9f9' }} onChange={e => setForm({...form, password: e.target.value})} />
+                    <button type="submit" style={{ padding: '20px', background: '#007bff', color: '#fff', borderRadius: '15px', border: 'none', fontWeight: 'bold', fontSize: '20px' }}>ENTRAR</button>
+                </form>
+                <div style={{ marginTop: '40px', fontSize: '12px', color: '#aaa' }}>v3.8.0 - Creado por <b>Daniel Martinez</b></div>
+            </div>
+        </div>
+    );
+};
+export default Login;
+--- END OF FILE ./client/src/Login.js ---
+
+--- START OF FILE ./client/src/App.js ---
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './Login';
+import AdminPanel from './AdminPanel';
+import TournamentView from './TournamentView';
+import Onboarding from './components/Onboarding';
+import MainDashboard from './components/MainDashboard';
+import VoteMvp from './components/VoteMvp';
+
+function App() {
+  // Inicialización limpia
+  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('user')));
+  const [myPlayer, setMyPlayer] = useState(() => JSON.parse(localStorage.getItem('my_player')));
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Debug para ver qué está pasando (mira la consola del navegador)
+  useEffect(() => {
+    console.log("Estado Actual - User:", user);
+    console.log("Estado Actual - Identidad FUT:", myPlayer);
+  }, [user, myPlayer]);
+
+  const handleLogin = (userData) => {
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+  };
+
+  const handleOnboardingComplete = (playerData) => {
+    setMyPlayer(playerData);
+    setIsEditing(false);
+    localStorage.setItem('my_player', JSON.stringify(playerData));
+  };
+
+  const logout = () => {
+    localStorage.clear();
+    setUser(null);
+    setMyPlayer(null);
+    window.location.href = "/";
+  };
+
+  return (
+    <Router>
+      <Routes>
+        {/* RUTA RAIZ: Si no hay 'user', al Login. Sin excepciones. */}
+        <Route path="/" element={
+          !user ? <Navigate to="/login" replace /> : (
+            user.role === 'admin' ? <Navigate to="/admin-panel" replace /> : <Navigate to="/home" replace />
+          )
+        } />
+
+        <Route path="/login" element={
+          !user ? <Login onLogin={handleLogin} /> : <Navigate to="/" replace />
+        } />
+
+        {/* HOME JUGADOR: Solo entra si hay 'user'. Si no hay 'myPlayer', salta Onboarding */}
+        <Route path="/home" element={
+          !user ? <Navigate to="/login" replace /> : (
+            (!myPlayer || isEditing) 
+              ? <Onboarding onComplete={handleOnboardingComplete} editPlayer={myPlayer} /> 
+              : <MainDashboard player={myPlayer} onEdit={() => setIsEditing(true)} onLogout={logout} />
+          )
+        } />
+
+        <Route path="/admin-panel" element={
+          user?.role === 'admin' ? <AdminPanel user={user} onLogout={logout} /> : <Navigate to="/" replace />
+        } />
+
+        <Route path="/tournament/:id" element={<TournamentView user={user} />} />
+        <Route path="/vote-mvp" element={myPlayer ? <VoteMvp myPlayer={myPlayer} /> : <Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
+--- END OF FILE ./client/src/App.js ---
