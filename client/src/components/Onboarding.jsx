@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import FutCard from './FutCard';
-import { ChevronLeft, Save, Loader2, Info, CheckCircle2 } from 'lucide-react';
-
+import { ChevronLeft, Save, Loader2, Info, CheckCircle2, Trophy } from 'lucide-react';
 
 const API_URL = "https://gestionfutbol-production.up.railway.app";
 
@@ -15,7 +14,6 @@ const Onboarding = ({ onComplete, editPlayer }) => {
   const [customData, setCustomData] = useState({ name: '', position: 'DC', dorsal: '' });
   const [loading, setLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
- 
 
   useEffect(() => {
     if (editPlayer) {
@@ -44,8 +42,6 @@ const Onboarding = ({ onComplete, editPlayer }) => {
       }).catch(() => setLoading(false));
     }
   }, [editPlayer]);
-  
-  // ... resto del archivo que te pasé antes (asegúrate de no copiar textos sueltos)
 
   const selectTeam = async (team) => {
     setSelectedTeam(team);
@@ -64,7 +60,6 @@ const Onboarding = ({ onComplete, editPlayer }) => {
   };
 
   const finalize = () => {
-    // Si estamos editando, no hace falta mostrar la bienvenida otra vez
     if (editPlayer) {
       startApp();
     } else {
@@ -84,50 +79,54 @@ const Onboarding = ({ onComplete, editPlayer }) => {
       rating: 60,
       stats: { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 }
     };
-    // localStorage.setItem('my_player', JSON.stringify(finalIdentity)); // Descomentar para producción
+    // Al finalizar, guardamos en el navegador
+    localStorage.setItem('my_player', JSON.stringify(finalIdentity));
     onComplete(finalIdentity);
   };
 
   if (loading) return (
-    <div className="fixed inset-0 bg-zinc-950 flex flex-col items-center justify-center">
-      <Loader2 className="text-fut-gold animate-spin w-12 h-12 mb-4" />
-      <p className="text-fut-gold font-bold uppercase tracking-widest text-xs tracking-[0.3em]">Cargando...</p>
+    <div className="fixed inset-0 bg-zinc-950 flex flex-col items-center justify-center text-fut-gold font-bold uppercase animate-pulse">
+      <Loader2 className="animate-spin mb-4" size={40} />
+      Sincronizando...
     </div>
   );
 
   return (
     <div className="fixed inset-0 z-[2000] bg-zinc-950 flex flex-col items-center justify-center p-6 overflow-y-auto">
       
+      {/* PASO 0: ELECCIÓN INICIAL */}
       {step === 0 && (
-  <div className="w-full max-w-sm text-center animate-in fade-in zoom-in duration-500">
-    <div className="bg-zinc-900 p-8 rounded-[40px] border-2 border-fut-gold shadow-2xl">
-      <Trophy className="mx-auto text-fut-gold w-16 h-16 mb-6" />
-      <h2 className="text-white text-2xl font-black uppercase italic mb-8">¿Eres jugador <br/> del torneo?</h2>
-      <div className="space-y-4">
-        <button onClick={() => setStep(1)} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase tracking-tighter shadow-lg active:scale-95 transition-all">SÍ, QUIERO MI TARJETA</button>
-        <button onClick={() => setStep(-1)} className="w-full bg-zinc-800 text-zinc-400 font-bold py-4 rounded-2xl uppercase text-sm active:scale-95 transition-all">NO, SOY ESPECTADOR</button>
-      </div>
-    </div>
-  </div>
-)}
+        <div className="w-full max-w-sm text-center animate-in fade-in zoom-in duration-500">
+          <div className="bg-zinc-900 p-8 rounded-[40px] border-2 border-fut-gold shadow-2xl">
+            <Trophy className="mx-auto text-fut-gold w-16 h-16 mb-6" />
+            <h2 className="text-white text-2xl font-black uppercase italic mb-8 leading-tight">¿Eres jugador <br/> del torneo?</h2>
+            <div className="space-y-4">
+              <button onClick={() => setStep(1)} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase shadow-lg active:scale-95 transition-all">SÍ, QUIERO MI TARJETA</button>
+              <button onClick={() => setStep(-1)} className="w-full bg-zinc-800 text-zinc-400 font-bold py-4 rounded-2xl uppercase text-sm active:scale-95 transition-all">NO, SOY ESPECTADOR</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-{step === -1 && (
-  <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-6 z-[4000]">
-    <div className="bg-zinc-900 border-2 border-fut-gold p-8 rounded-[40px] text-center max-w-sm">
-      <Info size={48} className="text-fut-gold mx-auto mb-4" />
-      <p className="text-white font-bold mb-6">Has indicado que no eres jugador. Podrás seguir resultados, clasificaciones y votar al MVP.</p>
-      <button onClick={() => {
-        localStorage.setItem('is_guest', 'true');
-        onComplete({ name: 'ESPECTADOR', isGuest: true });
-      }} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase">CONTINUAR</button>
-    </div>
-  </div>
-)}
+      {/* MODO ESPECTADOR */}
+      {step === -1 && (
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-6 z-[4000]">
+          <div className="bg-zinc-900 border-2 border-fut-gold p-8 rounded-[40px] text-center max-w-sm">
+            <Info size={48} className="text-fut-gold mx-auto mb-4" />
+            <p className="text-white font-bold mb-6">Podrás seguir resultados, clasificaciones y votar al MVP como invitado.</p>
+            <button onClick={() => {
+              localStorage.setItem('is_guest', 'true');
+              onComplete({ name: 'ESPECTADOR', isGuest: true, id: 9999 });
+            }} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase">CONTINUAR</button>
+          </div>
+        </div>
+      )}
 
+      {/* PASO 1: SELECCIONAR EQUIPO */}
       {step === 1 && (
         <div className="w-full max-w-md animate-in fade-in duration-500">
-          <h2 className="text-fut-gold text-center text-2xl font-black mb-8 uppercase italic tracking-widest">
-            Selecciona <span className="text-white block text-3xl">tu equipo</span>
+          <h2 className="text-fut-gold text-center text-2xl font-black mb-8 uppercase italic tracking-widest leading-none">
+            Selecciona <span className="text-white block text-3xl mt-1">tu equipo</span>
           </h2>
           <div className="grid grid-cols-2 gap-4">
             {teams.map(team => (
@@ -140,6 +139,7 @@ const Onboarding = ({ onComplete, editPlayer }) => {
         </div>
       )}
 
+      {/* PASO 2: BUSCAR JUGADOR */}
       {step === 2 && (
         <div className="w-full flex flex-col items-center animate-in slide-in-from-right">
           <button onClick={() => setStep(1)} className="absolute top-8 left-6 text-zinc-500 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest">
@@ -149,13 +149,14 @@ const Onboarding = ({ onComplete, editPlayer }) => {
           <div className="flex overflow-x-auto w-full gap-2 pb-10 snap-x no-scrollbar">
             {players.map(p => (
               <div key={p.id} onClick={() => handleSelectPlayer(p)} className="snap-center shrink-0 active:scale-95">
-              <FutCard player={{ ...p, rating: 60 }} size="medium" view="selection" /> {/* <--- AÑADE view="selection" */}
-            </div>
+                <FutCard player={{ ...p, rating: 60 }} size="medium" view="selection" />
+              </div>
             ))}
           </div>
         </div>
       )}
 
+      {/* PASO 3: PERSONALIZACIÓN */}
       {step === 3 && (
         <div className="w-full max-w-sm flex flex-col items-center animate-in zoom-in pb-10">
           {!editPlayer && (
@@ -165,9 +166,12 @@ const Onboarding = ({ onComplete, editPlayer }) => {
           )}
 
           <div className="drop-shadow-[0_20px_40px_rgba(212,175,55,0.3)]">
-            <FutCard player={{ ...selectedPlayer, name: customData.name, position: customData.position, rating: 60 }} />
-            view="selection"
-            size="medium"
+            {/* CORREGIDO: Las props ahora están dentro de la etiqueta */}
+            <FutCard 
+               player={{ ...selectedPlayer, name: customData.name, position: customData.position, rating: 60 }} 
+               view="selection" 
+               size="large" 
+            />
           </div>
           
           <div className="bg-zinc-900 w-full p-6 rounded-[35px] mt-8 border-t-2 border-fut-gold/50 shadow-2xl space-y-5">
@@ -199,6 +203,7 @@ const Onboarding = ({ onComplete, editPlayer }) => {
         </div>
       )}
 
+      {/* MODAL DE BIENVENIDA */}
       {showWelcome && (
         <div className="fixed inset-0 z-[3000] bg-black/95 flex items-center justify-center p-6 backdrop-blur-md animate-in fade-in">
           <div className="bg-zinc-900 border-2 border-fut-gold w-full max-w-sm rounded-[40px] p-8 text-center shadow-[0_0_50px_rgba(212,175,55,0.2)]">
@@ -210,7 +215,7 @@ const Onboarding = ({ onComplete, editPlayer }) => {
             
             <div className="text-left space-y-4 mb-8">
                 <div className="bg-zinc-800/50 p-4 rounded-2xl border border-zinc-700">
-                    <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-3">Parámetros de Evolución:</p>
+                    <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-3 italic">Evolución por:</p>
                     <ul className="text-xs space-y-2 text-zinc-300 font-bold">
                         <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-fut-gold"/> Partidos disputados</li>
                         <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-fut-gold"/> Resultado del partido</li>
@@ -221,7 +226,7 @@ const Onboarding = ({ onComplete, editPlayer }) => {
             </div>
 
             <button onClick={startApp} className="w-full bg-fut-gold text-black font-black py-4 rounded-2xl uppercase tracking-tighter text-sm shadow-xl active:scale-95 transition-all">
-                ¡A jugar!
+                ¡Entendido!
             </button>
           </div>
         </div>

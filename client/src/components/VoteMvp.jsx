@@ -25,25 +25,42 @@ const VoteMvp = ({ myPlayer }) => {
     const loadData = async () => {
       try {
         setLoading(true);
+        // 1. Buscamos el ID del torneo
         const resT = await axios.get(`${API_URL}/tournaments`);
-        // Dentro de useEffect de loadMatches
-const timeLeft = new Date(m.voting_ends_at) - new Date();
-if (timeLeft <= 0) {
-    // Si el tiempo se acabó, no mostrar este partido para votar
-}
+        
         if (resT.data.length > 0) {
           const tId = resT.data[resT.data.length - 1].id;
           setActiveTid(tId);
+
+          // 2. Descargamos partidos y goles
           const [resM, resG] = await Promise.all([
             axios.get(`${API_URL}/matches/${tId}`),
             axios.get(`${API_URL}/goals/${tId}`)
           ]);
+          
           setAllMatches(resM.data || []);
           setAllGoals(resG.data || []);
-          setMatches(resM.data.filter(m => m.played == 1 || m.played == true).sort((a, b) => b.id - a.id));
+
+          // 3. FILTRO INTELIGENTE (Aquí es donde va tu lógica del tiempo)
+          const now = new Date();
+          const finished = resM.data.filter(m => {
+            const estaJugado = (m.played == 1 || m.played == true);
+            
+            // Si quieres activar el límite de tiempo, usa estas líneas:
+            // const tiempoRestante = new Date(m.voting_ends_at) - now;
+            // return estaJugado && tiempoRestante > 0;
+            
+            // De momento, para el torneo, mostramos todos los finalizados:
+            return estaJugado; 
+          }).sort((a, b) => b.id - a.id);
+          
+          setMatches(finished);
         }
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+      } catch (e) { 
+        console.error("Error cargando datos de votación:", e); 
+      } finally { 
+        setLoading(false); 
+      }
     };
     loadData();
   }, []);
