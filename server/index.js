@@ -3,48 +3,24 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const app = express();
-app.use(cors()); 
-app.use(express.json());
+app.use(cors()); app.use(express.json());
 
-// Configuración del Pool de Conexión
 const db = mysql.createPool({
     host: process.env.MYSQLHOST,
     user: process.env.MYSQLUSER,
     password: process.env.MYSQLPASSWORD,
     database: process.env.MYSQLDATABASE,
-    port: process.env.MYSQLPORT || 3306,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+    port: process.env.MYSQLPORT || 3306
 });
 
-// --- AUTO-REPARACIÓN: Asegurar que la columna existe al arrancar ---
-const ensureColumnExists = () => {
-    const checkSql = "SHOW COLUMNS FROM matches LIKE 'votings_end_at'";
-    db.query(checkSql, (err, results) => {
-        if (err) {
-            console.error("❌ Error al verificar columnas:", err.message);
-            return;
-        }
-        if (results.length === 0) {
-            console.log("⚠️ Columna 'votings_end_at' no encontrada. Creándola...");
-            const alterSql = "ALTER TABLE matches ADD COLUMN votings_end_at DATETIME NULL DEFAULT NULL";
-            db.query(alterSql, (err) => {
-                if (err) console.error("❌ Error al crear la columna:", err.message);
-                else console.log("✅ Columna 'votings_end_at' creada con éxito.");
-            });
-        } else {
-            console.log("✅ Columna 'votings_end_at' verificada y lista.");
-        }
-    });
-};
-
-// Ejecutamos la verificación
-ensureColumnExists();
+// --- SEGURIDAD: CREAR COLUMNA SI NO EXISTE AL ARRANCAR ---
+db.query("SHOW COLUMNS FROM matches LIKE 'votings_end_at'", (err, results) => {
+    if (!err && results.length === 0) {
+        db.query("ALTER TABLE matches ADD COLUMN votings_end_at DATETIME NULL DEFAULT NULL");
+    }
+});
 
 const formatDate = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
-
-// --- RUTAS ---
 
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
@@ -55,13 +31,14 @@ app.post('/login', (req, res) => {
 
 app.get('/tournaments', (req, res) => { db.query('SELECT * FROM tournaments', (err, r) => res.send(r)); });
 
+// --- RESET MAESTRO MODULAR ---
 app.post('/reset-tournament/:id', (req, res) => {
     const tId = req.params.id;
     const { target } = req.body; 
     if (target === 'all') {
         db.query('DELETE FROM goals WHERE match_id IN (SELECT id FROM matches WHERE tournament_id = ?)', [tId], () => {
             db.query('DELETE FROM matches WHERE tournament_id = ? AND phase != "grupo"', [tId], () => {
-                db.query('UPDATE matches SET played = 0, team_a_goals = 0, team_b_goals = 0, votings_end_at = NULL WHERE tournament_id = ?', [tId], () => res.send("OK"));
+                db.query('UPDATE matches SET played = 0, team_a_goals = 0, team_b_goals = 0 WHERE tournament_id = ?', [tId], () => res.send("OK"));
             });
         });
     } else {
@@ -89,13 +66,8 @@ app.put('/matches/:id', (req, res) => {
     }
 
     const sql = "UPDATE matches SET team_a_goals=?, team_b_goals=?, played=?, referee=?, match_date=?, votings_end_at=? WHERE id=?";
-    const params = [team_a_goals, team_b_goals, played, referee, date, v_end, matchId];
-
-    db.query(sql, params, (err) => {
-        if (err) {
-            console.error("ERROR CRÍTICO:", err.message);
-            return res.status(500).send(err.message);
-        }
+    db.query(sql, [team_a_goals, team_b_goals, played, referee, date, v_end, matchId], (err) => {
+        if (err) return res.status(500).send(err.message);
         res.send("OK");
     });
 });
@@ -131,21 +103,9 @@ app.post('/activate-phase/:id', (req, res) => {
 });
 
 app.get('/teams/:tId', (req, res) => { db.query('SELECT * FROM teams WHERE tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
-
-app.get('/players/:tId', (req, res) => { 
-    db.query('SELECT p.*, t.name as team_name FROM players p JOIN teams t ON p.team_id = t.id WHERE t.tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); 
-});
-
-app.get('/players/team/:teamId', (req, res) => {
-    db.query('SELECT * FROM players WHERE team_id = ?', [req.params.teamId], (err, r) => res.send(r));
-});
-
-app.post('/players', (req, res) => { 
-    db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], () => res.send("OK")); 
-});
-
+app.get('/players/:tId', (req, res) => { db.query('SELECT p.*, t.name as team_name FROM players p JOIN teams t ON p.team_id = t.id WHERE t.tournament_id = ?', [req.params.tId], (err, r) => res.send(r)); });
+app.post('/players', (req, res) => { db.query('INSERT INTO players (team_id, name, is_goalkeeper) VALUES (?, ?, ?)', [req.body.team_id, req.body.name, req.body.is_goalkeeper ? 1 : 0], () => res.send("OK")); });
 app.get('/goals/:tId', (req, res) => { db.query('SELECT g.* FROM goals g JOIN matches m ON g.match_id = m.id WHERE m.tournament_id = ?', [req.params.tId], (err, r) => res.send(r || [])); });
-
 app.get('/stats/:tId', (req, res) => {
     const tId = req.params.tId;
     const sqlG = `SELECT p.name, t.name as team_name, COUNT(g.id) as total FROM goals g JOIN players p ON g.player_id = p.id JOIN teams t ON g.team_id = t.id WHERE t.tournament_id = ? GROUP BY p.id, p.name, t.name ORDER BY total DESC LIMIT 10`;
@@ -153,30 +113,27 @@ app.get('/stats/:tId', (req, res) => {
     db.query(sqlG, [tId], (err, g) => { db.query(sqlP, [tId], (err2, p) => res.send({ goleadores: g || [], porteros: p || [] })); });
 });
 
-// --- SISTEMA DE VOTOS MVP ---
 app.post('/submit-votes', (req, res) => {
     const { match_id, voter_id, votes } = req.body; 
-    if (!match_id || !voter_id || !votes || votes.length < 5) return res.status(400).send("Votación incompleta");
+    if (!match_id || !voter_id || !votes || votes.length < 5) return res.status(400).send("Faltan datos o votos incompletos");
 
-    db.query('SELECT id FROM votes WHERE match_id = ? AND voter_id = ?', [match_id, voter_id], (err, results) => {
+    db.query('SELECT * FROM votes WHERE match_id = ? AND voter_id = ?', [match_id, voter_id], (err, results) => {
         if (results && results.length > 0) return res.status(400).send("Ya has votado en este partido");
-
         const values = votes.map(v => [match_id, voter_id, v.player_id, v.points]);
-        db.query('INSERT INTO votes (match_id, voter_id, player_id, points) VALUES ?', [values], (err) => {
+        const sql = 'INSERT INTO votes (match_id, voter_id, player_id, points) VALUES ?';
+        db.query(sql, [values], (err) => {
             if (err) return res.status(500).send(err);
-            res.send("¡Votos registrados!");
+            res.send("¡Votación guardada con éxito!");
         });
     });
 });
 
 app.get('/player-rating/:id', (req, res) => {
-    const sql = `SELECT p.*, (60 + COALESCE(SUM(v.points), 0)) as current_rating FROM players p LEFT JOIN votes v ON p.id = v.player_id WHERE p.id = ? GROUP BY p.id`;
+    const sql = `SELECT p.*, (60 + COALESCE(SUM(v.points), 0)) as current_rating FROM players p LEFT JOIN votes v ON p.id = v.player_id WHERE p.id = ?`;
     db.query(sql, [req.params.id], (err, result) => {
         if (err) return res.status(500).send(err);
         res.json(result[0]);
     });
 });
 
-app.listen(process.env.PORT || 3001, '0.0.0.0', () => {
-    console.log("🚀 Server Running - v3.9.4");
-});
+app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log("🚀 v3.9.5 ready"));
