@@ -49,29 +49,28 @@ app.get('/matches/:tId', (req, res) => {
 
 app.put('/matches/:id', (req, res) => {
     const { team_a_goals, team_b_goals, played, referee, match_date } = req.body;
+    const matchId = req.params.id;
     
-    // 1. Formateamos la fecha normal del partido
+    // Formato de fecha del partido
     const date = match_date ? match_date.replace('T', ' ').slice(0, 19) : null;
 
-    // 2. LÓGICA DE VOTACIÓN:
-    // Si 'played' viene como true (o 1), calculamos 20 minutos desde AHORA.
-    // Si no, lo dejamos como null.
-    let votings_end_at = null;
-    if (played === true || played === 1 || played === "true") {
+    // Lógica de 20 min
+    let v_end = null;
+    if (played == true || played == 1) {
         const ahora = new Date();
-        const fechaFin = new Date(ahora.getTime() + 20 * 60000); // +20 minutos
-        votings_end_at = fechaFin.toISOString().slice(0, 19).replace('T', ' ');
+        const fechaFin = new Date(ahora.getTime() + 20 * 60000);
+        v_end = fechaFin.toISOString().slice(0, 19).replace('T', ' ');
     }
 
-    // 3. ACTUALIZACIÓN SQL: Añadimos votings_end_at a la consulta
-    const sql = 'UPDATE matches SET team_a_goals=?, team_b_goals=?, played=?, referee=?, match_date=?, votings_end_at=? WHERE id=?';
-    const params = [team_a_goals, team_b_goals, played, referee, date, votings_end_at, req.params.id];
-
-    db.query(sql, params, (err) => {
+    // Consulta simplificada al máximo
+    const sql = "UPDATE matches SET team_a_goals=?, team_b_goals=?, played=?, referee=?, match_date=?, votings_end_at=? WHERE id=?";
+    
+    db.query(sql, [team_a_goals, team_b_goals, played, referee, date, v_end, matchId], (err) => {
         if (err) {
-            console.error("Error al actualizar partido:", err);
-            return res.status(500).send(err);
+            console.error("ERROR CRÍTICO:", err.message);
+            return res.status(500).send(err.message);
         }
+        console.log("✅ Guardado con éxito en ID:", matchId);
         res.send("OK");
     });
 });
