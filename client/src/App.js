@@ -34,15 +34,17 @@ function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
-        {/* RUTA RAIZ: Decide según rol */}
+        {/* RUTA RAIZ: Redirección por rol */}
         <Route path="/" element={
           !user ? <Navigate to="/login" replace /> : (
             user.role === 'admin' ? <Navigate to="/admin-panel" replace /> : <Navigate to="/home" replace />
           )
         } />
 
+        {/* LOGIN */}
         <Route path="/login" element={!user ? <Login onLogin={handleLogin} /> : <Navigate to="/" replace />} />
 
+        {/* HOME / ONBOARDING */}
         <Route path="/home" element={
           !user ? <Navigate to="/login" replace /> : (
             (!myPlayer || isEditing) 
@@ -51,9 +53,17 @@ function App() {
           )
         } />
 
+        {/* PANEL ADMIN */}
         <Route path="/admin-panel" element={user?.role === 'admin' ? <AdminPanel user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
+        
+        {/* VISTA DE TORNEO */}
         <Route path="/tournament/:id" element={<TournamentView user={user} />} />
+        
+        {/* VISTA 1: LISTA DE PARTIDOS PARA VOTAR */}
         <Route path="/vote-mvp" element={myPlayer ? <VoteMvp myPlayer={myPlayer} /> : <Navigate to="/" replace />} />
+        
+        {/* VISTA 2: SELECCIÓN DE JUGADOR (El componente detectará el ID por el state) */}
+        <Route path="/vote-player/:matchId" element={myPlayer ? <VoteMvp myPlayer={myPlayer} /> : <Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

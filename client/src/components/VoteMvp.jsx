@@ -1,136 +1,142 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Trophy, Clock } from 'lucide-react';
-import VoteMatchCard from './VoteMatchCard'; // El componente que creamos antes
+import { ArrowLeft, Trophy, Star, ChevronRight, CheckCircle2 } from 'lucide-react';
+import VoteMatchCard from './VoteMatchCard';
 
 const API_URL = "https://gestionfutbol-production.up.railway.app";
 
-const VoteMVP = () => {
+const VoteMvp = ({ myPlayer }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // SEGURIDAD: Extraemos el match con valores por defecto para evitar errores de undefined
+  const { match = null } = location.state || {};
+
   const [matches, setMatches] = useState([]);
+  const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [voted, setVoted] = useState(false);
 
-  // 1. Lógica del Reloj en Tiempo Real para la cabecera
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // 2. Carga de partidos desde la API
-  useEffect(() => {
-    const fetchMatches = async () => {
+    const fetchData = async () => {
+      setLoading(true);
       try {
-        // Obtenemos el torneo activo
-        const resT = await axios.get(`${API_URL}/tournaments`);
-        if (resT.data.length > 0) {
-          const tId = resT.data[resT.data.length - 1].id;
-          // Obtenemos los partidos del torneo
-          const resM = await axios.get(`${API_URL}/matches/${tId}`);
+        if (match && match.id) {
+          // MODO SELECCIÓN JUGADORES
+          const tA = match.team_a_id || match.teamA_id;
+          const tB = match.team_b_id || match.teamB_id;
           
-          // Filtramos solo los partidos que tienen fecha programada
-          // (La lógica de si se muestran o no por tiempo la hace el VoteMatchCard interno)
-          setMatches(resM.data.filter(m => m.played || m.schedule));
+          const [resA, resB] = await Promise.all([
+            axios.get(`${API_URL}/players/team/${tA}`).catch(() => ({data: []})),
+            axios.get(`${API_URL}/players/team/${tB}`).catch(() => ({data: []}))
+          ]);
+          
+          const todos = [...resA.data, ...resB.data];
+          if (todos.length === 0 && match.tournament_id) {
+             const resBackup = await axios.get(`${API_URL}/players/${match.tournament_id}`);
+             setPlayers(resBackup.data);
+          } else {
+             setPlayers(todos);
+          }
+        } else {
+          // MODO LISTA DE PARTIDOS
+          const resT = await axios.get(`${API_URL}/tournaments`);
+          if (resT.data && resT.data.length > 0) {
+            const tId = resT.data[resT.data.length - 1].id;
+            const resM = await axios.get(`${API_URL}/matches/${tId}`);
+            // Solo mostramos los terminados
+            setMatches(resM.data.filter(m => m.played === 1 || m.played === true));
+          }
         }
       } catch (error) {
-        console.error("Error cargando partidos para votar:", error);
+        console.error("Error en carga:", error);
       } finally {
         setLoading(false);
       }
     };
+    fetchData();
+  }, [match]);
 
-    fetchMatches();
-  }, []);
-
-  const handleVote = (match) => {
-    // Aquí rediriges a la pantalla donde eliges al jugador específico de ese partido
-    navigate(`/vote-player/${match.id}`, { state: { match } });
+  const handleVote = async (playerId) => {
+    try {
+      await axios.post(`${API_URL}/submit-votes`, {
+        match_id: match.id,
+        voter_id: myPlayer?.id,
+        votes: [{ player_id: playerId, points: 5 }]
+      });
+      setVoted(true);
+      setTimeout(() => navigate('/home'), 2000);
+    } catch (err) {
+      alert("Error al registrar voto");
+      navigate('/home');
+    }
   };
 
-  return (
-    <div className="min-h-screen flex flex-col font-sans overflow-x-hidden relative"
-         style={{
-           backgroundColor: '#0a0a0a',
-           backgroundImage: `
-             linear-gradient(30deg, #0f0f0f 12%, transparent 12.5%, transparent 87%, #0f0f0f 87.5%, #0f0f0f),
-             linear-gradient(150deg, #0f0f0f 12%, transparent 12.5%, transparent 87%, #0f0f0f 87.5%, #0f0f0f),
-             linear-gradient(60deg, #141414 25%, transparent 25.5%, transparent 75%, #141414 75%, #141414)
-           `,
-           backgroundSize: '40px 70px'
-         }}>
-      
-      {/* TEXTURA DE CARBONO SOBREPUESTA */}
-      <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
-           style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/carbon-fibre.png")` }}></div>
+  if (voted) return (
+    <div className="h-screen bg-black flex flex-col items-center justify-center text-white text-center p-6">
+      <CheckCircle2 size={60} className="text-orange-500 mb-4 animate-bounce" />
+      <h2 className="text-2xl font-black uppercase italic tracking-tighter">VOTO REGISTRADO</h2>
+    </div>
+  );
 
-      {/* CABECERA FIJA */}
-      <div className="pt-10 pb-6 px-6 flex justify-between items-center z-30 sticky top-0 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/5">
-        <button 
-          onClick={() => navigate(-1)} 
-          className="p-3 bg-white/5 rounded-2xl border border-white/10 text-zinc-400 active:scale-90 transition-all"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        
-        <div className="flex flex-col items-center">
-          <h1 className="text-lg font-black italic tracking-tighter text-orange-500 uppercase">
-            Votación MVP
-          </h1>
-          <div className="flex items-center gap-2 mt-0.5">
-            <Clock size={10} className="text-orange-400 animate-pulse" />
-            <span className="text-[9px] font-mono font-black text-zinc-500 tracking-widest">
-              {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </div>
-        </div>
-
-        <div className="p-3 bg-orange-500/10 rounded-2xl border border-orange-500/20 text-orange-500">
-          <Trophy size={20} />
+  // VISTA: SELECCIÓN DE JUGADOR (Diseño Premium Recuperado)
+  if (match) return (
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <div className="p-6 flex items-center gap-4 sticky top-0 bg-black/90 backdrop-blur-md z-50 border-b border-white/5">
+        <button onClick={() => navigate('/vote-mvp')} className="p-3 bg-white/5 rounded-2xl border border-white/10"><ArrowLeft size={20}/></button>
+        <div>
+          <h1 className="text-sm font-black uppercase italic text-orange-500 leading-none">VOTAR MVP</h1>
+          <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">{match.team_a_name || 'Equipo A'} vs {match.team_b_name || 'Equipo B'}</p>
         </div>
       </div>
 
-      {/* CONTENIDO SCROLLABLE */}
-      <div className="flex-1 px-6 pt-6 pb-20 z-10 overflow-y-auto">
-        
-        <div className="mb-8">
-          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-1">Partidos Disponibles</p>
-          <h2 className="text-2xl font-black text-white italic leading-none">SELECCIONA<br/>EL ENCUENTRO</h2>
-        </div>
-
+      <div className="p-6">
+        <h2 className="text-3xl font-black italic uppercase leading-tight mb-8">ELIGE AL MEJOR<br/>DEL ENCUENTRO</h2>
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <div className="w-10 h-10 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin"></div>
-            <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Buscando partidos...</span>
-          </div>
-        ) : matches.length === 0 ? (
-          <div className="bg-zinc-900/40 border border-white/5 rounded-[30px] p-10 text-center">
-            <Clock size={40} className="mx-auto text-zinc-700 mb-4 opacity-20" />
-            <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">
-              No hay votaciones activas en este momento
-            </p>
-          </div>
+          <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-orange-500 border-t-transparent animate-spin rounded-full"></div></div>
         ) : (
-          <div className="space-y-2">
-            {matches.map((match) => (
-              <VoteMatchCard 
-                key={match.id} 
-                match={match} 
-                onVote={handleVote} 
-              />
-            ))}
+          <div className="grid grid-cols-1 gap-3 pb-10">
+            {players.length > 0 ? players.map(p => (
+              <div key={p.id} onClick={() => handleVote(p.id)} className="bg-zinc-900/50 border border-white/10 p-5 rounded-[30px] flex items-center justify-between active:scale-[0.98] transition-all hover:bg-orange-500/5">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-zinc-800 rounded-2xl flex items-center justify-center border border-white/5"><Star size={20} className="text-orange-500" /></div>
+                  <div>
+                    <h3 className="text-sm font-black uppercase italic tracking-tighter">{p.name}</h3>
+                    <p className="text-[9px] text-zinc-600 uppercase font-bold">{p.team_name || 'Jugador'}</p>
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-zinc-700" />
+              </div>
+            )) : <p className="text-center text-zinc-500 py-10 uppercase text-[10px] font-bold">No hay jugadores disponibles</p>}
           </div>
         )}
       </div>
+    </div>
+  );
 
-      {/* PIE DE PÁGINA DECORATIVO */}
-      <div className="p-6 text-center opacity-20 z-0">
-        <span className="text-[8px] font-black uppercase tracking-[0.5em] text-zinc-500">
-          PRO LEAGUE SEASON 2026
-        </span>
+  // VISTA: LISTA DE PARTIDOS
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
+      <div className="pt-10 pb-6 px-6 flex justify-between items-center sticky top-0 bg-[#0a0a0a]/90 backdrop-blur-md z-50 border-b border-white/5">
+        <button onClick={() => navigate('/home')} className="p-3 bg-white/5 rounded-2xl border border-white/10 text-zinc-400"><ArrowLeft size={20} /></button>
+        <div className="text-center"><h1 className="text-lg font-black italic text-orange-500 uppercase leading-none tracking-tighter">Votación</h1></div>
+        <div className="p-3 bg-orange-500/10 rounded-2xl text-orange-500"><Trophy size={20} /></div>
+      </div>
+      <div className="flex-1 px-6 pt-8 pb-20 overflow-y-auto">
+        <h2 className="text-3xl font-black text-white italic leading-none mb-8 uppercase tracking-tighter">PARTIDOS<br/>FINALIZADOS</h2>
+        {loading ? (
+          <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-orange-500 border-t-transparent animate-spin rounded-full"></div></div>
+        ) : (
+          matches.length > 0 ? (
+            matches.map(m => <VoteMatchCard key={m.id} match={m} onVote={(d) => navigate(`/vote-player/${m.id}`, { state: { match: d } })} />)
+          ) : (
+            <div className="bg-zinc-900/20 border border-white/5 rounded-[40px] p-12 text-center text-zinc-700 uppercase text-[10px] font-bold tracking-widest leading-relaxed">No hay urnas de votación<br/>abiertas en este momento</div>
+          )
+        )}
       </div>
     </div>
   );
 };
 
-export default VoteMVP;
+export default VoteMvp;
