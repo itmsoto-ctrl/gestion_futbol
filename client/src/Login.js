@@ -11,36 +11,34 @@ const Login = ({ onLogin }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            // 1. Hacemos el login normal
             const res = await axios.post(`${API_URL}/login`, form);
             const data = res.data;
-
-            // 1. Guardar la sesión en localStorage para que no se borre al recargar
-            if (data.token) localStorage.setItem('token', data.token);
-            localStorage.setItem('user', JSON.stringify(data.user || data));
-
             let finalData = { ...data };
-            
-            // 2. Buscamos si el usuario ya tiene un player_id asignado
-            const pId = data.player_id || (data.user && data.user.player_id);
 
-            // 3. Forzamos la recuperación de la carta para evitar la pantalla de selección
-            if (data.player) {
-                // Si la API ya te mandaba la carta, la guardamos
-                localStorage.setItem('player', JSON.stringify(data.player));
-            } else if (pId) {
-                // Si la API solo te manda el ID, hacemos el GET a la carta
-                try {
-                    const playerRes = await axios.get(`${API_URL}/players/${pId}`);
-                    localStorage.setItem('player', JSON.stringify(playerRes.data));
-                    finalData.player = playerRes.data; // Se lo inyectamos al estado global
-                } catch (err) {
-                    console.warn("No se pudo cargar la carta del jugador", err);
+            // 2. Buscamos la carta del jugador automáticamente
+            try {
+                const playersRes = await axios.get(`${API_URL}/players`);
+                const userObj = data.user || data;
+                
+                // Buscamos la carta que coincida con tu usuario
+                const miCarta = playersRes.data.find(p => 
+                    String(p.user_id) === String(userObj.id) || 
+                    String(p.id) === String(userObj.player_id)
+                );
+
+                if (miCarta) {
+                    finalData.player = miCarta; // Le inyectamos la carta a los datos
                 }
+            } catch (err) {
+                console.warn("Fallo al recuperar la carta en el login:", err);
             }
 
-            // 4. Pasamos la data completa (con la carta) a App.jsx y redirigimos
+            // 3. Pasamos todo a App.jsx (que ahora sí guardará my_player)
             onLogin(finalData);
-            navigate('/dashboard');
+            
+            // 4. Redirigimos a home (App.jsx ya decidirá si mostrar Dashboard u Onboarding)
+            navigate('/home');
             
         } catch (error) { 
             alert("Acceso denegado: Revisa tus credenciales"); 
@@ -49,11 +47,9 @@ const Login = ({ onLogin }) => {
 
     return (
         <div className="min-h-screen bg-zinc-950 flex flex-col justify-center items-center p-6 font-sans">
-            {/* Decoración de fondo (Brillo Dorado) */}
             <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-64 bg-fut-gold/10 blur-[120px] pointer-events-none"></div>
 
             <div className="w-full max-w-sm z-10">
-                {/* Logo / Icono */}
                 <div className="flex flex-col items-center mb-10 animate-in fade-in zoom-in duration-700">
                     <div className="w-20 h-20 bg-fut-gold rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(212,175,55,0.4)] mb-4">
                         <Trophy size={40} className="text-black" />
@@ -64,9 +60,7 @@ const Login = ({ onLogin }) => {
                     </h1>
                 </div>
 
-                {/* Card de Login */}
                 <div className="bg-zinc-900 border-2 border-zinc-800 p-8 rounded-[40px] shadow-2xl relative overflow-hidden">
-                    {/* Línea decorativa lateral similar al Dashboard */}
                     <div className="absolute left-0 top-10 bottom-10 w-1 bg-fut-gold rounded-r-full shadow-[2px_0_15px_#d4af37]"></div>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
@@ -105,10 +99,9 @@ const Login = ({ onLogin }) => {
                     </form>
                 </div>
 
-                {/* Footer del Login */}
                 <div className="mt-10 text-center">
                     <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.4em]">
-                        v3.9.4 — {new Date().getFullYear()}
+                        v3.9.5 — {new Date().getFullYear()}
                     </p>
                     <p className="text-zinc-500 text-[9px] font-bold mt-2">
                         DESIGNED BY <span className="text-zinc-400">DANIEL MARTINEZ</span>
