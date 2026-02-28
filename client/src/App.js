@@ -26,6 +26,12 @@ function App() {
   const handleLogin = (userData) => {
     setUser(userData);
     localStorage.setItem('user', JSON.stringify(userData));
+    
+    // LA SOLUCIÓN: Si el login trae la info de la carta, la seteamos al instante
+    if (userData.player) {
+      setMyPlayer(userData.player);
+      localStorage.setItem('my_player', JSON.stringify(userData.player));
+    }
   };
 
   // Guardado del jugador (Onboarding)
@@ -35,14 +41,12 @@ function App() {
     localStorage.setItem('my_player', JSON.stringify(playerData));
   };
 
-  // Logout limpio para tests
+  // Logout súper limpio
   const logout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('my_player');
+    localStorage.clear(); // Borra absolutamente todo el caché de la sesión
     setUser(null);
     setMyPlayer(null);
     setIsEditing(false);
-    // Usamos el navigate natural de las rutas o recarga limpia
     window.location.href = "/login";
   };
 
