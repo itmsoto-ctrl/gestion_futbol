@@ -9,7 +9,7 @@ import MainDashboard from './components/MainDashboard';
 import VoteMvp from './components/VoteMvp';
 
 function App() {
-  // Inicialización directa desde localStorage para evitar parpadeos
+  // Inicialización desde localStorage (Clave: user y my_player)
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('user');
     return saved ? JSON.parse(saved) : null;
@@ -22,28 +22,28 @@ function App() {
 
   const [isEditing, setIsEditing] = useState(false);
 
-  // Manejo de Login y persistencia
+  // Manejo de Login: Guardamos tanto el usuario como la carta
   const handleLogin = (userData) => {
     setUser(userData);
     localStorage.setItem('user', JSON.stringify(userData));
     
-    // LA SOLUCIÓN: Si el login trae la info de la carta, la seteamos al instante
-    if (userData.player) {
-      setMyPlayer(userData.player);
-      localStorage.setItem('my_player', JSON.stringify(userData.player));
+    // Si los datos del login ya traen la carta, la guardamos directamente
+    const playerCard = userData.player || (userData.user && userData.user.player);
+    
+    if (playerCard) {
+      setMyPlayer(playerCard);
+      localStorage.setItem('my_player', JSON.stringify(playerCard));
     }
   };
 
-  // Guardado del jugador (Onboarding)
   const handleOnboardingComplete = (playerData) => {
     setMyPlayer(playerData);
     setIsEditing(false);
     localStorage.setItem('my_player', JSON.stringify(playerData));
   };
 
-  // Logout súper limpio
   const logout = () => {
-    localStorage.clear(); // Borra absolutamente todo el caché de la sesión
+    localStorage.clear(); 
     setUser(null);
     setMyPlayer(null);
     setIsEditing(false);
@@ -53,17 +53,14 @@ function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
-        {/* RUTA RAIZ: Redirección inteligente */}
         <Route path="/" element={
           !user ? <Navigate to="/login" replace /> : (
             user.role === 'admin' ? <Navigate to="/admin-panel" replace /> : <Navigate to="/home" replace />
           )
         } />
 
-        {/* LOGIN */}
         <Route path="/login" element={!user ? <Login onLogin={handleLogin} /> : <Navigate to="/" replace />} />
 
-        {/* HOME: Si ya existe myPlayer, va directo al Dashboard */}
         <Route path="/home" element={
           !user ? <Navigate to="/login" replace /> : (
             (!myPlayer || isEditing) 
@@ -72,24 +69,15 @@ function App() {
           )
         } />
 
-        {/* PANEL ADMIN */}
         <Route path="/admin-panel" element={
           user?.role === 'admin' ? <AdminPanel user={user} onLogout={logout} /> : <Navigate to="/" replace />
         } />
         
-        {/* VISTA DE TORNEO (TABLA Y PARTIDOS) */}
         <Route path="/tournament/:id" element={<TournamentView user={user} />} />
         
-        {/* RUTAS DE VOTACIÓN MVP */}
-        <Route path="/vote-mvp" element={
-          myPlayer ? <VoteMvp myPlayer={myPlayer} /> : <Navigate to="/login" replace />
-        } />
-        
-        <Route path="/vote-player/:matchId" element={
-          myPlayer ? <VoteMvp myPlayer={myPlayer} /> : <Navigate to="/login" replace />
-        } />
+        <Route path="/vote-mvp" element={myPlayer ? <VoteMvp myPlayer={myPlayer} /> : <Navigate to="/login" replace />} />
+        <Route path="/vote-player/:matchId" element={myPlayer ? <VoteMvp myPlayer={myPlayer} /> : <Navigate to="/login" replace />} />
 
-        {/* CATCH ALL: Por si entran en una ruta rara, al login */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
