@@ -9,41 +9,49 @@ import MainDashboard from './components/MainDashboard';
 import VoteMvp from './components/VoteMvp';
 
 function App() {
-  // Inicialización desde localStorage (Clave: user y my_player)
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
-  });
-
+  // 1. Cargamos el usuario
+  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('user')));
+  
+  // 2. Cargamos el player usando una clave ÚNICA para cada usuario
   const [myPlayer, setMyPlayer] = useState(() => {
-    const saved = localStorage.getItem('my_player');
-    return saved ? JSON.parse(saved) : null;
+    const savedUser = JSON.parse(localStorage.getItem('user'));
+    if (savedUser) {
+      const savedPlayer = localStorage.getItem(`player_${savedUser.id || savedUser.username}`);
+      return savedPlayer ? JSON.parse(savedPlayer) : null;
+    }
+    return null;
   });
 
   const [isEditing, setIsEditing] = useState(false);
 
-  // Manejo de Login: Guardamos tanto el usuario como la carta
   const handleLogin = (userData) => {
     setUser(userData);
     localStorage.setItem('user', JSON.stringify(userData));
     
-    // Si los datos del login ya traen la carta, la guardamos directamente
-    const playerCard = userData.player || (userData.user && userData.user.player);
-    
-    if (playerCard) {
-      setMyPlayer(playerCard);
-      localStorage.setItem('my_player', JSON.stringify(playerCard));
+    // Al loguear, intentamos ver si este usuario ya tenía una carta guardada en este móvil
+    const savedPlayer = localStorage.getItem(`player_${userData.id || userData.username}`);
+    if (savedPlayer) {
+      setMyPlayer(JSON.parse(savedPlayer));
+    } else {
+      setMyPlayer(null);
     }
   };
 
   const handleOnboardingComplete = (playerData) => {
     setMyPlayer(playerData);
     setIsEditing(false);
-    localStorage.setItem('my_player', JSON.stringify(playerData));
+    // GUARDADO CLAVE: Guardamos la carta vinculada al ID del usuario
+    if (user) {
+      localStorage.setItem(`player_${user.id || user.username}`, JSON.stringify(playerData));
+      // También guardamos una copia general por si acaso
+      localStorage.setItem('my_player', JSON.stringify(playerData));
+    }
   };
 
   const logout = () => {
-    localStorage.clear(); 
+    // No usamos clear() para no borrar las cartas guardadas de otros usuarios en el mismo móvil
+    localStorage.removeItem('user');
+    localStorage.removeItem('my_player');
     setUser(null);
     setMyPlayer(null);
     setIsEditing(false);
@@ -53,14 +61,8 @@ function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
-        <Route path="/" element={
-          !user ? <Navigate to="/login" replace /> : (
-            user.role === 'admin' ? <Navigate to="/admin-panel" replace /> : <Navigate to="/home" replace />
-          )
-        } />
-
+        <Route path="/" element={!user ? <Navigate to="/login" replace /> : (user.role === 'admin' ? <Navigate to="/admin-panel" replace /> : <Navigate to="/home" replace />)} />
         <Route path="/login" element={!user ? <Login onLogin={handleLogin} /> : <Navigate to="/" replace />} />
-
         <Route path="/home" element={
           !user ? <Navigate to="/login" replace /> : (
             (!myPlayer || isEditing) 
@@ -68,16 +70,9 @@ function App() {
               : <MainDashboard player={myPlayer} onEdit={() => setIsEditing(true)} onLogout={logout} />
           )
         } />
-
-        <Route path="/admin-panel" element={
-          user?.role === 'admin' ? <AdminPanel user={user} onLogout={logout} /> : <Navigate to="/" replace />
-        } />
-        
+        <Route path="/admin-panel" element={user?.role === 'admin' ? <AdminPanel user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
         <Route path="/tournament/:id" element={<TournamentView user={user} />} />
-        
         <Route path="/vote-mvp" element={myPlayer ? <VoteMvp myPlayer={myPlayer} /> : <Navigate to="/login" replace />} />
-        <Route path="/vote-player/:matchId" element={myPlayer ? <VoteMvp myPlayer={myPlayer} /> : <Navigate to="/login" replace />} />
-
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

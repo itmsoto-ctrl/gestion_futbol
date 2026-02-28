@@ -12,69 +12,38 @@ const Login = ({ onLogin }) => {
         e.preventDefault();
         try {
             const res = await axios.post(`${API_URL}/login`, form);
-            const data = res.data;
-            let finalData = { ...data };
-            const userObj = data.user || data;
-
-            // RECUPERACIÓN DE CARTA: Buscamos el jugador vinculado al usuario
-            try {
-                const playersRes = await axios.get(`${API_URL}/players`);
-                const miCarta = playersRes.data.find(p => 
-                    String(p.user_id) === String(userObj.id)
-                );
-
-                if (miCarta) {
-                    finalData.player = miCarta; 
-                }
-            } catch (err) {
-                console.warn("No se pudo recuperar la carta automáticamente:", err.message);
-            }
-
-            onLogin(finalData);
+            onLogin(res.data);
             navigate('/home');
-            
         } catch (error) { 
-            alert("Acceso denegado: Revisa tus credenciales"); 
+            alert("Acceso denegado: Revisa credenciales"); 
         }
     };
 
     return (
-        <div className="min-h-screen bg-zinc-950 flex flex-col justify-center items-center p-6 font-sans">
-            <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-64 bg-fut-gold/10 blur-[120px] pointer-events-none"></div>
-            <div className="w-full max-w-sm z-10">
+        <div className="min-h-screen bg-zinc-950 flex flex-col justify-center items-center p-6">
+            <div className="w-full max-w-sm">
                 <div className="flex flex-col items-center mb-10">
-                    <div className="w-20 h-20 bg-fut-gold rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(212,175,55,0.4)] mb-4">
+                    <div className="w-20 h-20 bg-fut-gold rounded-full flex items-center justify-center mb-4">
                         <Trophy size={40} className="text-black" />
                     </div>
-                    <h1 className="text-white text-3xl font-black uppercase italic tracking-tighter leading-none text-center">
-                        GESTIÓN DE <br/>
-                        <span className="text-fut-gold">FÚTBOL</span>
+                    <h1 className="text-white text-3xl font-black uppercase italic text-center">
+                        GESTIÓN DE <br/><span className="text-fut-gold">FÚTBOL</span>
                     </h1>
                 </div>
-
-                <div className="bg-zinc-900 border-2 border-zinc-800 p-8 rounded-[40px] shadow-2xl relative overflow-hidden">
-                    <div className="absolute left-0 top-10 bottom-10 w-1 bg-fut-gold rounded-r-full shadow-[2px_0_15px_#d4af37]"></div>
+                <div className="bg-zinc-900 border-2 border-zinc-800 p-8 rounded-[40px] relative">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="relative">
-                            <label className="text-[10px] text-zinc-500 font-black uppercase tracking-widest ml-2 mb-2 block">Usuario</label>
-                            <input 
-                                type="text" 
-                                placeholder="USUARIO" 
-                                className="w-full bg-zinc-800 border-2 border-zinc-700 focus:border-fut-gold rounded-2xl py-4 px-12 text-white font-bold outline-none transition-all"
-                                onChange={e => setForm({...form, username: e.target.value})}
-                            />
-                        </div>
-                        <div className="relative">
-                            <label className="text-[10px] text-zinc-500 font-black uppercase tracking-widest ml-2 mb-2 block">Contraseña</label>
-                            <input 
-                                type="password" 
-                                placeholder="••••••••" 
-                                className="w-full bg-zinc-800 border-2 border-zinc-700 focus:border-fut-gold rounded-2xl py-4 px-12 text-white font-bold outline-none transition-all"
-                                onChange={e => setForm({...form, password: e.target.value})}
-                            />
-                        </div>
-                        <button type="submit" className="w-full bg-fut-gold text-black font-black py-5 rounded-2xl mt-4 flex items-center justify-center gap-2 uppercase tracking-tighter shadow-[0_10px_20px_rgba(212,175,55,0.2)] active:scale-95 transition-all">
-                            Entrar al Estadio <ArrowRight size={20} />
+                        <input 
+                            type="text" placeholder="USUARIO" 
+                            className="w-full bg-zinc-800 border-2 border-zinc-700 rounded-2xl py-4 px-6 text-white font-bold outline-none"
+                            onChange={e => setForm({...form, username: e.target.value})}
+                        />
+                        <input 
+                            type="password" placeholder="••••••••" 
+                            className="w-full bg-zinc-800 border-2 border-zinc-700 rounded-2xl py-4 px-6 text-white font-bold outline-none"
+                            onChange={e => setForm({...form, password: e.target.value})}
+                        />
+                        <button type="submit" className="w-full bg-fut-gold text-black font-black py-5 rounded-2xl flex items-center justify-center gap-2 uppercase">
+                            Entrar <ArrowRight size={20} />
                         </button>
                     </form>
                 </div>
