@@ -12,8 +12,36 @@ const Login = ({ onLogin }) => {
         e.preventDefault();
         try {
             const res = await axios.post(`${API_URL}/login`, form);
-            onLogin(res.data);
+            const data = res.data;
+
+            // 1. Guardar la sesión en localStorage para que no se borre al recargar
+            if (data.token) localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user || data));
+
+            let finalData = { ...data };
+            
+            // 2. Buscamos si el usuario ya tiene un player_id asignado
+            const pId = data.player_id || (data.user && data.user.player_id);
+
+            // 3. Forzamos la recuperación de la carta para evitar la pantalla de selección
+            if (data.player) {
+                // Si la API ya te mandaba la carta, la guardamos
+                localStorage.setItem('player', JSON.stringify(data.player));
+            } else if (pId) {
+                // Si la API solo te manda el ID, hacemos el GET a la carta
+                try {
+                    const playerRes = await axios.get(`${API_URL}/players/${pId}`);
+                    localStorage.setItem('player', JSON.stringify(playerRes.data));
+                    finalData.player = playerRes.data; // Se lo inyectamos al estado global
+                } catch (err) {
+                    console.warn("No se pudo cargar la carta del jugador", err);
+                }
+            }
+
+            // 4. Pasamos la data completa (con la carta) a App.jsx y redirigimos
+            onLogin(finalData);
             navigate('/dashboard');
+            
         } catch (error) { 
             alert("Acceso denegado: Revisa tus credenciales"); 
         }
@@ -80,7 +108,7 @@ const Login = ({ onLogin }) => {
                 {/* Footer del Login */}
                 <div className="mt-10 text-center">
                     <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.4em]">
-                        v3.9.3 — {new Date().getFullYear()}
+                        v3.9.4 — {new Date().getFullYear()}
                     </p>
                     <p className="text-zinc-500 text-[9px] font-bold mt-2">
                         DESIGNED BY <span className="text-zinc-400">DANIEL MARTINEZ</span>
