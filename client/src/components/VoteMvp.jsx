@@ -1,140 +1,190 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Trophy, Star, ChevronRight, CheckCircle2 } from 'lucide-react';
-import VoteMatchCard from './VoteMatchCard';
+import { useNavigate } from 'react-router-dom';
+import FutCard from './FutCard';
+import { Trophy, ChevronLeft, Loader2 } from 'lucide-react';
 
 const API_URL = "https://gestionfutbol-production.up.railway.app";
 
 const VoteMvp = ({ myPlayer }) => {
   const navigate = useNavigate();
-  const location = useLocation();
-  
-  // SEGURIDAD: Extraemos el match con valores por defecto para evitar errores de undefined
-  const { match = null } = location.state || {};
-
   const [matches, setMatches] = useState([]);
+  const [selectedMatch, setSelectedMatch] = useState(null);
   const [players, setPlayers] = useState([]);
+  const [votes, setVotes] = useState({});
   const [loading, setLoading] = useState(true);
-  const [voted, setVoted] = useState(false);
+  const pointsSystem = [5, 4, 3, 2, 1];
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
+    const loadMatches = async () => {
       try {
-        if (match && match.id) {
-          // MODO SELECCIÓN JUGADORES
-          const tA = match.team_a_id || match.teamA_id;
-          const tB = match.team_b_id || match.teamB_id;
-          
-          const [resA, resB] = await Promise.all([
-            axios.get(`${API_URL}/players/team/${tA}`).catch(() => ({data: []})),
-            axios.get(`${API_URL}/players/team/${tB}`).catch(() => ({data: []}))
-          ]);
-          
-          const todos = [...resA.data, ...resB.data];
-          if (todos.length === 0 && match.tournament_id) {
-             const resBackup = await axios.get(`${API_URL}/players/${match.tournament_id}`);
-             setPlayers(resBackup.data);
-          } else {
-             setPlayers(todos);
-          }
-        } else {
-          // MODO LISTA DE PARTIDOS
-          const resT = await axios.get(`${API_URL}/tournaments`);
-          if (resT.data && resT.data.length > 0) {
-            const tId = resT.data[resT.data.length - 1].id;
-            const resM = await axios.get(`${API_URL}/matches/${tId}`);
-            // Solo mostramos los terminados
-            setMatches(resM.data.filter(m => m.played === 1 || m.played === true));
-          }
+        setLoading(true);
+        const resT = await axios.get(`${API_URL}/tournaments`);
+        if (resT.data.length > 0) {
+          const tId = resT.data.sort((a, b) => b.id - a.id)[0].id;
+          const resM = await axios.get(`${API_URL}/matches/${tId}`);
+          setMatches(resM.data.filter(m => m.played == 1).sort((a, b) => b.id - a.id));
         }
-      } catch (error) {
-        console.error("Error en carga:", error);
-      } finally {
-        setLoading(false);
-      }
+      } catch (e) { console.error("Error cargando partidos:", e); }
+      finally { setLoading(false); }
     };
-    fetchData();
-  }, [match]);
+    loadMatches();
+  }, []);
 
-  const handleVote = async (playerId) => {
+  const selectMatch = async (match) => {
+    setSelectedMatch(match);
+    setLoading(true);
     try {
-      await axios.post(`${API_URL}/submit-votes`, {
-        match_id: match.id,
-        voter_id: myPlayer?.id,
-        votes: [{ player_id: playerId, points: 5 }]
-      });
-      setVoted(true);
-      setTimeout(() => navigate('/home'), 2000);
-    } catch (err) {
-      alert("Error al registrar voto");
-      navigate('/home');
+      let playersData = [];
+      let goalsData = [];
+
+      const resP = await axios.get(`${API_URL}/players/${match.tournament_id}`);
+      playersData = resP.data || [];
+
+      const rutasGoles = [
+        `${API_URL}/goals`,
+        `${API_URL}/player-goals`,
+        `${API_URL}/goals/${match.tournament_id}`,
+        `${API_URL}/match-goals/${match.id}`
+      ];
+
+      for (const ruta of rutasGoles) {
+        try {
+          const resG = await axios.get(ruta);
+          if (resG.data && Array.isArray(resG.data)) {
+            goalsData = resG.data;
+            console.log("✅ Goles encontrados en:", ruta);
+            break;
+          }
+        } catch (err) {
+          console.warn(`❌ No hay goles en: ${ruta}`);
+        }
+      }
+
+      const detailed = playersData
+        .filter(p => (String(p.team_id).trim() === String(match.team_a_id).trim() || String(p.team_id).trim() === String(match.team_b_id).trim()))
+        .map(p => {
+          const pId = String(p.id).trim();
+          const pTeamId = String(p.team_id).trim();
+
+          const misGoles = goalsData.filter(g => 
+            String(g.player_id || g.playerId).trim() === pId
+          ).length;
+
+          const esLocal = pTeamId === String(match.team_a_id).trim();
+          const sA = Number(match.team_a_score || match.team_a_goals || 0);
+          const sB = Number(match.team_b_score || match.team_b_goals || 0);
+          const gano = esLocal ? (sA > sB) : (sB > sA);
+
+          let ratingFinal = 62 + (misGoles * 8) + (gano ? 5 : 0);
+          ratingFinal = Math.min(ratingFinal, 99);
+
+          return { 
+            ...p, 
+            rating: ratingFinal,
+            pac: ratingFinal,
+            sho: Math.max(60, 60 + (misGoles * 15)), 
+            pas: Math.max(60, 62 + (gano ? 8 : 0)),
+            dri: Math.max(60, ratingFinal - 1),
+            def: Math.max(60, 60 + (gano ? 5 : 0)),
+            phy: Math.max(60, 65 + (gano ? 5 : 0))
+          };
+        });
+
+      setPlayers(detailed.sort((a, b) => b.rating - a.rating));
+    } catch (e) { 
+        console.error("Error fatal procesando partido:", e); 
+    } finally { 
+        setLoading(false); 
     }
   };
 
-  if (voted) return (
-    <div className="h-screen bg-black flex flex-col items-center justify-center text-white text-center p-6">
-      <CheckCircle2 size={60} className="text-orange-500 mb-4 animate-bounce" />
-      <h2 className="text-2xl font-black uppercase italic tracking-tighter">VOTO REGISTRADO</h2>
+  const handleVote = (playerId, pts) => {
+    const newVotes = { ...votes };
+    Object.keys(newVotes).forEach(id => { if (newVotes[id] === pts) delete newVotes[id]; });
+    newVotes[playerId] = pts;
+    setVotes(newVotes);
+  };
+
+  if (loading) return (
+    <div className="h-screen bg-zinc-950 flex flex-col items-center justify-center text-orange-500 font-black animate-pulse">
+      <Loader2 className="animate-spin mb-4" size={40} />
+      ESCANER DE RENDIMIENTO...
     </div>
   );
 
-  // VISTA: SELECCIÓN DE JUGADOR (Diseño Premium Recuperado)
-  if (match) return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="p-6 flex items-center gap-4 sticky top-0 bg-black/90 backdrop-blur-md z-50 border-b border-white/5">
-        <button onClick={() => navigate('/vote-mvp')} className="p-3 bg-white/5 rounded-2xl border border-white/10"><ArrowLeft size={20}/></button>
-        <div>
-          <h1 className="text-sm font-black uppercase italic text-orange-500 leading-none">VOTAR MVP</h1>
-          <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">{match.team_a_name || 'Equipo A'} vs {match.team_b_name || 'Equipo B'}</p>
-        </div>
-      </div>
-
-      <div className="p-6">
-        <h2 className="text-3xl font-black italic uppercase leading-tight mb-8">ELIGE AL MEJOR<br/>DEL ENCUENTRO</h2>
-        {loading ? (
-          <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-orange-500 border-t-transparent animate-spin rounded-full"></div></div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 pb-10">
-            {players.length > 0 ? players.map(p => (
-              <div key={p.id} onClick={() => handleVote(p.id)} className="bg-zinc-900/50 border border-white/10 p-5 rounded-[30px] flex items-center justify-between active:scale-[0.98] transition-all hover:bg-orange-500/5">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-zinc-800 rounded-2xl flex items-center justify-center border border-white/5"><Star size={20} className="text-orange-500" /></div>
-                  <div>
-                    <h3 className="text-sm font-black uppercase italic tracking-tighter">{p.name}</h3>
-                    <p className="text-[9px] text-zinc-600 uppercase font-bold">{p.team_name || 'Jugador'}</p>
-                  </div>
-                </div>
-                <ChevronRight size={18} className="text-zinc-700" />
-              </div>
-            )) : <p className="text-center text-zinc-500 py-10 uppercase text-[10px] font-bold">No hay jugadores disponibles</p>}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // VISTA: LISTA DE PARTIDOS
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
-      <div className="pt-10 pb-6 px-6 flex justify-between items-center sticky top-0 bg-[#0a0a0a]/90 backdrop-blur-md z-50 border-b border-white/5">
-        <button onClick={() => navigate('/home')} className="p-3 bg-white/5 rounded-2xl border border-white/10 text-zinc-400"><ArrowLeft size={20} /></button>
-        <div className="text-center"><h1 className="text-lg font-black italic text-orange-500 uppercase leading-none tracking-tighter">Votación</h1></div>
-        <div className="p-3 bg-orange-500/10 rounded-2xl text-orange-500"><Trophy size={20} /></div>
+    <div className="h-[100dvh] bg-zinc-950 text-white flex flex-col overflow-hidden font-sans">
+      {/* HEADER */}
+      <div className="bg-zinc-900 pt-12 pb-5 px-6 flex items-center justify-between border-b border-orange-500/20 shadow-2xl">
+        <button onClick={() => selectedMatch ? setSelectedMatch(null) : navigate('/home')} className="text-zinc-400 active:scale-90 transition-transform">
+          <ChevronLeft size={30}/>
+        </button>
+        <div className="text-center">
+            <h1 className="text-[10px] font-black uppercase italic tracking-[0.3em] text-orange-500 leading-none">VOTACIÓN MVP</h1>
+            <p className="text-[8px] text-zinc-500 font-bold uppercase mt-1 tracking-widest leading-none">Reparte los puntos</p>
+        </div>
+        <Trophy size={24} className="text-orange-500 drop-shadow-[0_0_10px_rgba(249,115,22,0.4)]" />
       </div>
-      <div className="flex-1 px-6 pt-8 pb-20 overflow-y-auto">
-        <h2 className="text-3xl font-black text-white italic leading-none mb-8 uppercase tracking-tighter">PARTIDOS<br/>FINALIZADOS</h2>
-        {loading ? (
-          <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-orange-500 border-t-transparent animate-spin rounded-full"></div></div>
-        ) : (
-          matches.length > 0 ? (
-            matches.map(m => <VoteMatchCard key={m.id} match={m} onVote={(d) => navigate(`/vote-player/${m.id}`, { state: { match: d } })} />)
-          ) : (
-            <div className="bg-zinc-900/20 border border-white/5 rounded-[40px] p-12 text-center text-zinc-700 uppercase text-[10px] font-bold tracking-widest leading-relaxed">No hay urnas de votación<br/>abiertas en este momento</div>
-          )
-        )}
-      </div>
+
+      {!selectedMatch ? (
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
+          {matches.map(m => (
+            <button key={m.id} onClick={() => selectMatch(m)} className="w-full bg-zinc-900/60 backdrop-blur-md border border-white/5 p-6 rounded-[35px] flex justify-between items-center shadow-xl active:scale-95 transition-all">
+               <div className="text-left">
+                  <div className="text-[9px] text-orange-500 font-black uppercase mb-1 tracking-widest leading-none">Resultado</div>
+                  <div className="font-black uppercase italic text-sm text-zinc-200">
+                    {m.team_a_name} <span className="text-white mx-1">{m.team_a_score}-{m.team_b_score}</span> {m.team_b_name}
+                  </div>
+               </div>
+               <div className="w-10 h-10 bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-500 border border-white/5">
+                  <Trophy size={16} />
+               </div>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col relative">
+            <div className="flex justify-center gap-2 py-6">
+                {pointsSystem.map(p => (
+                    <div key={p} className={`w-9 h-9 rounded-2xl flex items-center justify-center text-xs font-black transition-all ${
+                        Object.values(votes).includes(p) ? 'bg-zinc-800 text-zinc-600 scale-75 border border-white/10' : 'bg-orange-500 text-black border-2 border-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]'
+                    }`}>{p}</div>
+                ))}
+            </div>
+
+            <div className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar w-full py-4">
+                {players.map(p => (
+                    <div key={p.id} className="snap-center shrink-0 w-[85%] mx-[7.5%] bg-zinc-900/80 backdrop-blur-xl rounded-[50px] p-6 flex items-center border border-white/10 shadow-2xl relative">
+                        <div className="flex-1 flex justify-center scale-[0.88] -ml-12 drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)]">
+                          <FutCard player={{...p, rating: p.rating + (votes[p.id] || 0)}} view="voting" />
+                        </div>
+                        
+                        {/* BOTONES ACTUALIZADOS: BLANCOS POR DEFECTO */}
+                        <div className="w-16 flex flex-col gap-2 z-10">
+                            {pointsSystem.map(pts => (
+                                <button 
+                                    key={pts} 
+                                    onClick={() => handleVote(p.id, pts)} 
+                                    className={`w-12 h-12 rounded-2xl text-sm font-black transition-all active:scale-90 border-2 ${
+                                        votes[p.id] === pts 
+                                        ? 'bg-orange-500 border-orange-400 text-black scale-110 shadow-lg' 
+                                        : 'bg-white border-white text-zinc-900 shadow-md'
+                                    }`}
+                                >
+                                    {pts}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+            
+            <div className="mt-auto p-10">
+               <p className="text-center text-[9px] font-bold text-zinc-500 uppercase tracking-[0.3em] italic">Desliza para ver a todos los cracks</p>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

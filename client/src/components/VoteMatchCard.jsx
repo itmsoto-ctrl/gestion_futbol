@@ -7,24 +7,24 @@ const VoteMatchCard = ({ match, onVote }) => {
 
   useEffect(() => {
     const calcularTiempo = () => {
-      let fechaCierre;
-
-      // LÓGICA DE TIEMPO PRIORITARIA:
-      // 1. Si existe 'votings_end_at' (tu campo de DB), lo usamos.
-      // 2. Si no, usamos Hora Inicio + 50 minutos como seguridad.
-      if (match.votings_end_at) {
-        fechaCierre = new Date(match.votings_end_at);
-      } else {
-        const fechaInicio = new Date(match.date_time || match.schedule || match.startTime);
-        fechaCierre = new Date(fechaInicio.getTime() + (50 * 60 * 1000));
+      // 1. Obtenemos la hora en que finalizó el partido según la tabla 'matches'
+      if (!match.votings_end_at) {
+        setIsVisible(false); // Si no hay fecha de fin, no mostramos la urna por seguridad
+        return;
       }
 
+      const finPartido = new Date(match.votings_end_at);
+      
+      // 2. LA REGLA: La votación cierra exactamente 20 minutos después del fin del partido
+      const fechaCierreReal = new Date(finPartido.getTime() + (20 * 60 * 1000));
+      
       const ahora = new Date();
-      const diferenciaMs = fechaCierre - ahora;
+      const diferenciaMs = fechaCierreReal - ahora;
 
       if (diferenciaMs <= 0) {
-        setIsVisible(false); // Desaparece si ya pasó la hora de cierre
+        setIsVisible(false); // HAN PASADO LOS 20 MINUTOS: La caja se destruye
       } else {
+        // Formateamos los minutos y segundos para el móvil
         const mins = Math.floor((diferenciaMs / 1000) / 60);
         const secs = Math.floor((diferenciaMs / 1000) % 60);
         setTimeLeft(`${mins}:${secs < 10 ? '0' : ''}${secs}`);
@@ -36,9 +36,9 @@ const VoteMatchCard = ({ match, onVote }) => {
     return () => clearInterval(interval);
   }, [match]);
 
+  // Si ya pasaron los 20 minutos de margen, no se renderiza nada
   if (!isVisible) return null;
 
-  // Función para renderizar el logo o el fallback (inicial)
   const renderLogo = (logoUrl, teamName) => {
     if (logoUrl) {
       return (
@@ -46,7 +46,7 @@ const VoteMatchCard = ({ match, onVote }) => {
           src={logoUrl} 
           alt={teamName} 
           className="w-14 h-14 object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]"
-          onError={(e) => e.target.style.display = 'none'} // Si falla la imagen, se oculta
+          onError={(e) => e.target.style.display = 'none'}
         />
       );
     }
@@ -58,16 +58,16 @@ const VoteMatchCard = ({ match, onVote }) => {
   };
 
   return (
-    <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/10 rounded-[35px] p-6 mb-4 relative overflow-hidden shadow-2xl">
+    <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/10 rounded-[35px] p-6 mb-4 relative overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
       
-      {/* 1. HEADER DE LA CAJA */}
+      {/* HEADER: Cronómetro Dinámico */}
       <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
         <div className="flex items-center gap-3">
           <div className="bg-orange-500/10 p-2 rounded-xl border border-orange-500/20">
             <Clock size={16} className="text-orange-500 animate-pulse" />
           </div>
           <div className="flex flex-col">
-            <span className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.2em]">Urna de votación</span>
+            <span className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.2em]">Cierre de urna</span>
             <span className="text-sm font-mono font-black text-orange-400 tracking-wider">
               {timeLeft}
             </span>
@@ -76,13 +76,12 @@ const VoteMatchCard = ({ match, onVote }) => {
         
         <div className="flex items-center gap-2 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
           <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
-          <span className="text-[9px] font-black text-emerald-500 uppercase italic">Votación en vivo</span>
+          <span className="text-[9px] font-black text-emerald-500 uppercase italic">Activa</span>
         </div>
       </div>
 
-      {/* 2. ENFRENTAMIENTO (Con Logos) */}
+      {/* ENFRENTAMIENTO */}
       <div className="flex justify-between items-center px-2 mb-2">
-        {/* Equipo A */}
         <div className="flex flex-col items-center w-2/5 text-center gap-3">
           {renderLogo(match.team_a_logo, match.team_a_name)}
           <span className="text-[11px] font-black uppercase italic leading-tight text-white tracking-tighter">
@@ -94,7 +93,6 @@ const VoteMatchCard = ({ match, onVote }) => {
           <span className="text-zinc-800 font-black italic text-3xl tracking-tighter opacity-50">VS</span>
         </div>
 
-        {/* Equipo B */}
         <div className="flex flex-col items-center w-2/5 text-center gap-3">
           {renderLogo(match.team_b_logo, match.team_b_name)}
           <span className="text-[11px] font-black uppercase italic leading-tight text-white tracking-tighter">
@@ -103,7 +101,7 @@ const VoteMatchCard = ({ match, onVote }) => {
         </div>
       </div>
 
-      {/* 3. BOTÓN */}
+      {/* BOTÓN DE ACCIÓN */}
       <button
         onClick={() => onVote(match)}
         className="w-full mt-6 bg-gradient-to-r from-orange-600 to-orange-500 py-4 rounded-[22px] flex items-center justify-center gap-3 shadow-xl active:scale-[0.96] transition-all border-t border-white/20"
@@ -114,6 +112,7 @@ const VoteMatchCard = ({ match, onVote }) => {
         </span>
       </button>
 
+      {/* Decoración de fondo */}
       <Timer size={120} className="absolute -right-8 -bottom-8 text-white/[0.02] -rotate-12 pointer-events-none" />
     </div>
   );
