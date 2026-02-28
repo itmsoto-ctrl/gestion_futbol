@@ -69,7 +69,7 @@ const FutCard = ({ player, size = "large", view = "dashboard" }) => {
 
     // DASHBOARD / POR DEFECTO
     return { 
-      val: "top-[68px] left-[60px]", pos: "top-[140px] left-[80px]", nom: "top-[270px]", 
+      val: "top-[68px] left-[60px]", pos: "top-[140px] left-[80px]", nom: "top-[285px]", 
       statsY: "top-[340px]", statsX_Izq: "left-[58px]", statsX_Der: "left-[192px]"
     };
   };
