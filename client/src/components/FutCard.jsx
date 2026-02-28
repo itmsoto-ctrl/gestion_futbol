@@ -18,8 +18,9 @@ const FutCard = ({ player, size = "large", view = "dashboard" }) => {
   const rating = parseInt(player.rating) || 60;
 
   const getCardTheme = (r) => {
+    // CORRECCIÓN: Ahora carga '/leyenda.png' en vez de '/oro.png'
     if (r >= 90) return {
-      img: '/oro.png',
+      img: '/leyenda.png', 
       video: '/particulas_leyenda.mp4',
       glow: "shadow-[0_0_40px_rgba(52,211,153,0.6)]",
       label: "LEYENDA"
