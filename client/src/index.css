@@ -16,3 +16,82 @@
     perspective: 1000px;
   }
 }
+
+/* Registramos la propiedad del ángulo para que CSS sepa animarla correctamente */
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+
+.halo-wrapper {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* El contenedor debe ser un poco más grande que el logo */
+  border-radius: 50%;
+  overflow: hidden; /* Cortamos el exceso del gradiente para que solo se vea en el borde */
+  background: #09090b; /* Fondo oscuro (Zinc-950) */
+}
+
+/* La "Serpiente" de luz */
+.halo-wrapper::before {
+  content: '';
+  position: absolute;
+  width: 180%; /* Mucho más grande para que al girar siempre cubra el borde */
+  height: 180%;
+  background: conic-gradient(
+    transparent 0%,
+    transparent 70%,   /* 70% del círculo es invisible (esto crea el efecto de "estela") */
+    #a3e635 90%,       /* Color lima */
+    #ffffff 100%       /* La punta de la luz es blanca para que brille más */
+  );
+  animation: rotate-snake 2s linear infinite;
+}
+
+/* El "Escudo" interior: Tapa el centro del gradiente para dejar solo el borde */
+.halo-wrapper::after {
+  content: '';
+  position: absolute;
+  inset: 3px; /* Este número define el GROSOR del borde (3px) */
+  background: #09090b; /* Debe ser el MISMO color que el fondo de tu app */
+  border-radius: 50%;
+  z-index: 1;
+}
+
+/* El resplandor difuminado (Glow) exterior */
+.halo-glow {
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  background: #a3e635;
+  filter: blur(25px);
+  opacity: 0.15; /* Brillo muy sutil */
+  z-index: 0;
+}
+
+@keyframes rotate-snake {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* El Logo en sí */
+.logo-img {
+  position: relative;
+  z-index: 10; /* Por encima del "escudo" y de la "serpiente" */
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+}
+
+/* Esto asegura que toda la página, se estire lo que se estire, sea oscura */
+html, body {
+  background-color: #030712; /* Este es el código de gray-950 */
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}

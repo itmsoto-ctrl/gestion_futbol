@@ -1,0 +1,84 @@
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.perfect-contour-container {
+  position: relative;
+  width: 280px; /* Tamaño protagonista */
+  height: 280px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* LA SERPIENTE DE LUZ (Efecto Borde Fino) */
+.contour-chase-effect {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+
+  /* --- TRUCO DE MÁSCARA PARA BORDE FINO --- */
+  /* Usamos la misma imagen dos veces */
+  -webkit-mask-image: var(--logo-url), var(--logo-url);
+  mask-image: var(--logo-url), var(--logo-url);
+  
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+
+  /* La primera máscara muestra todo, la segunda (más pequeña) lo "resta" */
+  -webkit-mask-composite: source-in, destination-out;
+  mask-composite: intersect, exclude; 
+  
+  /* Ajustamos el recorte para que solo quede el borde (1.01 vs 1.0) */
+  -webkit-mask-clip: border-box, content-box;
+  
+  /* Hacemos que la capa de luz sea un pelín más grande para que asome */
+  transform: scale(1.02); 
+  filter: drop-shadow(0 0 2px #a3e635);
+}
+
+/* El destello que gira (ahora solo se verá en el borde recortado) */
+.contour-chase-effect::after {
+  content: '';
+  position: absolute;
+  inset: -100px;
+  background: conic-gradient(
+    from var(--angle),
+    transparent 75%,
+    rgba(163, 230, 53, 0.9) 90%,
+    #ffffff 95%,
+    rgba(163, 230, 53, 0.9) 100%
+  );
+  animation: rotate-angle 2s linear infinite;
+}
+
+/* EL LOGO REAL (Encima de todo) */
+.logo-contour-real {
+  position: relative;
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+  z-index: 10;
+  /* Opcional: un filtro para que el logo se vea más vibrante */
+  filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
+}
+
+/* RESPLANDOR DE FONDO (Sutil) */
+.logo-contour-glow {
+  position: absolute;
+  width: 10%;
+  height: 10%;
+  object-fit: contain;
+  opacity: 0.15;
+  filter: blur(20px) brightness(1.5);
+  z-index: 1;
+}
+
+@keyframes rotate-angle {
+  to { --angle: 360deg; }
+}
