@@ -4,7 +4,7 @@ const pool = require('../config/db');
 const { verifyToken } = require('../middleware/auth.middleware');
 const crypto = require('crypto');
 
-// 1. OBTENER LIGAS DEL ADMIN
+// 1. OBTENER LIGAS DEL ADMIN (Dashboard General)
 router.get('/my-leagues', verifyToken, async (req, res) => {
     try {
         const [rows] = await pool.execute(
@@ -21,7 +21,47 @@ router.get('/my-leagues', verifyToken, async (req, res) => {
     }
 });
 
-// 2. CREAR LIGA (NORMALIZADA CON IDs)
+// 2. DETALLE DE LIGA PARA EL ADMIN (Equipos, Tokens y Estado de Capitanes)
+router.get('/:id', verifyToken, async (req, res) => {
+    try {
+        const [league] = await pool.execute('SELECT * FROM leagues WHERE id = ?', [req.params.id]);
+        if (league.length === 0) return res.status(404).json({ message: "Liga no encontrada" });
+
+        const [teams] = await pool.execute(
+            `SELECT id, name, team_token, captain_phone, captain_id, logo,
+            (SELECT COUNT(*) FROM league_players WHERE team_id = league_teams.id) as player_count
+            FROM league_teams WHERE league_id = ?`,
+            [req.params.id]
+        );
+
+        res.json({ ...league[0], teams });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 3. PORTAL INTELIGENTE (Público - Se abre desde el enlace de WhatsApp)
+router.get('/team-portal/:token', async (req, res) => {
+    try {
+        const [teams] = await pool.execute(
+            `SELECT t.id, t.name as teamName, t.captain_id, l.name as leagueName, l.id as leagueId
+             FROM league_teams t 
+             JOIN leagues l ON t.league_id = l.id 
+             WHERE t.team_token = ?`,
+            [req.params.token]
+        );
+
+        if (teams.length === 0) return res.status(404).json({ message: "Enlace no válido" });
+
+        const team = teams[0];
+        const type = !team.captain_id ? 'CAPTAIN_INVITE' : 'PLAYER_REGISTRATION';
+        res.json({ type, team });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 4. CREAR LIGA (Proceso de inicialización masiva)
 router.post('/create', verifyToken, async (req, res) => {
     const { config, schedule } = req.body;
     const adminId = req.user.id;
@@ -31,7 +71,7 @@ router.post('/create', verifyToken, async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // A. Insertar la Liga
+        // A. Insertar Liga
         const [leagueResult] = await connection.execute(
             `INSERT INTO leagues (
                 admin_id, name, teams_count, match_minutes, 
@@ -47,18 +87,19 @@ router.post('/create', verifyToken, async (req, res) => {
         );
         const leagueId = leagueResult.insertId;
 
-        // B. Insertar Equipos y Crear Mapa de IDs (Usando .trim() para seguridad)
+        // B. Insertar Equipos con su TOKEN único de WhatsApp
         const teamIdsMap = {};
         for (const team of config.teams) {
             const cleanName = team.name.trim();
+            const teamToken = crypto.randomBytes(3).toString('hex').toUpperCase(); 
             const [tResult] = await connection.execute(
-                `INSERT INTO league_teams (league_id, name) VALUES (?, ?)`,
-                [leagueId, cleanName]
+                `INSERT INTO league_teams (league_id, name, team_token, captain_phone) VALUES (?, ?, ?, ?)`,
+                [leagueId, cleanName, teamToken, team.phone || null]
             );
             teamIdsMap[cleanName] = tResult.insertId;
         }
 
-        // C. Insertar Sedes y Crear Mapa de IDs (Usando .trim())
+        // C. Insertar Sedes
         const venueIdsMap = {};
         for (const v of config.selectedVenues) {
             const cleanVenueName = v.name.trim();
@@ -69,47 +110,82 @@ router.post('/create', verifyToken, async (req, res) => {
             venueIdsMap[cleanVenueName] = vResult.insertId;
         }
 
-        // D. Insertar Partidos con Filtrado Robusto
-       // D. Insertar Partidos usando los IDs mapeados
-if (schedule && schedule.length > 0) {
-    const matchData = schedule.map(item => {
-        // Buscamos los IDs en el mapa. Si es "1º Clasif", devolverá undefined.
-        const hId = teamIdsMap[item.match.home.trim()];
-        const aId = teamIdsMap[item.match.away.trim()];
-        const vId = venueIdsMap[item.venue.trim()];
-
-        return [
-            leagueId,
-            hId || null, // Si no hay ID (Playoffs), enviamos NULL
-            aId || null, // Si no hay ID (Playoffs), enviamos NULL
-            vId,         // La sede SIEMPRE debe existir
-            item.dateStr,
-            item.time
-        ];
-    });
-
-    try {
-        await connection.query(
-            `INSERT INTO league_matches (league_id, home_team_id, away_team_id, venue_id, match_date, match_time) 
-             VALUES ?`,
-            [matchData]
-        );
-        console.log("✅ Calendario completo (Regular + Playoffs) guardado.");
-    } catch (insertError) {
-        console.error("❌ Error en el INSERT de partidos:", insertError);
-        throw insertError; 
-    }
-}
+        // D. Insertar Partidos
+        if (schedule && schedule.length > 0) {
+            const matchData = schedule.map(item => {
+                const hId = teamIdsMap[item.match.home.trim()];
+                const aId = teamIdsMap[item.match.away.trim()];
+                const vId = venueIdsMap[item.venue.trim()];
+                return [leagueId, hId || null, aId || null, vId, item.dateStr, item.time];
+            });
+            await connection.query(
+                `INSERT INTO league_matches (league_id, home_team_id, away_team_id, venue_id, match_date, match_time) VALUES ?`,
+                [matchData]
+            );
+        }
 
         await connection.commit();
-        res.status(201).json({ message: "Liga creada con éxito", leagueId, inviteToken });
-
+        res.status(201).json({ message: "Liga creada con éxito", leagueId });
     } catch (error) {
         await connection.rollback();
-        console.error("🔥 Error en la transacción:", error);
-        res.status(500).json({ message: "Error al procesar la creación", error: error.message });
+        res.status(500).json({ error: error.message });
     } finally {
         connection.release();
+    }
+});
+
+// 5. GESTIÓN DEL EQUIPO POR EL ADMIN (Actualizar logo o teléfono)
+router.patch('/teams/:teamId', verifyToken, async (req, res) => {
+    const { logo, captain_phone } = req.body;
+    try {
+        await pool.execute(
+            'UPDATE league_teams SET logo = ?, captain_phone = ? WHERE id = ?',
+            [logo || null, captain_phone || null, req.params.teamId]
+        );
+        res.json({ message: "Datos del equipo actualizados" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 6. VER PLANTILLA DE UN EQUIPO (Para Admin y Capitán)
+router.get('/teams/:teamId/roster', verifyToken, async (req, res) => {
+    try {
+        const [players] = await pool.execute(
+            'SELECT * FROM league_players WHERE team_id = ? ORDER BY created_at DESC',
+            [req.params.teamId]
+        );
+        res.json(players);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 7. VINCULAR CAPITÁN AL EQUIPO
+router.post('/claim-team', verifyToken, async (req, res) => {
+    const { teamId } = req.body;
+    try {
+        const [team] = await pool.execute('SELECT captain_id, name FROM league_teams WHERE id = ?', [teamId]);
+        if (team[0].captain_id !== null) return res.status(400).json({ message: "Equipo ya vinculado" });
+
+        await pool.execute('UPDATE league_teams SET captain_id = ? WHERE id = ?', [req.user.id, teamId]);
+        res.json({ message: `¡Ahora eres el capitán de ${team[0].name}!` });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 8. AUTO-REGISTRO DE JUGADOR CON CHECK PWA
+router.post('/register-player', async (req, res) => {
+    const { teamId, full_name, dorsal, dni, is_pwa } = req.body;
+    try {
+        await pool.execute(
+            'INSERT INTO league_players (team_id, full_name, dorsal, dni, is_pwa) VALUES (?, ?, ?, ?, ?)',
+            [teamId, full_name, dorsal, dni, is_pwa || false]
+        );
+        res.status(201).json({ message: "Registro completado con éxito" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
