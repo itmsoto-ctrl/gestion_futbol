@@ -19,8 +19,7 @@ const AdminLogin = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // IMPORTANTE: Si tu backend espera 'username', cambia 'email' por 'username'
-          username: credentials.email, 
+          email: credentials.email, // <--- Ahora la llave se llama "email"
           password: credentials.password
         })
       });
