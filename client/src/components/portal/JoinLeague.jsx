@@ -1,3 +1,4 @@
+// src/components/portal/JoinLeague.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -11,7 +12,6 @@ const JoinLeague = () => {
     const [loading, setLoading] = useState(true);
     const [claiming, setClaiming] = useState(false);
 
-    // 1. Cargar datos del equipo al entrar
     useEffect(() => {
         const loadPortal = async () => {
             try {
@@ -26,40 +26,35 @@ const JoinLeague = () => {
         if (token) loadPortal();
     }, [token]);
 
-    // 2. Función unificada para reclamar el equipo
     const handleClaimCaptain = async () => {
         const userToken = localStorage.getItem('token');
         
-        // Si no hay token, mandamos al login
         if (!userToken) {
+            // Mandamos al login guardando el destino
             navigate(`/admin/login?token=${token}&dest=claim`);
             return;
         }
 
         setClaiming(true);
         try {
-            // Hacemos la vinculación en la DB
             const res = await axios.post(`${API_BASE_URL}/api/leagues/claim-team`, 
                 { teamId: data.team.id },
                 { headers: { Authorization: `Bearer ${userToken}` } }
             );
 
             if (res.data.success) {
-                // 🚀 SALTO AL PERFIL: Pasamos los IDs necesarios para evitar pantalla negra
+                // 🚀 SALTO AL PERFIL: Pasamos leagueId y teamId en el state
                 navigate('/complete-profile', { 
                     state: { 
                         leagueId: data.team.league_id, 
-                        teamId: data.team.id 
+                        teamId: data.team.id,
+                        inviteToken: token
                     } 
                 });
             }
         } catch (err) {
             console.error("Error al vincular:", err);
-            if (err.response?.status === 401) {
-                navigate(`/admin/login?token=${token}&dest=claim`);
-            } else {
-                alert(err.response?.data?.message || "Error al vincular el equipo");
-            }
+            alert(err.response?.data?.message || "Error al vincular equipo");
         } finally {
             setClaiming(false);
         }
@@ -71,33 +66,22 @@ const JoinLeague = () => {
         </div>
     );
 
-    if (!data) return (
-        <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
-            <p className="uppercase font-black italic">Enlace no válido</p>
-        </div>
-    );
+    if (!data) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center italic font-black">ENLACE NO VÁLIDO</div>;
 
     return (
-        <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-6">
-            {/* Logo Shine */}
+        <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-6 text-center">
             <img src="/logo-shine.webp" alt="VORA" className="h-12 mb-10 drop-shadow-[0_0_15px_rgba(163,230,53,0.3)]" />
 
-            <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 p-8 rounded-[3rem] text-center shadow-2xl">
+            <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 p-8 rounded-[3rem] shadow-2xl">
                 <h1 className="text-3xl font-black uppercase italic mb-2">{data.team.teamName}</h1>
-                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-8">
-                    {data.team.leagueName}
-                </p>
+                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-8">{data.team.leagueName}</p>
 
                 <button 
                     onClick={handleClaimCaptain}
                     disabled={claiming}
                     className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-2xl flex items-center justify-center gap-2 uppercase italic transition-all active:scale-95 disabled:opacity-50"
                 >
-                    {claiming ? (
-                        <Loader2 className="animate-spin" />
-                    ) : (
-                        <><ShieldCheck size={20} /> Soy el Capitán <ArrowRight size={20} /></>
-                    )}
+                    {claiming ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={20} /> Soy el Capitán <ArrowRight size={20} /></>}
                 </button>
             </div>
         </div>

@@ -1,10 +1,11 @@
+// src/components/v2/auth/AdminLogin.jsx
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-// ✅ Asegúrate de que esta ruta llegue correctamente a tu archivo apiConfig.js
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import API_BASE_URL from '../../../apiConfig'; 
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [credentials, setCredentials] = useState({ email: '', password: '' });
 
@@ -13,13 +14,11 @@ const AdminLogin = () => {
     setLoading(true);
 
     try {
-      // ✅ CORRECCIÓN: Ahora usamos backticks ` ` para que funcione ${API_BASE_URL}
-      // ✅ Cómo tiene que estar (con backtick `):
         const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: credentials.email, // <--- Ahora la llave se llama "email"
+          email: credentials.email,
           password: credentials.password
         })
       });
@@ -28,13 +27,19 @@ const AdminLogin = () => {
 
       if (response.ok) {
         localStorage.setItem('token', data.token); 
-        navigate('/admin/dashboard');
+        
+        // 🔄 Lógica de retorno: si hay token de invitación, vuelve al portal
+        const inviteToken = searchParams.get('token');
+        if (inviteToken) {
+            navigate(`/join/${inviteToken}`);
+        } else {
+            navigate('/admin/dashboard');
+        }
       } else {
         alert(data.message || "Credenciales incorrectas");
       }
     } catch (error) {
-      console.error("Error de login:", error);
-      alert("Error: No se pudo conectar con el servidor de Railway");
+      alert("Error: No se pudo conectar con el servidor");
     } finally {
       setLoading(false);
     }
@@ -42,57 +47,39 @@ const AdminLogin = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex flex-col justify-center items-center p-6 font-sans">
-      <div className="w-full max-w-md bg-zinc-900/50 p-8 rounded-[2.5rem] border border-zinc-800 shadow-2xl backdrop-blur-sm">
-        <header className="text-center mb-10">
-          <div className="inline-block bg-lime-400/10 p-3 rounded-2xl mb-4">
-            <span className="text-3xl">🔐</span>
-          </div>
-          <h2 className="text-3xl font-black uppercase italic tracking-tighter">
-            Acceso <span className="text-lime-400">Admin</span>
-          </h2>
-          <p className="text-zinc-500 text-[10px] uppercase tracking-[0.3em] mt-2">Introduce tus credenciales de gestor</p>
-        </header>
+      <div className="w-full max-w-md bg-zinc-900/50 p-8 rounded-[2.5rem] border border-zinc-800 shadow-2xl backdrop-blur-sm text-center">
+        <img src="/logo-shine.webp" alt="VORA" className="h-10 mx-auto mb-10" />
+        <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-8 text-white">
+            Acceso <span className="text-lime-400">VORA ID</span>
+        </h2>
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-6 text-left">
           <div className="space-y-2">
             <label className="text-[10px] uppercase font-bold text-zinc-500 ml-2 tracking-widest">Email / Usuario</label>
             <input 
               type="text" required
-              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-2xl py-4 px-6 focus:border-lime-400 outline-none transition-all placeholder:text-zinc-600"
-              placeholder="admin@futnex.com"
+              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-2xl py-4 px-6 focus:border-lime-400 outline-none transition-all text-white"
               onChange={(e) => setCredentials({...credentials, email: e.target.value})}
             />
           </div>
-
           <div className="space-y-2">
             <label className="text-[10px] uppercase font-bold text-zinc-500 ml-2 tracking-widest">Contraseña</label>
             <input 
               type="password" required
-              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-2xl py-4 px-6 focus:border-lime-400 outline-none transition-all placeholder:text-zinc-600"
-              placeholder="••••••••"
+              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-2xl py-4 px-6 focus:border-lime-400 outline-none transition-all text-white"
               onChange={(e) => setCredentials({...credentials, password: e.target.value})}
             />
           </div>
-
           <button 
             type="submit" disabled={loading}
-            className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-2xl text-xl uppercase italic shadow-[0_10px_30px_rgba(163,230,53,0.2)] active:scale-95 transition-all disabled:opacity-50"
+            className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-2xl text-xl uppercase italic active:scale-95 transition-all disabled:opacity-50"
           >
-            {loading ? 'Verificando...' : 'Entrar al Panel'}
+            {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
-
-        <footer className="mt-8 text-center">
-          <button 
-            onClick={() => navigate('/admin/setup')}
-            className="text-zinc-500 text-[10px] uppercase font-bold hover:text-white transition-colors"
-          >
-            ¿No tienes cuenta? <span className="text-lime-400">Regístrate como Organizador</span>
-          </button>
-        </footer>
       </div>
     </div>
   );
 };
 
-export default AdminLogin;// Update VORA
+export default AdminLogin;

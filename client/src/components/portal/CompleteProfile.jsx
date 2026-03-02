@@ -1,65 +1,62 @@
-import React, { useState } from 'react';
+// src/components/portal/CompleteProfile.jsx
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Camera, IdCard, Hash, Calendar, CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { Camera, IdCard, Hash, CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
 
 const CompleteProfile = () => {
     const location = useLocation();
     const navigate = useNavigate();
     
     const API_URL = "https://gestionfutbol-production.up.railway.app";
-    const { missingFields, inviteToken } = location.state || { missingFields: [], inviteToken: null };
+    // 🛡️ Extracción segura del state
+    const { leagueId, teamId, inviteToken } = location.state || {};
+    const [missingFields, setMissingFields] = useState(['photo', 'dni', 'age']); // Default por seguridad
 
-    // --- ESTADOS ---
-    const [form, setForm] = useState({
-        dni: '',
-        photo_url: '',
-        phone: '',
-        age: '',
-        dorsal: ''
-    });
-    const [loading, setLoading] = useState(false); // Estado para el envío final
-    const [uploading, setUploading] = useState(false); // Estado para la subida a Cloudinary
+    const [form, setForm] = useState({ dni: '', photo_url: '', phone: '', age: '', dorsal: '' });
+    const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
 
-    // --- LÓGICA DE CLOUDINARY ---
+    useEffect(() => {
+        // Si no hay datos, algo fue mal en el flujo
+        if (!leagueId || !teamId) {
+            console.error("Faltan datos de liga/equipo en el state");
+        }
+    }, [leagueId, teamId]);
+
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         setUploading(true);
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('upload_preset', 'futnex_players'); // Asegúrate que sea 'Unsigned' en Cloudinary
+        formData.append('upload_preset', 'futnex_players');
 
         try {
-            // Reemplaza 'dqoplz61y' por tu Cloud Name si es distinto
             const res = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', {
                 method: 'POST',
                 body: formData
             });
             const data = await res.json();
-            
             setForm({ ...form, photo_url: data.secure_url });
         } catch (err) {
-            alert("Error al subir la imagen a la nube.");
+            alert("Error al subir el selfie.");
         } finally {
             setUploading(false);
         }
     };
 
-    // --- ENVÍO FINAL ---
     const handleComplete = async (e) => {
         e.preventDefault();
+        if (!form.photo_url) return alert("Por favor, hazte el selfie obligatorio.");
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            
-            // 1. Actualizar perfil global del usuario
+            // 1. Actualizar perfil global
             await axios.post(`${API_URL}/api/auth/update-profile`, form, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-
-            // 2. Unirse al equipo con el token
+            // 2. Inscribir en la liga
             await axios.post(`${API_URL}/api/auth/join-team-by-token`, { 
                 inviteToken,
                 dorsal: form.dorsal 
@@ -67,20 +64,27 @@ const CompleteProfile = () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
-            navigate('/dashboard');
+            navigate('/admin/dashboard');
         } catch (error) {
-            console.error("Error en registro final:", error);
-            alert("Error al completar la inscripción.");
+            alert("Error al finalizar el registro.");
         } finally {
             setLoading(false);
         }
     };
 
+    if (!leagueId) return (
+        <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-10 text-center">
+            <h2 className="text-red-500 font-black uppercase italic mb-4">Error de Sesión</h2>
+            <p className="text-zinc-500 text-sm mb-8">No se han recibido los datos de la liga. Por favor, vuelve al enlace inicial.</p>
+            <button onClick={() => navigate(-1)} className="bg-white text-black px-6 py-3 rounded-xl font-bold">Volver</button>
+        </div>
+    );
+
     return (
         <div className="min-h-screen bg-zinc-950 text-white p-6 flex flex-col items-center font-sans">
             <div className="max-w-sm w-full space-y-8 pt-10">
+                <img src="/logo-shine.webp" alt="VORA" className="h-8 mx-auto mb-6" />
                 
-                {/* BRANDING VORA */}
                 <div className="text-center space-y-2">
                     <div className="w-16 h-16 bg-lime-400 rounded-3xl flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(163,230,53,0.3)]">
                         <CheckCircle className="text-black" size={32} />
@@ -88,95 +92,32 @@ const CompleteProfile = () => {
                     <h1 className="text-4xl font-black uppercase italic leading-none tracking-tighter">
                         VORA <span className="text-lime-400">ID</span>
                     </h1>
-                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.2em]">
-                        Validación de ficha oficial
-                    </p>
                 </div>
 
                 <form onSubmit={handleComplete} className="space-y-4">
-                    
-                    {/* SECCIÓN FOTO DINÁMICA */}
-                        {missingFields.includes('photo') && (
-                            <div className="bg-zinc-900 p-6 rounded-[2.5rem] border border-zinc-800 text-center space-y-4 shadow-xl">
-                                <label className="text-[10px] text-zinc-500 font-black uppercase tracking-widest block">Foto de Ficha</label>
-                                <div className="w-32 h-32 bg-zinc-800 rounded-full mx-auto flex items-center justify-center border-2 border-dashed border-zinc-700 overflow-hidden relative group">
-                                    {uploading ? (
-                                        <div className="flex flex-col items-center">
-                                            <div className="w-6 h-6 border-2 border-lime-400 border-t-transparent rounded-full animate-spin mb-2"></div>
-                                            <span className="text-[8px] font-black uppercase">Subiendo...</span>
-                                        </div>
-                                    ) : form.photo_url ? (
-                                        <img src={form.photo_url} alt="Preview" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <Camera size={32} className="text-zinc-600 group-hover:text-lime-400 transition-colors" />
-                                    )}
-                                    
-                                    {/* Input oculto pero funcional */}
-                                    <input 
-                                        type="file" 
-                                        accept="image/*"
-                                        capture="user" // 👈 Esto abre la cámara frontal directamente en móviles
-                                        className="absolute inset-0 opacity-0 cursor-pointer" 
-                                        onChange={handleImageUpload}
-                                        disabled={uploading}
-                                    />
-                                </div>
-                                <p className="text-[8px] text-zinc-600 font-bold uppercase">
-                                    {form.photo_url ? "¡Foto cargada!" : "Pulsa para hacerte un selfie"}
-                                </p>
-                            </div>
-                        )}
-
-                    <div className="space-y-3">
-                        {missingFields.includes('dni') && (
-                            <div className="relative group">
-                                <IdCard className="absolute left-5 top-5 text-zinc-500 group-focus-within:text-lime-400 transition-colors" size={20} />
-                                <input 
-                                    type="text" placeholder="DNI / NIE / PASAPORTE" 
-                                    className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl py-5 pl-14 pr-6 font-bold outline-none focus:border-lime-400 transition-all uppercase"
-                                    onChange={e => setForm({...form, dni: e.target.value})}
-                                    required
-                                />
-                            </div>
-                        )}
-
-                        {missingFields.includes('age') && (
-                            <div className="relative group">
-                                <Calendar className="absolute left-5 top-5 text-zinc-500 group-focus-within:text-lime-400 transition-colors" size={20} />
-                                <input 
-                                    type="number" placeholder="TU EDAD" 
-                                    className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl py-5 pl-14 pr-6 font-bold outline-none focus:border-lime-400 transition-all"
-                                    onChange={e => setForm({...form, age: e.target.value})}
-                                    required
-                                />
-                            </div>
-                        )}
-
-                        {/* El Dorsal siempre se pide por equipo */}
-                        <div className="relative group">
-                            <Hash className="absolute left-5 top-5 text-lime-400" size={20} />
-                            <input 
-                                type="number" placeholder="DORSAL" 
-                                className="w-full bg-zinc-900 border-2 border-lime-400/30 rounded-2xl py-5 pl-14 pr-6 font-bold outline-none focus:border-lime-400 transition-all text-lime-400"
-                                onChange={e => setForm({...form, dorsal: e.target.value})}
-                                required
-                            />
+                    {/* Selfie obligatorio */}
+                    <div className="bg-zinc-900 p-6 rounded-[2.5rem] border border-zinc-800 text-center space-y-4 shadow-xl relative overflow-hidden">
+                        <label className="text-[10px] text-zinc-500 font-black uppercase tracking-widest block">Foto de Ficha (Selfie)</label>
+                        <div className="w-32 h-32 bg-zinc-800 rounded-full mx-auto flex items-center justify-center border-2 border-dashed border-lime-400/30 overflow-hidden relative">
+                            {uploading ? <Loader2 className="animate-spin text-lime-400" /> : 
+                             form.photo_url ? <img src={form.photo_url} className="w-full h-full object-cover" /> : 
+                             <Camera size={32} className="text-zinc-600" />}
+                            <input type="file" accept="image/*" capture="user" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageUpload} />
                         </div>
+                        <p className="text-[8px] text-zinc-500 font-bold uppercase">{form.photo_url ? "¡Foto lista!" : "Pulsa para abrir cámara"}</p>
                     </div>
 
-                    <button 
-                        type="submit" 
-                        disabled={loading || uploading}
-                        className={`w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-[2rem] flex items-center justify-center gap-3 uppercase italic text-lg shadow-xl shadow-lime-400/10 transition-all ${loading || uploading ? 'opacity-50 cursor-not-allowed' : 'active:scale-95 hover:bg-white'}`}
-                    >
+                    <div className="space-y-3">
+                        <input type="text" placeholder="DNI / NIE" className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-5 px-6 font-bold focus:border-lime-400 outline-none" onChange={e => setForm({...form, dni: e.target.value})} required />
+                        <input type="number" placeholder="TU EDAD" className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-5 px-6 font-bold focus:border-lime-400 outline-none" onChange={e => setForm({...form, age: e.target.value})} required />
+                        <input type="number" placeholder="DORSAL" className="w-full bg-zinc-900 border border-lime-400/30 rounded-2xl py-5 px-6 font-bold focus:border-lime-400 outline-none text-lime-400" onChange={e => setForm({...form, dorsal: e.target.value})} required />
+                    </div>
+
+                    <button type="submit" disabled={loading || uploading} className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-[2rem] flex items-center justify-center gap-3 uppercase italic text-lg shadow-xl active:scale-95 transition-all disabled:opacity-50">
                         {loading ? 'Finalizando...' : 'Confirmar Registro'}
-                        {!loading && <ArrowRight size={20} />}
+                        <ArrowRight size={20} />
                     </button>
                 </form>
-
-                <div className="text-center">
-                    <span className="text-[8px] text-zinc-700 font-black uppercase tracking-[0.3em]">Power by VORA v2.0</span>
-                </div>
             </div>
         </div>
     );
