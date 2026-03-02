@@ -26,39 +26,33 @@ const JoinLeague = () => {
         if (token) loadPortal();
     }, [token]);
 
-    const handleClaimCaptain = async () => {
-        const userToken = localStorage.getItem('token');
-        
-        if (!userToken) {
-            // Mandamos al login guardando el destino
-            navigate(`/admin/login?token=${token}&dest=claim`);
-            return;
-        }
+    // Fragmento de JoinLeague.jsx
+const handleClaimCaptain = async () => {
+    const userToken = localStorage.getItem('token');
+    if (!userToken) {
+        navigate(`/admin/login?token=${token}&dest=claim`);
+        return;
+    }
 
-        setClaiming(true);
-        try {
-            const res = await axios.post(`${API_BASE_URL}/api/leagues/claim-team`, 
-                { teamId: data.team.id },
-                { headers: { Authorization: `Bearer ${userToken}` } }
-            );
+    try {
+        const res = await axios.post(`${API_BASE_URL}/api/leagues/claim-team`, 
+            { teamId: data.team.id },
+            { headers: { Authorization: `Bearer ${userToken}` } }
+        );
 
-            if (res.data.success) {
-                // 🚀 SALTO AL PERFIL: Pasamos leagueId y teamId en el state
-                navigate('/complete-profile', { 
-                    state: { 
-                        leagueId: data.team.league_id, 
-                        teamId: data.team.id,
-                        inviteToken: token
-                    } 
-                });
-            }
-        } catch (err) {
-            console.error("Error al vincular:", err);
-            alert(err.response?.data?.message || "Error al vincular equipo");
-        } finally {
-            setClaiming(false);
+        if (res.data.success) {
+            // 🚀 SALTO AL PERFIL (AQUÍ SE HACE EL SELFIE)
+            navigate('/complete-profile', { 
+                state: { 
+                    leagueId: data.team.league_id, 
+                    teamId: data.team.id 
+                } 
+            });
         }
-    };
+    } catch (err) {
+        alert("Error al vincular.");
+    }
+};
 
     if (loading) return (
         <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
