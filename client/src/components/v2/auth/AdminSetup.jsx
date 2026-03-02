@@ -16,7 +16,7 @@ const AdminSetup = () => {
       setLoading(true);
       try {
         // ENLACE CON TU SERVIDOR V2
-        const response = await fetch('http://localhost:3001/api/auth/admin-register', {
+        const response = await fetch(`${API_BASE_URL}/api/auth/admin-register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(adminData)
