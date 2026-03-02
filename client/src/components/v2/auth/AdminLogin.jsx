@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import API_BASE_URL from '../../../apiConfig';
+// ✅ Asegúrate de que esta ruta llegue correctamente a tu archivo apiConfig.js
+import API_BASE_URL from '../../../apiConfig'; 
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -12,11 +13,15 @@ const AdminLogin = () => {
     setLoading(true);
 
     try {
-      // IMPORTANTE: Cambia esta URL por la de tu servidor de Railway real
-      const response = await fetch('${API_BASE_URL}/api/auth/login', {
+      // ✅ CORRECCIÓN: Ahora usamos backticks ` ` para que funcione ${API_BASE_URL}
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials)
+        body: JSON.stringify({
+          // IMPORTANTE: Si tu backend espera 'username', cambia 'email' por 'username'
+          username: credentials.email, 
+          password: credentials.password
+        })
       });
 
       const data = await response.json();
@@ -28,6 +33,7 @@ const AdminLogin = () => {
         alert(data.message || "Credenciales incorrectas");
       }
     } catch (error) {
+      console.error("Error de login:", error);
       alert("Error: No se pudo conectar con el servidor de Railway");
     } finally {
       setLoading(false);
@@ -49,9 +55,9 @@ const AdminLogin = () => {
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-2">
-            <label className="text-[10px] uppercase font-bold text-zinc-500 ml-2 tracking-widest">Email</label>
+            <label className="text-[10px] uppercase font-bold text-zinc-500 ml-2 tracking-widest">Email / Usuario</label>
             <input 
-              type="email" required
+              type="text" required
               className="w-full bg-zinc-800/50 border border-zinc-700 rounded-2xl py-4 px-6 focus:border-lime-400 outline-none transition-all placeholder:text-zinc-600"
               placeholder="admin@futnex.com"
               onChange={(e) => setCredentials({...credentials, email: e.target.value})}

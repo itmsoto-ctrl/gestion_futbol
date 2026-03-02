@@ -3,22 +3,25 @@ import axios from 'axios';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Trophy, ArrowRight, UserCircle2 } from 'lucide-react';
 
+// 1. IMPORTAMOS LA URL CENTRALIZADA (Asegúrate de que la ruta al archivo es correcta)
+import API_BASE_URL from '../../../apiConfig'; 
+
 const Login = ({ onLogin }) => {
     const [form, setForm] = useState({ username: '', password: '' });
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     
-    // --- ESTADOS PARA LA INVITACIÓN ---
     const [inviteData, setInviteData] = useState(null);
     const inviteToken = searchParams.get('token');
-    const API_URL = "https://gestionfutbol-production.up.railway.app";
+    const destination = searchParams.get('dest'); // Para saber si es 'claim' o 'join'
 
-    // ✅ EFECTO: Si hay token, cargamos quién invita y a qué equipo
+    // ✅ EFECTO: Carga el contexto de la invitación
     useEffect(() => {
         if (inviteToken) {
             const fetchInviteInfo = async () => {
                 try {
-                    const res = await axios.get(`${API_URL}/api/leagues/team-portal/${inviteToken}`);
+                    // Usamos la variable centralizada con backticks
+                    const res = await axios.get(`${API_BASE_URL}/api/leagues/team-portal/${inviteToken}`);
                     setInviteData(res.data);
                 } catch (err) {
                     console.error("Error cargando contexto de invitación:", err);
@@ -31,25 +34,52 @@ const Login = ({ onLogin }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const res = await axios.post(`${API_URL}/api/auth/login`, form);
-            const { token } = res.data;
+            // 2. LOGIN CENTRALIZADO
+            const res = await axios.post(`${API_BASE_URL}/api/auth/login`, form);
+            const { token, user } = res.data;
+            
+            // Guardamos el token en localStorage para las siguientes peticiones
+            localStorage.setItem('token', token);
             onLogin(res.data);
 
             if (inviteToken) {
-                // Verificamos requisitos antes de entrar
-                const checkRes = await axios.get(`${API_URL}/api/leagues/check-requirements-by-token/${inviteToken}`, {
+                // 3. SI ES UN CAPITÁN RECLAMANDO EL EQUIPO ('dest=claim')
+                if (destination === 'claim') {
+                    try {
+                        await axios.post(`${API_BASE_URL}/api/leagues/claim-team`, 
+                            { teamToken: inviteToken },
+                            { headers: { 'Authorization': `Bearer ${token}` } }
+                        );
+                        console.log("⚽ Equipo reclamado con éxito por el capitán");
+                    } catch (claimErr) {
+                        console.error("Error al reclamar equipo:", claimErr);
+                    }
+                }
+
+                // 4. VERIFICACIÓN DE REQUISITOS (Foto, DNI, etc.)
+                const checkRes = await axios.get(`${API_BASE_URL}/api/leagues/check-requirements-by-token/${inviteToken}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
                 if (checkRes.data.isComplete) {
-                    navigate('/dashboard');
+                    navigate('/dashboard'); 
                 } else {
+                    // Si le falta la foto o datos, al Complete Profile
                     navigate('/complete-profile', { 
-                        state: { missingFields: checkRes.data.missingFields, inviteToken } 
+                        state: { 
+                            missingFields: checkRes.data.missingFields, 
+                            inviteToken,
+                            isCaptain: destination === 'claim'
+                        } 
                     });
                 }
             } else {
-                navigate('/home');
+                // Login normal sin invitación
+                if (user.role === 'admin') {
+                    navigate('/admin/dashboard');
+                } else {
+                    navigate('/home');
+                }
             }
         } catch (error) { 
             alert("Acceso denegado: Revisa credenciales"); 
@@ -60,7 +90,6 @@ const Login = ({ onLogin }) => {
         <div className="min-h-screen bg-zinc-950 flex flex-col justify-center items-center p-6 font-sans">
             <div className="w-full max-w-sm space-y-8">
                 
-                {/* 1. MENSAJE DE INVITACIÓN (Solo si hay token) */}
                 {inviteData && (
                     <div className="animate-in fade-in slide-in-from-top duration-700">
                         <div className="bg-lime-400/10 border border-lime-400/20 p-6 rounded-[2.5rem] text-center space-y-2 relative overflow-hidden">
@@ -73,16 +102,15 @@ const Login = ({ onLogin }) => {
                                     {inviteData.team.teamName}
                                 </span>
                             </h2>
-                            {inviteData.type === 'CAPTAIN_INVITE' && (
+                            {destination === 'claim' && (
                                 <div className="mt-2 inline-block bg-white text-black text-[9px] font-black px-3 py-1 rounded-full uppercase italic">
-                                    Acceso de Capitán
+                                    Acceso de Responsable / Capitán
                                 </div>
                             )}
                         </div>
                     </div>
                 )}
 
-                {/* 2. LOGO VORA (Si no hay invitación, se ve más grande) */}
                 {!inviteData && (
                     <div className="flex flex-col items-center mb-6">
                         <div className="w-20 h-20 bg-lime-400 rounded-full flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(163,230,53,0.2)]">
@@ -94,7 +122,6 @@ const Login = ({ onLogin }) => {
                     </div>
                 )}
 
-                {/* 3. FORMULARIO */}
                 <div className="bg-zinc-900 border-2 border-zinc-800 p-8 rounded-[3rem] shadow-2xl">
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <div className="space-y-1">
