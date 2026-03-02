@@ -8,7 +8,7 @@ const EditTeamModal = ({ team, onClose, onUpdate }) => {
   const handleSave = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:3001/api/leagues/teams/${team.id}`, {
+      const response = await fetch(`https://gestionfutbol-production.up.railway.app/api/leagues/teams/${team.id}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',

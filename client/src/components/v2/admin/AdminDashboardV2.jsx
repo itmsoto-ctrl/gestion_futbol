@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import LeagueCreator from './LeagueCreator';
+import API_BASE_URL from '../../../apiConfig';
 
 const AdminDashboardV2 = () => {
   const [activeTab, setActiveTab] = useState('leagues');
@@ -10,7 +11,7 @@ const AdminDashboardV2 = () => {
   const fetchLeagues = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/leagues/my-leagues', {
+      const response = await fetch('${API_BASE_URL}/api/leagues/my-leagues', {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await response.json();

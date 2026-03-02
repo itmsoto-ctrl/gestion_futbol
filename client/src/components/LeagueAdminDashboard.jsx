@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import API_BASE_URL from '../apiConfig';
 
 // --- SUB-COMPONENTE: MODAL DE EDICIÓN ---
 const EditTeamModal = ({ team, onClose, onUpdate }) => {
@@ -10,7 +11,7 @@ const EditTeamModal = ({ team, onClose, onUpdate }) => {
   const handleSave = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:3001/api/leagues/teams/${team.id}`, {
+      const response = await fetch(`https://gestionfutbol-production.up.railway.app/api/leagues/teams/${team.id}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
@@ -87,7 +88,7 @@ const LeagueAdminDashboard = () => {
   // Función para cargar los datos de la liga
   const fetchLeagueData = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/leagues/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/leagues/${id}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await response.json();

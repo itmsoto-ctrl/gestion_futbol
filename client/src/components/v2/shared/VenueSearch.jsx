@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_BASE_URL from '../../../apiConfig';
 
 const VenueSelector = ({ onSelect, onAddNew }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -12,7 +13,7 @@ const VenueSelector = ({ onSelect, onAddNew }) => {
         try {
           // 🔌 LLAMADA REAL A TU SERVIDOR EN EL MAC MINI
           const token = localStorage.getItem('token');
-          const response = await fetch(`http://localhost:3001/api/admin/venues/search?q=${searchTerm}`, {
+          const response = await fetch(`${API_BASE_URL}/api/admin/venues/search?q=${searchTerm}`, {
             headers: { 
               'Authorization': `Bearer ${token}` 
             }

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../apiConfig';
 
 const TeamPortal = () => {
   const { token } = useParams();
@@ -7,7 +8,7 @@ const TeamPortal = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`http://localhost:3001/api/leagues/team-portal/${token}`)
+    fetch(`${API_BASE_URL}/api/leagues/team-portal/${token}`)
       .then(res => res.json())
       .then(setData)
       .finally(() => setLoading(false));

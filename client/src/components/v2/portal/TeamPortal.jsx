@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../../../apiConfig';
 
 const TeamPortal = () => {
   const { token } = useParams();
@@ -11,7 +12,7 @@ const TeamPortal = () => {
     const fetchPortalInfo = async () => {
       try {
         // Cambia localhost por tu URL de Railway si vas a probar en móvil real
-        const response = await fetch(`https://gestionfutbol-production.up.railway.app/api/leagues/team-portal/${token}`);
+        const response = await fetch(`${API_BASE_URL}/api/leagues/team-portal/${token}`);
         const result = await response.json();
         
         console.log("📦 VORA DATA:", result);
