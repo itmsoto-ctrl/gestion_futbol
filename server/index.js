@@ -1,51 +1,62 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const pool = require('./config/db');
 
-
-// Importación de rutas modulares
+// 1. IMPORTACIÓN DE RUTAS
 const adminRoutes = require('./routes/admin.routes');
-const authRoutes = require('./routes/auth.routes'); // ✅ Activado
+const authRoutes = require('./routes/auth.routes');
 const leagueRoutes = require('./routes/league.routes');
 
-const app = express();
+const app = express(); // ✅ Creado al principio para poder usarlo abajo
 
-// Middlewares
-app.use(cors());
-app.use(express.json());
+// 2. CONFIGURACIÓN DE CORS (Antes de las rutas)
+const corsOptions = {
+    origin: [
+      'http://localhost:3000', 
+      'https://tu-app-en-netlify.netlify.app' // 👈 ¡OJO! Pon aquí tu URL REAL de Netlify
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions)); // ✅ Aplicamos CORS con las opciones
+app.use(express.json());    // ✅ Para que el servidor entienda JSON
+
+// 3. RUTAS
 app.use('/api/leagues', leagueRoutes);
-
-// --- RUTAS V2 (MODULARES) ---
 app.use('/api/admin', adminRoutes);
-app.use('/api/auth', authRoutes); // ✅ Activado: Login y Registro ya disponibles
+app.use('/api/auth', authRoutes);
 
-// --- SALUD DEL SISTEMA ---
+// 4. SALUD DEL SISTEMA
 app.get('/health', (req, res) => {
-    res.send('🚀 Servidor V2 de Fútbol: Operativo y con Autenticación Activa');
+    res.send('🚀 Servidor VORA: Operativo y con Autenticación Activa');
 });
 
-const PORT = process.env.PORT || 3001;
-// Middleware para capturar errores y verlos en la terminal de VS Code
+// 5. MIDDLEWARE DE ERRORES (Al final de todo)
 app.use((err, req, res, next) => {
     console.error("❌ ERROR DETECTADO EN EL SERVIDOR:");
     console.error("Mensaje:", err.message);
     console.error("Ruta:", req.originalUrl);
-    console.error("Stack:", err.stack); // Esto nos dirá la línea exacta del fallo
-    res.status(500).json({ error: 'Error interno del servidor', details: err.message });
+    res.status(500).json({ 
+        error: 'Error interno del servidor', 
+        details: err.message 
+    });
 });
 
+// 6. ARRANQUE DEL SERVIDOR
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`
     =========================================
-    ✅ SERVIDOR V2 LISTO EN PUERTO ${PORT}
-    🛡️ Seguridad JWT & Bcrypt: ACTIVA
-    📂 Estructura Modular: FUNCIONANDO
-    ⚡ Pool de Conexiones MySQL: CONECTADO
+    ✅ SERVIDOR VORA LISTO EN PUERTO ${PORT}
+    🛡️ CORS configurado para Netlify
     =========================================
     `);
 });
 
-const pool = require('./config/db');
+// 7. TEST DE CONEXIÓN A DB
 pool.query('SELECT 1 + 1 AS test')
-    .then(() => console.log("✨ CONEXIÓN REAL CON RAILWAY CONFIRMADA"))
-    .catch(err => console.error("🚨 FALLO REAL DE CONEXIÓN:", err.message));
+    .then(() => console.log("✨ CONEXIÓN CON RAILWAY CONFIRMADA"))
+    .catch(err => console.error("🚨 FALLO DE CONEXIÓN DB:", err.message));
