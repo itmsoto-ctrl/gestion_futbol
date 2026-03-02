@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import CompleteProfile from './component/portal/CompleteProfile';
 
 // 1. IMPORTACIÓN CRÍTICA (Asegúrate de que esta línea exista)
 import TeamPortal from './components/portal/TeamPortal';
@@ -33,6 +34,7 @@ function App() {
         {/* OTROS */}
         <Route path="/login" element={<AdminLogin />} /> 
         <Route path="/info/:leagueId" element={<LandingPage />} />
+        <Route path="/complete-profile" element={<CompleteProfile />} />
       </Routes>
     </Router>
   );

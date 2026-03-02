@@ -8,22 +8,25 @@ const crypto = require('crypto');
 
 router.get('/my-leagues', verifyToken, async (req, res) => {
     try {
-        const userId = req.user.id;
-        console.log("-----------------------------------------");
-        console.log("🔍 BUSCANDO LIGAS PARA EL USER ID:", userId);
+        // 💡 DEBUG: Mira esto en los logs de Railway para saber el nombre exacto
+        console.log("CONTENIDO DEL TOKEN DECODIFICADO:", req.user);
 
-        // CONSULTA MÍNIMA: Sin orden, sin conteos, solo lo básico para que no de error
+        // Intenta pillar 'id', si no 'adminId', si no 'userId'
+        const userId = req.user.id || req.user.adminId || req.user.userId;
+
+        if (!userId) {
+            console.error("🚨 NO SE ENCONTRÓ ID EN EL TOKEN");
+            return res.status(400).json({ error: "Token no contiene un ID de usuario válido" });
+        }
+
         const [rows] = await pool.execute(
             'SELECT id, name, invite_token, teams_count, match_minutes FROM leagues WHERE admin_id = ?',
             [userId]
         );
 
-        console.log("✅ LIGAS ENCONTRADAS:", rows.length);
         res.json(rows);
     } catch (error) {
-        console.error("🚨 ERROR SQL REAL:");
-        console.error("MENSAJE:", error.message);
-        res.status(500).json({ error: error.message });
+        // ... resto del error
     }
 });
 
