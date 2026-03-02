@@ -27,36 +27,48 @@ const JoinLeague = () => {
     }, [token]);
 
     // ✅ CORRECCIÓN: Nombre de función unificado a 'handleClaimCaptain'
+    
     const handleClaimCaptain = async () => {
-        const userToken = localStorage.getItem('token');
-        
-        if (!userToken) {
+    const userToken = localStorage.getItem('token');
+    
+    // 🚩 CASO 1: NO ESTÁ LOGEADO
+    if (!userToken) {
+        console.log("Redirigiendo a Login...");
+        // Guardamos el token de la invitación para volver aquí después del login
+        navigate(`/admin/login?token=${token}&dest=claim`);
+        return;
+    }
+
+    // 🚩 CASO 2: ESTÁ LOGEADO, PROCESAMOS VINCULACIÓN
+    setClaiming(true);
+    try {
+        const res = await axios.post(`${API_BASE_URL}/api/leagues/claim-team`, 
+            { teamId: data.team.id },
+            { headers: { Authorization: `Bearer ${userToken}` } }
+        );
+
+        if (res.data.success) {
+            // 🚀 SALTO AUTOMÁTICO AL REGISTRO/PERFIL
+            navigate('/complete-profile', { 
+                state: { 
+                    leagueId: data.team.league_id, 
+                    teamId: data.team.id 
+                } 
+            });
+        }
+    } catch (err) {
+        console.error("Error al vincular:", err);
+        // Si el error es 401 (token caducado), también lo mandamos a login
+        if (err.response?.status === 401) {
             navigate(`/admin/login?token=${token}&dest=claim`);
-            return;
+        } else {
+            alert(err.response?.data?.message || "Error en el servidor");
         }
+    } finally {
+        setClaiming(false);
+    }
+};
 
-        setClaiming(true);
-        try {
-            const res = await axios.post(`${API_BASE_URL}/api/leagues/claim-team`, 
-                { teamId: data.team.id },
-                { headers: { Authorization: `Bearer ${userToken}` } }
-            );
-
-            if (res.data.success) {
-                // 🚀 ESTE ES EL SALTO QUE TE FALTABA
-                navigate('/complete-profile', { 
-                    state: { 
-                        leagueId: data.team.league_id, 
-                        teamId: data.team.id 
-                    } 
-                });
-            }
-        } catch (err) {
-            alert(err.response?.data?.message || "Error al vincular");
-        } finally {
-            setClaiming(false);
-        }
-    };
 
     if (loading) return (
         <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
