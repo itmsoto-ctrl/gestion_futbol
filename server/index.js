@@ -14,7 +14,7 @@ const app = express(); // ✅ Creado al principio para poder usarlo abajo
 const corsOptions = {
     origin: [
       'http://localhost:3000', 
-      'https://tu-nombre-real-en-netlify.netlify.app' // 👈 PON AQUÍ TU URL REAL
+      'https://gestionfutbol-production.up.railway.app' // 👈 PON AQUÍ TU URL REAL
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
