@@ -5,13 +5,11 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const crypto = require('crypto');
 
 // 1. OBTENER LIGAS DEL ADMIN (Dashboard General)
-
 router.get('/my-leagues', verifyToken, async (req, res) => {
     try {
-        // 💡 DEBUG: Mira esto en los logs de Railway para saber el nombre exacto
-        console.log("CONTENIDO DEL TOKEN DECODIFICADO:", req.user);
+        console.log("-----------------------------------------");
+        console.log("🔍 BUSCANDO LIGAS PARA EL USER ID:", req.user);
 
-        // Intenta pillar 'id', si no 'adminId', si no 'userId'
         const userId = req.user.id || req.user.adminId || req.user.userId;
 
         if (!userId) {
@@ -26,58 +24,48 @@ router.get('/my-leagues', verifyToken, async (req, res) => {
 
         res.json(rows);
     } catch (error) {
-        // ... resto del error
+        console.error("🚨 ERROR EN MY-LEAGUES:", error.message);
+        res.status(500).json({ error: error.message });
     }
 });
 
-// 2. DETALLE DE LIGA (Soporta Token de texto o ID numérico)
+// 2. DETALLE DE LIGA
 router.get('/:id', verifyToken, async (req, res) => {
     try {
-        const identifier = req.params.id; // Aquí llega '4f127af4f8'
+        const identifier = req.params.id;
         
-        console.log("-----------------------------------------");
-        console.log("🔎 BUSCANDO DETALLE DE LIGA:", identifier);
-
-        // Buscamos en la tabla leagues por el campo invite_token O por el id
         const [leagueRows] = await pool.execute(
             'SELECT * FROM leagues WHERE invite_token = ? OR id = ?',
             [identifier, identifier]
         );
 
-        if (leagueRows.length === 0) {
-            console.log("❌ LIGA NO ENCONTRADA EN DB");
-            return res.status(404).json({ message: "Liga no encontrada" });
-        }
+        if (leagueRows.length === 0) return res.status(404).json({ message: "Liga no encontrada" });
 
         const league = leagueRows[0];
-        console.log("✅ LIGA ENCONTRADA:", league.name);
 
-        // Ahora buscamos los equipos vinculados a esa liga
         const [teams] = await pool.execute(
             `SELECT id, name, team_token, captain_phone, captain_id, logo,
             (SELECT COUNT(*) FROM league_players WHERE team_id = league_teams.id) as player_count
             FROM league_teams WHERE league_id = ?`,
             [league.id]
         );
-
-        console.log(`⚽ EQUIPOS CARGADOS: ${teams.length}`);
         
         res.json({ ...league, teams });
 
     } catch (error) {
-        console.error("🚨 ERROR EN DETALLE LIGA:", error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
-// 3. PORTAL INTELIGENTE (Público) - Versión Blindada
+// 3. PORTAL INTELIGENTE (Público) - ¡CORREGIDO!
 router.get('/team-portal/:token', async (req, res) => {
     try {
+        // ✅ Cambio: u.username -> u.fullName (o la columna que tengas en la DB)
         const [teams] = await pool.execute(
             `SELECT t.id, t.name as teamName, t.captain_id, 
                     l.name as leagueName, l.id as leagueId, 
                     l.player_fields_config,
-                    u.username as adminName
+                    u.fullName as adminName 
              FROM league_teams t 
              JOIN leagues l ON t.league_id = l.id 
              JOIN users u ON l.admin_id = u.id 
@@ -89,14 +77,6 @@ router.get('/team-portal/:token', async (req, res) => {
 
         const team = teams[0];
 
-        // 🔍 DEBUG: Mira esto en la terminal de tu VS Code / Mac
-        console.log("-----------------------------------------");
-        console.log(`⚽ PORTAL VORA - Equipo: ${team.teamName}`);
-        console.log(`👤 Captain_ID en DB: [${team.captain_id}]`);
-        console.log(`🤔 Tipo de dato: ${typeof team.captain_id}`);
-
-        // Lógica ultra-segura: 
-        // Si es null, undefined, 0 o string vacío, es CAPTAIN_INVITE
         const isCaptainMissing = (
             team.captain_id === null || 
             team.captain_id === undefined || 
@@ -105,9 +85,6 @@ router.get('/team-portal/:token', async (req, res) => {
         );
 
         const type = isCaptainMissing ? 'CAPTAIN_INVITE' : 'PLAYER_REGISTRATION';
-        
-        console.log(`🚩 Resultado Lógica: ${type}`);
-        console.log("-----------------------------------------");
 
         res.json({ 
             type, 
@@ -121,69 +98,60 @@ router.get('/team-portal/:token', async (req, res) => {
     }
 });
 
-// 4. CREAR LIGA (Proceso de inicialización masiva)
-// MODIFICADO: Ahora guarda player_fields_config en la tabla leagues
+// 4. CREAR LIGA
 router.post('/create', verifyToken, async (req, res) => {
     const { config, schedule } = req.body;
-    const adminId = req.user.id;
+    const adminId = req.user.id || req.user.adminId;
     const inviteToken = crypto.randomBytes(5).toString('hex');
     const connection = await pool.getConnection();
     
     try {
         await connection.beginTransaction();
-
-        // Guardamos la configuración de campos como un String JSON
         const fieldsConfig = JSON.stringify(config.registrationConfig);
 
-        // A. Insertar Liga (Añadida la columna player_fields_config)
         const [leagueResult] = await connection.execute(
             `INSERT INTO leagues (
                 admin_id, name, teams_count, match_minutes, 
                 has_return_match, has_playoffs, playoff_teams, 
                 playoff_format, start_date, playing_days, invite_token,
-                player_fields_config -- ✅ Nueva columna
+                player_fields_config
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 adminId, config.name, config.teamsCount, config.duration,
                 config.hasReturnMatch || 0, config.hasPlayoffs || 0, 
                 config.playoffTeams || 4, config.playoffFormat || 'single', 
                 config.startDate, JSON.stringify(config.selectedVenues), inviteToken,
-                fieldsConfig // ✅ Valor insertado
+                fieldsConfig
             ]
         );
         const leagueId = leagueResult.insertId;
 
-        // B. Insertar Equipos (Igual)
         const teamIdsMap = {};
         for (const team of config.teams) {
-            const cleanName = team.name.trim();
             const teamToken = crypto.randomBytes(3).toString('hex').toUpperCase(); 
             const [tResult] = await connection.execute(
                 `INSERT INTO league_teams (league_id, name, team_token, captain_phone) VALUES (?, ?, ?, ?)`,
-                [leagueId, cleanName, teamToken, team.phone || null]
+                [leagueId, team.name.trim(), teamToken, team.phone || null]
             );
-            teamIdsMap[cleanName] = tResult.insertId;
+            teamIdsMap[team.name.trim()] = tResult.insertId;
         }
 
-        // C. Insertar Sedes (Igual)
-        const venueIdsMap = {};
         for (const v of config.selectedVenues) {
-            const cleanVenueName = v.name.trim();
-            const [vResult] = await connection.execute(
+            await connection.execute(
                 `INSERT INTO venues (name, address, city, created_by) VALUES (?, ?, ?, ?)`,
-                [cleanVenueName, v.address || '', v.city || '', adminId]
+                [v.name.trim(), v.address || '', v.city || '', adminId]
             );
-            venueIdsMap[cleanVenueName] = vResult.insertId;
         }
 
-        // D. Insertar Partidos (Igual)
         if (schedule && schedule.length > 0) {
-            const matchData = schedule.map(item => {
-                const hId = teamIdsMap[item.match.home.trim()];
-                const aId = teamIdsMap[item.match.away.trim()];
-                const vId = venueIdsMap[item.venue.trim()];
-                return [leagueId, hId || null, aId || null, vId, item.dateStr, item.time];
-            });
+            const matchData = schedule.map(item => [
+                leagueId, 
+                teamIdsMap[item.match.home.trim()] || null, 
+                teamIdsMap[item.match.away.trim()] || null, 
+                null, // venue_id simplificado
+                item.dateStr, 
+                item.time
+            ]);
             await connection.query(
                 `INSERT INTO league_matches (league_id, home_team_id, away_team_id, venue_id, match_date, match_time) VALUES ?`,
                 [matchData]
@@ -194,14 +162,13 @@ router.post('/create', verifyToken, async (req, res) => {
         res.status(201).json({ message: "Liga creada con éxito", leagueId });
     } catch (error) {
         await connection.rollback();
-        console.error("🚨 Error al crear liga:", error.message);
         res.status(500).json({ error: error.message });
     } finally {
         connection.release();
     }
 });
 
-// 5. GESTIÓN DEL EQUIPO POR EL ADMIN (Actualizar logo o teléfono)
+// 5. ACTUALIZAR EQUIPO
 router.patch('/teams/:teamId', verifyToken, async (req, res) => {
     const { logo, captain_phone } = req.body;
     try {
@@ -215,7 +182,7 @@ router.patch('/teams/:teamId', verifyToken, async (req, res) => {
     }
 });
 
-// 6. VER PLANTILLA DE UN EQUIPO (Para Admin y Capitán)
+// 6. VER PLANTILLA
 router.get('/teams/:teamId/roster', verifyToken, async (req, res) => {
     try {
         const [players] = await pool.execute(
@@ -228,7 +195,7 @@ router.get('/teams/:teamId/roster', verifyToken, async (req, res) => {
     }
 });
 
-// 7. VINCULAR CAPITÁN AL EQUIPO
+// 7. VINCULAR CAPITÁN
 router.post('/claim-team', verifyToken, async (req, res) => {
     const { teamId } = req.body;
     try {
@@ -242,7 +209,7 @@ router.post('/claim-team', verifyToken, async (req, res) => {
     }
 });
 
-// 8. AUTO-REGISTRO DE JUGADOR CON CHECK PWA
+// 8. REGISTRO JUGADOR
 router.post('/register-player', async (req, res) => {
     const { teamId, full_name, dorsal, dni, is_pwa } = req.body;
     try {
@@ -256,23 +223,19 @@ router.post('/register-player', async (req, res) => {
     }
 });
 
-// Esta ruta se llama después de que el usuario haga Login o Registro
+// 9. CHECK REQUISITOS
 router.get('/check-requirements/:leagueId', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        const leagueId = req.params.leagueId;
-
-        // 1. Obtenemos los datos actuales del usuario
         const [users] = await pool.execute(
             'SELECT fullName, dni, phone, photo_url, age FROM users WHERE id = ?',
             [userId]
         );
         const user = users[0];
 
-        // 2. Obtenemos los requisitos de la liga
         const [leagues] = await pool.execute(
             'SELECT player_fields_config FROM leagues WHERE id = ?',
-            [leagueId]
+            [req.params.leagueId]
         );
         
         if (leagues.length === 0) return res.status(404).json({ message: "Liga no encontrada" });
@@ -280,19 +243,16 @@ router.get('/check-requirements/:leagueId', verifyToken, async (req, res) => {
         const config = JSON.parse(leagues[0].player_fields_config);
         const missingFields = [];
 
-        // 3. LA LÓGICA DE CRUCE: Comprobamos qué falta
         if (config.dni && !user.dni) missingFields.push('dni');
         if (config.photo && !user.photo_url) missingFields.push('photo');
         if (config.phone && !user.phone) missingFields.push('phone');
         if (config.age && !user.age) missingFields.push('age');
-        // El dorsal no se comprueba aquí porque va en la tabla de 'league_players', no en 'users'
 
         res.json({
             isComplete: missingFields.length === 0,
-            missingFields: missingFields,
-            user: user // Devolvemos los datos que ya tenemos para no pedirlos otra vez
+            missingFields,
+            user
         });
-
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
