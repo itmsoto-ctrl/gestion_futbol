@@ -14,7 +14,8 @@ const AdminLogin = () => {
 
     try {
       // ✅ CORRECCIÓN: Ahora usamos backticks ` ` para que funcione ${API_BASE_URL}
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      // ✅ Cómo tiene que estar (con backtick `):
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -95,4 +96,4 @@ const AdminLogin = () => {
   );
 };
 
-export default AdminLogin;
+export default AdminLogin;// Update VORA
