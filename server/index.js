@@ -14,11 +14,11 @@ const app = express(); // ✅ Creado al principio para poder usarlo abajo
 const corsOptions = {
     origin: [
       'http://localhost:3000', 
-      'https://tu-app-en-netlify.netlify.app' // 👈 ¡OJO! Pon aquí tu URL REAL de Netlify
+      'https://tu-nombre-real-en-netlify.netlify.app' // 👈 PON AQUÍ TU URL REAL
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'] // 👈 Añade X-Requested-With para Safari
 };
 
 app.use(cors(corsOptions)); // ✅ Aplicamos CORS con las opciones
