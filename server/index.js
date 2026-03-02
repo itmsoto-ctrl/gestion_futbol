@@ -24,6 +24,7 @@ const corsOptions = {
 app.use(cors(corsOptions)); // ✅ Aplicamos CORS con las opciones
 app.use(express.json());    // ✅ Para que el servidor entienda JSON
 
+
 // 3. RUTAS
 app.use('/api/leagues', leagueRoutes);
 app.use('/api/admin', adminRoutes);
