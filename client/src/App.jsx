@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 // 1. IMPORTACIÓN CRÍTICA (Asegúrate de que esta línea exista)
-import TeamPortal from './components/v2/portal/TeamPortal';
+import TeamPortal from './components/v2/Portal/TeamPortal';
 
 // Otros componentes (ajusta las rutas según tu carpeta real)
 import SaaSLanding from './components/v2/SaaSLanding'; 
