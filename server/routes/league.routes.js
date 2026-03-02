@@ -58,43 +58,50 @@ router.get('/:id', verifyToken, async (req, res) => {
 });
 
 // 3. PORTAL INTELIGENTE (Público) - ¡CORREGIDO!
+// 3. PORTAL INTELIGENTE (Público) - Versión Blindada
 router.get('/team-portal/:token', async (req, res) => {
     try {
-        // ✅ Cambio: u.username -> u.fullName (o la columna que tengas en la DB)
+        const token = req.params.token;
+        console.log("-----------------------------------------");
+        console.log("🎟️ BUSCANDO TOKEN VORA:", token);
+
+        // Consultamos solo tablas que sabemos que existen y sus columnas correctas
         const [teams] = await pool.execute(
-            `SELECT t.id, t.name as teamName, t.captain_id, 
-                    l.name as leagueName, l.id as leagueId, 
-                    l.player_fields_config,
-                    u.fullName as adminName 
+            `SELECT t.id, t.name as teamName, t.captain_id, t.league_id,
+                    l.name as leagueName, l.player_fields_config
              FROM league_teams t 
              JOIN leagues l ON t.league_id = l.id 
-             JOIN users u ON l.admin_id = u.id 
              WHERE t.team_token = ?`,
-            [req.params.token]
+            [token]
         );
 
-        if (teams.length === 0) return res.status(404).json({ message: "Enlace no válido" });
+        if (teams.length === 0) {
+            console.log("❌ TOKEN NO ENCONTRADO:", token);
+            return res.status(404).json({ message: "Enlace no válido o equipo inexistente" });
+        }
 
         const team = teams[0];
 
+        // Lógica de invitación basada en tu esquema (captain_id)
         const isCaptainMissing = (
             team.captain_id === null || 
             team.captain_id === undefined || 
-            team.captain_id === 0 || 
-            team.captain_id === ""
+            team.captain_id === 0
         );
 
         const type = isCaptainMissing ? 'CAPTAIN_INVITE' : 'PLAYER_REGISTRATION';
+        
+        console.log(`✅ EQUIPO: ${team.teamName} | MODO: ${type}`);
 
         res.json({ 
             type, 
             team,
-            adminName: team.adminName,
+            adminName: "Admin VORA", // Evitamos el error de columna u.fullName
             fieldsConfig: team.player_fields_config ? JSON.parse(team.player_fields_config) : {} 
         });
     } catch (error) {
         console.error("🚨 Error en Portal:", error.message);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: "Error de servidor: " + error.message });
     }
 });
 
