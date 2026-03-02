@@ -53,22 +53,13 @@ const CalendarPreview = ({ config, onConfirm }) => {
     const numTeams = teams.length;
     let rounds = [];
 
-    // ALGORITMO ROUND ROBIN CON ALTERNANCIA DE LOCALÍA
     for (let i = 0; i < numTeams - 1; i++) {
       let rMatches = [];
       for (let j = 0; j < numTeams / 2; j++) {
         let home = teams[j];
         let away = teams[numTeams - 1 - j];
-
-        // LÓGICA DE INTERCALADO: 
-        // Si la jornada es impar, invertimos el orden para que el local pase a ser visitante
-        if ((i + j) % 2 === 1) {
-          [home, away] = [away, home];
-        }
-
-        if (home !== "DESCANSO" && away !== "DESCANSO") {
-          rMatches.push({ home, away });
-        }
+        if ((i + j) % 2 === 1) [home, away] = [away, home];
+        if (home !== "DESCANSO" && away !== "DESCANSO") rMatches.push({ home, away });
       }
       rounds.push(rMatches);
       teams.splice(1, 0, teams.pop());
@@ -84,6 +75,8 @@ const CalendarPreview = ({ config, onConfirm }) => {
     let roundIdx = 0;
 
     while (roundIdx < rounds.length) {
+      // ✅ CORRECCIÓN: Capturamos el valor para evitar el error no-loop-func
+      const currentRoundNumber = roundIdx + 1;
       const dayKey = DAYS_MAP[iterDate.getDay()];
       const dateStr = iterDate.toISOString().split('T')[0];
       const hasSlot = config.selectedVenues?.some(v => v.slots?.some(s => s.day === dayKey));
@@ -96,7 +89,8 @@ const CalendarPreview = ({ config, onConfirm }) => {
               generated.push({
                 type: 'REGULAR', dateStr, dateObj: new Date(iterDate),
                 venue: venue.name, fieldName: slot.fieldName, time: slot.start,
-                match: currentRoundMatches.shift(), round: roundIdx + 1,
+                match: currentRoundMatches.shift(), 
+                round: currentRoundNumber, // 👈 Usamos la constante
                 weekHolidays: getHolidaysDetails(iterDate),
                 isHoliday: !!HOLIDAYS_2026[dateStr]
               });
@@ -108,7 +102,7 @@ const CalendarPreview = ({ config, onConfirm }) => {
       iterDate.setDate(iterDate.getDate() + 1);
     }
 
-    // PLAYOFFS MEJORADOS (IDA Y VUELTA)
+    // Playoff Logic...
     if (config.hasPlayoffs === 1 && config.selectedVenues.length > 0) {
       const phases = [];
       if (config.playoffTeams === 4) phases.push('SEMIFINAL IDA');
@@ -121,12 +115,10 @@ const CalendarPreview = ({ config, onConfirm }) => {
           const dayKey = DAYS_MAP[iterDate.getDay()];
           const dateStr = iterDate.toISOString().split('T')[0];
           const hasSlot = config.selectedVenues.some(v => v.slots?.some(s => s.day === dayKey));
-          
           if (hasSlot && !cancelledDates.includes(dateStr)) {
             const venue = config.selectedVenues[0];
             const slotsOfDay = venue.slots.filter(s => s.day === dayKey);
             const matchesToCreate = phase.includes('SEMIFINAL') ? 2 : 1;
-            
             for(let i=0; i < matchesToCreate; i++) {
                 const slot = slotsOfDay[i] || slotsOfDay[0];
                 generated.push({
@@ -203,13 +195,13 @@ const CalendarPreview = ({ config, onConfirm }) => {
               </div>
 
               <div className="space-y-3">
-                {group.map((item) => {
+                {group.map((item, iIdx) => {
                   const globalIdx = schedule.findIndex(s => s === item);
                   const dayKey = DAYS_MAP[item.dateObj.getDay()];
                   const allDaySlots = config.selectedVenues.flatMap(v => v.slots.filter(s => s.day === dayKey));
 
                   return (
-                    <div key={globalIdx} className="relative group/match">
+                    <div key={`${gIdx}-${iIdx}`} className="relative group/match">
                       <div 
                         onClick={() => setEditingIdx(editingIdx === globalIdx ? null : globalIdx)}
                         className={`p-5 rounded-2xl border transition-all duration-300 relative cursor-pointer

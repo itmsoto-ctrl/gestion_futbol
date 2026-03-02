@@ -202,15 +202,27 @@ router.get('/teams/:teamId/roster', verifyToken, async (req, res) => {
     }
 });
 
-// 7. VINCULAR CAPITÁN
+// 7.SUSTITUYE LA RUTA 7 EN league.routes.js
+// server/routes/league.routes.js
+
 router.post('/claim-team', verifyToken, async (req, res) => {
     const { teamId } = req.body;
-    try {
-        const [team] = await pool.execute('SELECT captain_id, name FROM league_teams WHERE id = ?', [teamId]);
-        if (team[0].captain_id !== null) return res.status(400).json({ message: "Equipo ya vinculado" });
+    // 💡 Triple check del ID para que no llegue NULL a la DB
+    const userId = req.user.id || req.user.adminId || req.user.userId;
 
-        await pool.execute('UPDATE league_teams SET captain_id = ? WHERE id = ?', [req.user.id, teamId]);
-        res.json({ message: `¡Ahora eres el capitán de ${team[0].name}!` });
+    try {
+        if (!userId) return res.status(401).json({ message: "Usuario no identificado" });
+
+        // Verificamos si ya hay capitán
+        const [team] = await pool.execute('SELECT captain_id, name FROM league_teams WHERE id = ?', [teamId]);
+        if (team.length === 0) return res.status(404).json({ message: "Equipo no encontrado" });
+        if (team[0].captain_id !== null) return res.status(400).json({ message: "Este equipo ya tiene capitán" });
+
+        // ACTUALIZAMOS LA TABLA league_teams
+        await pool.execute('UPDATE league_teams SET captain_id = ? WHERE id = ?', [userId, teamId]);
+        
+        console.log(`✅ User ${userId} vinculado al equipo ${teamId}`);
+        res.json({ success: true, message: `¡Ahora eres el capitán de ${team[0].name}!` });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

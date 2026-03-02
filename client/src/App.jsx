@@ -2,10 +2,10 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import CompleteProfile from './components/portal/CompleteProfile'; 
 
-// 1. IMPORTACIÓN CRÍTICA (Asegúrate de que esta línea exista)
-import TeamPortal from './components/portal/TeamPortal';
+// ✅ IMPORTACIÓN CORREGIDA
+import JoinLeague from './components/portal/JoinLeague';
 
-// Otros componentes (ajusta las rutas según tu carpeta real)
+// Otros componentes
 import SaaSLanding from './components/v2/SaaSLanding'; 
 import AdminSetup from './components/v2/auth/AdminSetup'; 
 import AdminDashboardV2 from './components/v2/admin/AdminDashboardV2.jsx';
@@ -27,9 +27,8 @@ function App() {
         <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboardV2 /></ProtectedRoute>} />
         <Route path="/admin/league/:id" element={<ProtectedRoute><LeagueAdminDashboard /></ProtectedRoute>} />
 
-        {/* 🚀 EL PORTAL VORA (RUTA /join/:token) */}
-        {/* Al estar definido arriba en el import, ya no dará error */}
-        <Route path="/join/:token" element={<TeamPortal />} />
+        {/* 🚀 EL PORTAL VORA (CORREGIDO CON JOINLEAGUE) */}
+        <Route path="/join/:token" element={<JoinLeague />} />
 
         {/* OTROS */}
         <Route path="/login" element={<AdminLogin />} /> 
