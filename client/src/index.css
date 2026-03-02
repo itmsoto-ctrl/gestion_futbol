@@ -95,3 +95,13 @@ html, body {
   padding: 0;
   height: 100%;
 }
+
+@keyframes pulse-shine {
+  0% { filter: drop-shadow(0 0 5px rgba(163, 230, 53, 0.2)); }
+  50% { filter: drop-shadow(0 0 20px rgba(163, 230, 53, 0.5)); }
+  100% { filter: drop-shadow(0 0 5px rgba(163, 230, 53, 0.2)); }
+}
+
+.logo-shine {
+  animation: pulse-shine 3s infinite ease-in-out;
+}
