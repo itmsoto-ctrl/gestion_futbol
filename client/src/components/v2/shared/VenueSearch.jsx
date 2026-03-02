@@ -1,63 +1,87 @@
 import React, { useState, useEffect } from 'react';
 
-const VenueSelector = ({ onSelect }) => {
+const VenueSelector = ({ onSelect, onAddNew }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState([]);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-
-  // Simulación de búsqueda en base de datos global
-  const allVenues = [
-    { id: 1, name: 'Polideportivo Municipal Cornellà', address: 'Carrer de la Rugby, 1', city: 'Cornellà' },
-    { id: 2, name: 'Camp de Futbol Can Buxeres', address: 'Camí de Can Buxeres, s/n', city: 'Hospitalet' },
-  ];
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (searchTerm.length > 2) {
-      const filtered = allVenues.filter(v => 
-        v.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setResults(filtered);
-    } else {
-      setResults([]);
-    }
-  }, [searchTerm]);
+    const searchDB = async () => {
+      if (searchTerm.length > 2) {
+        setLoading(true);
+        try {
+          // 🔌 LLAMADA REAL A TU SERVIDOR EN EL MAC MINI
+          const token = localStorage.getItem('token');
+          const response = await fetch(`http://localhost:3001/api/admin/venues/search?q=${searchTerm}`, {
+            headers: { 
+              'Authorization': `Bearer ${token}` 
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            setResults(data);
+          }
+        } catch (err) {
+          console.error("🚨 Error en la búsqueda de sedes:", err);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setResults([]);
+      }
+    };
+
+    const delayDebounceFn = setTimeout(() => {
+      searchDB();
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]); // <-- Aquí es donde te marcaba el error por algo abierto arriba
 
   return (
     <div className="space-y-4">
       <div className="relative">
         <input 
           type="text"
-          className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-4 px-6 focus:border-lime-400 outline-none transition-all"
+          className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-4 px-6 focus:border-lime-400 outline-none transition-all uppercase font-bold text-xs tracking-widest text-white"
           placeholder="Busca por nombre, calle o ciudad..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
-        <span className="absolute right-6 top-5 opacity-30 text-xs uppercase font-bold tracking-widest">Global Search</span>
+        <span className="absolute right-6 top-5 opacity-40 text-[8px] uppercase font-black tracking-widest text-lime-400">
+          {loading ? 'Buscando...' : 'Railway Live'}
+        </span>
       </div>
 
-      {/* Resultados del filtrado */}
+      {/* RESULTADOS DE LA BASE DE DATOS */}
       {results.length > 0 && (
-        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl animate-in fade-in slide-in-from-top-2">
           {results.map(venue => (
             <button 
               key={venue.id}
-              onClick={() => onSelect(venue)}
-              className="w-full text-left p-4 hover:bg-zinc-800 border-b border-zinc-800 last:border-none"
+              onClick={() => {
+                onSelect(venue);
+                setSearchTerm('');
+              }}
+              className="w-full text-left p-5 hover:bg-lime-400 hover:text-zinc-950 border-b border-zinc-800 last:border-none transition-all group"
             >
-              <p className="font-bold text-lime-400">{venue.name}</p>
-              <p className="text-[10px] text-zinc-500 uppercase">{venue.address} • {venue.city}</p>
+              <p className="font-black uppercase italic">{venue.name}</p>
+              <p className="text-[9px] opacity-60 font-bold uppercase group-hover:opacity-100">
+                {venue.address} • {venue.city}
+              </p>
             </button>
           ))}
         </div>
       )}
 
-      {/* Si no hay resultados, invitamos a crear uno nuevo */}
-      {searchTerm.length > 3 && results.length === 0 && (
+      {/* BOTÓN PARA CREAR NUEVA SEDE SI NO EXISTE */}
+      {searchTerm.length > 3 && results.length === 0 && !loading && (
         <button 
-          onClick={() => setShowCreateModal(true)}
-          className="w-full bg-zinc-800/50 border border-dashed border-zinc-700 p-4 rounded-2xl text-zinc-400 text-sm italic"
+          onClick={() => onAddNew(searchTerm)}
+          className="w-full bg-zinc-900/50 border border-dashed border-zinc-700 p-6 rounded-3xl text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:border-lime-400 hover:text-white transition-all"
         >
-          ¿No encuentras la sede? <span className="text-white font-bold underline">Crea una nueva</span>
+          No existe "{searchTerm}". <span className="text-lime-400 underline">Crear sede nueva</span>
         </button>
       )}
     </div>

@@ -28,6 +28,7 @@ const CalendarPreview = ({ config, onConfirm }) => {
 
   useEffect(() => {
     generateCalendar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cancelledDates, config]);
 
   const getHolidaysDetails = (baseDate) => {

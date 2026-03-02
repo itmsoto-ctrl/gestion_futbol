@@ -5,48 +5,79 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const crypto = require('crypto');
 
 // 1. OBTENER LIGAS DEL ADMIN (Dashboard General)
+
 router.get('/my-leagues', verifyToken, async (req, res) => {
     try {
+        const userId = req.user.id;
+        console.log("-----------------------------------------");
+        console.log("🔍 BUSCANDO LIGAS PARA EL USER ID:", userId);
+
+        // CONSULTA MÍNIMA: Sin orden, sin conteos, solo lo básico para que no de error
         const [rows] = await pool.execute(
-            `SELECT *, 
-            (SELECT COUNT(*) FROM league_matches WHERE league_id = leagues.id) as total_matches 
-            FROM leagues 
-            WHERE admin_id = ? 
-            ORDER BY created_at DESC`,
-            [req.user.id]
+            'SELECT id, name, invite_token, teams_count, match_minutes FROM leagues WHERE admin_id = ?',
+            [userId]
         );
+
+        console.log("✅ LIGAS ENCONTRADAS:", rows.length);
         res.json(rows);
     } catch (error) {
-        res.status(500).json({ message: "Error al obtener ligas", error: error.message });
-    }
-});
-
-// 2. DETALLE DE LIGA PARA EL ADMIN (Equipos, Tokens y Estado de Capitanes)
-router.get('/:id', verifyToken, async (req, res) => {
-    try {
-        const [league] = await pool.execute('SELECT * FROM leagues WHERE id = ?', [req.params.id]);
-        if (league.length === 0) return res.status(404).json({ message: "Liga no encontrada" });
-
-        const [teams] = await pool.execute(
-            `SELECT id, name, team_token, captain_phone, captain_id, logo,
-            (SELECT COUNT(*) FROM league_players WHERE team_id = league_teams.id) as player_count
-            FROM league_teams WHERE league_id = ?`,
-            [req.params.id]
-        );
-
-        res.json({ ...league[0], teams });
-    } catch (error) {
+        console.error("🚨 ERROR SQL REAL:");
+        console.error("MENSAJE:", error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
-// 3. PORTAL INTELIGENTE (Público - Se abre desde el enlace de WhatsApp)
+// 2. DETALLE DE LIGA (Soporta Token de texto o ID numérico)
+router.get('/:id', verifyToken, async (req, res) => {
+    try {
+        const identifier = req.params.id; // Aquí llega '4f127af4f8'
+        
+        console.log("-----------------------------------------");
+        console.log("🔎 BUSCANDO DETALLE DE LIGA:", identifier);
+
+        // Buscamos en la tabla leagues por el campo invite_token O por el id
+        const [leagueRows] = await pool.execute(
+            'SELECT * FROM leagues WHERE invite_token = ? OR id = ?',
+            [identifier, identifier]
+        );
+
+        if (leagueRows.length === 0) {
+            console.log("❌ LIGA NO ENCONTRADA EN DB");
+            return res.status(404).json({ message: "Liga no encontrada" });
+        }
+
+        const league = leagueRows[0];
+        console.log("✅ LIGA ENCONTRADA:", league.name);
+
+        // Ahora buscamos los equipos vinculados a esa liga
+        const [teams] = await pool.execute(
+            `SELECT id, name, team_token, captain_phone, captain_id, logo,
+            (SELECT COUNT(*) FROM league_players WHERE team_id = league_teams.id) as player_count
+            FROM league_teams WHERE league_id = ?`,
+            [league.id]
+        );
+
+        console.log(`⚽ EQUIPOS CARGADOS: ${teams.length}`);
+        
+        res.json({ ...league, teams });
+
+    } catch (error) {
+        console.error("🚨 ERROR EN DETALLE LIGA:", error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 3. PORTAL INTELIGENTE (Público) - Versión Blindada
 router.get('/team-portal/:token', async (req, res) => {
     try {
         const [teams] = await pool.execute(
-            `SELECT t.id, t.name as teamName, t.captain_id, l.name as leagueName, l.id as leagueId
+            `SELECT t.id, t.name as teamName, t.captain_id, 
+                    l.name as leagueName, l.id as leagueId, 
+                    l.player_fields_config,
+                    u.username as adminName
              FROM league_teams t 
              JOIN leagues l ON t.league_id = l.id 
+             JOIN users u ON l.admin_id = u.id 
              WHERE t.team_token = ?`,
             [req.params.token]
         );
@@ -54,14 +85,41 @@ router.get('/team-portal/:token', async (req, res) => {
         if (teams.length === 0) return res.status(404).json({ message: "Enlace no válido" });
 
         const team = teams[0];
-        const type = !team.captain_id ? 'CAPTAIN_INVITE' : 'PLAYER_REGISTRATION';
-        res.json({ type, team });
+
+        // 🔍 DEBUG: Mira esto en la terminal de tu VS Code / Mac
+        console.log("-----------------------------------------");
+        console.log(`⚽ PORTAL VORA - Equipo: ${team.teamName}`);
+        console.log(`👤 Captain_ID en DB: [${team.captain_id}]`);
+        console.log(`🤔 Tipo de dato: ${typeof team.captain_id}`);
+
+        // Lógica ultra-segura: 
+        // Si es null, undefined, 0 o string vacío, es CAPTAIN_INVITE
+        const isCaptainMissing = (
+            team.captain_id === null || 
+            team.captain_id === undefined || 
+            team.captain_id === 0 || 
+            team.captain_id === ""
+        );
+
+        const type = isCaptainMissing ? 'CAPTAIN_INVITE' : 'PLAYER_REGISTRATION';
+        
+        console.log(`🚩 Resultado Lógica: ${type}`);
+        console.log("-----------------------------------------");
+
+        res.json({ 
+            type, 
+            team,
+            adminName: team.adminName,
+            fieldsConfig: team.player_fields_config ? JSON.parse(team.player_fields_config) : {} 
+        });
     } catch (error) {
+        console.error("🚨 Error en Portal:", error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
 // 4. CREAR LIGA (Proceso de inicialización masiva)
+// MODIFICADO: Ahora guarda player_fields_config en la tabla leagues
 router.post('/create', verifyToken, async (req, res) => {
     const { config, schedule } = req.body;
     const adminId = req.user.id;
@@ -71,23 +129,28 @@ router.post('/create', verifyToken, async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // A. Insertar Liga
+        // Guardamos la configuración de campos como un String JSON
+        const fieldsConfig = JSON.stringify(config.registrationConfig);
+
+        // A. Insertar Liga (Añadida la columna player_fields_config)
         const [leagueResult] = await connection.execute(
             `INSERT INTO leagues (
                 admin_id, name, teams_count, match_minutes, 
                 has_return_match, has_playoffs, playoff_teams, 
-                playoff_format, start_date, playing_days, invite_token
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                playoff_format, start_date, playing_days, invite_token,
+                player_fields_config -- ✅ Nueva columna
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 adminId, config.name, config.teamsCount, config.duration,
                 config.hasReturnMatch || 0, config.hasPlayoffs || 0, 
                 config.playoffTeams || 4, config.playoffFormat || 'single', 
-                config.startDate, JSON.stringify(config.selectedVenues), inviteToken
+                config.startDate, JSON.stringify(config.selectedVenues), inviteToken,
+                fieldsConfig // ✅ Valor insertado
             ]
         );
         const leagueId = leagueResult.insertId;
 
-        // B. Insertar Equipos con su TOKEN único de WhatsApp
+        // B. Insertar Equipos (Igual)
         const teamIdsMap = {};
         for (const team of config.teams) {
             const cleanName = team.name.trim();
@@ -99,7 +162,7 @@ router.post('/create', verifyToken, async (req, res) => {
             teamIdsMap[cleanName] = tResult.insertId;
         }
 
-        // C. Insertar Sedes
+        // C. Insertar Sedes (Igual)
         const venueIdsMap = {};
         for (const v of config.selectedVenues) {
             const cleanVenueName = v.name.trim();
@@ -110,7 +173,7 @@ router.post('/create', verifyToken, async (req, res) => {
             venueIdsMap[cleanVenueName] = vResult.insertId;
         }
 
-        // D. Insertar Partidos
+        // D. Insertar Partidos (Igual)
         if (schedule && schedule.length > 0) {
             const matchData = schedule.map(item => {
                 const hId = teamIdsMap[item.match.home.trim()];
@@ -128,6 +191,7 @@ router.post('/create', verifyToken, async (req, res) => {
         res.status(201).json({ message: "Liga creada con éxito", leagueId });
     } catch (error) {
         await connection.rollback();
+        console.error("🚨 Error al crear liga:", error.message);
         res.status(500).json({ error: error.message });
     } finally {
         connection.release();
@@ -184,6 +248,48 @@ router.post('/register-player', async (req, res) => {
             [teamId, full_name, dorsal, dni, is_pwa || false]
         );
         res.status(201).json({ message: "Registro completado con éxito" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Esta ruta se llama después de que el usuario haga Login o Registro
+router.get('/check-requirements/:leagueId', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const leagueId = req.params.leagueId;
+
+        // 1. Obtenemos los datos actuales del usuario
+        const [users] = await pool.execute(
+            'SELECT fullName, dni, phone, photo_url, age FROM users WHERE id = ?',
+            [userId]
+        );
+        const user = users[0];
+
+        // 2. Obtenemos los requisitos de la liga
+        const [leagues] = await pool.execute(
+            'SELECT player_fields_config FROM leagues WHERE id = ?',
+            [leagueId]
+        );
+        
+        if (leagues.length === 0) return res.status(404).json({ message: "Liga no encontrada" });
+        
+        const config = JSON.parse(leagues[0].player_fields_config);
+        const missingFields = [];
+
+        // 3. LA LÓGICA DE CRUCE: Comprobamos qué falta
+        if (config.dni && !user.dni) missingFields.push('dni');
+        if (config.photo && !user.photo_url) missingFields.push('photo');
+        if (config.phone && !user.phone) missingFields.push('phone');
+        if (config.age && !user.age) missingFields.push('age');
+        // El dorsal no se comprueba aquí porque va en la tabla de 'league_players', no en 'users'
+
+        res.json({
+            isComplete: missingFields.length === 0,
+            missingFields: missingFields,
+            user: user // Devolvemos los datos que ya tenemos para no pedirlos otra vez
+        });
+
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

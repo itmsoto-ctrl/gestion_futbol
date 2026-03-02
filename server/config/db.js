@@ -1,15 +1,20 @@
 const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
 
 const pool = mysql.createPool({
-    host: process.env.MYSQLHOST,
-    user: process.env.MYSQLUSER,
-    password: process.env.MYSQLPASSWORD,
-    database: process.env.MYSQLDATABASE,
-    port: process.env.MYSQLPORT || 3306,
+    host: process.env.MYSQLHOST || "shuttle.proxy.rlwy.net",
+    user: process.env.MYSQLUSER || "root",
+    password: process.env.MYSQLPASSWORD || "WmQUPzYMGioBxMsuEqkcYJapMYYjaTqy",
+    database: process.env.MYSQLDATABASE || "railway",
+    port: 24076,
     waitForConnections: true,
-    connectionLimit: 10, // Subimos a 10 para soportar los 6 equipos entrando a la vez
+    connectionLimit: 5,
+    queueLimit: 0,
+    connectTimeout: 20000, 
     enableKeepAlive: true,
-    keepAliveInitialDelay: 10000
+    keepAliveInitialDelay: 10000,
+    ssl: { rejectUnauthorized: false }
 });
 
 module.exports = pool;

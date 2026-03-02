@@ -104,7 +104,7 @@ const LeagueAdminDashboard = () => {
   }, [fetchLeagueData]);
 
   const sendWhatsApp = (team) => {
-    const inviteLink = `${window.location.origin}/join-team/${team.team_token}`;
+    const inviteLink = `${window.location.origin}/join/${team.team_token}`;
     const text = `⚽ ¡Hola! Soy el Admin de la liga ${league.name}. Aquí tienes el enlace para que tú y tu equipo os registréis: ${inviteLink}`;
     
     const url = team.captain_phone 
