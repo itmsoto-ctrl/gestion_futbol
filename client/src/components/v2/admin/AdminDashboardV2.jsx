@@ -11,7 +11,7 @@ const AdminDashboardV2 = () => {
   const fetchLeagues = async () => {
     try {
       setLoading(true);
-      const response = await fetch('${API_BASE_URL}/api/leagues/my-leagues', {
+      const response = await fetch(`${API_BASE_URL}/api/leagues/my-leagues`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await response.json();
