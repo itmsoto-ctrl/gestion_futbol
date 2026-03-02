@@ -3,61 +3,59 @@ const express = require('express');
 const cors = require('cors');
 const pool = require('./config/db');
 
-// 1. IMPORTACIÓN DE RUTAS
 const adminRoutes = require('./routes/admin.routes');
 const authRoutes = require('./routes/auth.routes');
 const leagueRoutes = require('./routes/league.routes');
 
-const app = express(); // ✅ Creado al principio para poder usarlo abajo
+const app = express();
 
-// 2. CONFIGURACIÓN DE CORS (Antes de las rutas)
-const corsOptions = {
-    origin: [
-      'http://localhost:3000', 
-      'https://gestionfutbol-production.up.railway.app' // 👈 PON AQUÍ TU URL REAL
-    ],
+// ✅ 1. CONFIGURACIÓN DE CORS ÚNICA Y CORRECTA
+const allowedOrigins = [
+    'http://localhost:3000',
+    'https://gestionfutbol7.netlify.app'
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // Permitimos peticiones sin origin (útil para Postman o Apps móviles)
+        // o si el origen está en nuestra "lista blanca"
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Bloqueado por seguridad VORA (CORS)'));
+        }
+    },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'] // 👈 Añade X-Requested-With para Safari
-};
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-app.use(cors(corsOptions)); // ✅ Aplicamos CORS con las opciones
-app.use(express.json());    // ✅ Para que el servidor entienda JSON
+// ✅ 2. MIDDLEWARES BÁSICOS
+app.use(express.json());
 
-
-// 3. RUTAS
+// ✅ 3. RUTAS
 app.use('/api/leagues', leagueRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes);
 
-// 4. SALUD DEL SISTEMA
+// ✅ 4. HEALTH CHECK
 app.get('/health', (req, res) => {
     res.send('🚀 Servidor VORA: Operativo y con Autenticación Activa');
 });
 
-// 5. MIDDLEWARE DE ERRORES (Al final de todo)
+// ✅ 5. MIDDLEWARE DE ERRORES
 app.use((err, req, res, next) => {
-    console.error("❌ ERROR DETECTADO EN EL SERVIDOR:");
-    console.error("Mensaje:", err.message);
-    console.error("Ruta:", req.originalUrl);
-    res.status(500).json({ 
-        error: 'Error interno del servidor', 
-        details: err.message 
-    });
+    console.error("❌ ERROR SERVIDOR:", err.message);
+    res.status(500).json({ error: 'Error interno', details: err.message });
 });
 
-// 6. ARRANQUE DEL SERVIDOR
+// ✅ 6. ARRANQUE
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`
-    =========================================
-    ✅ SERVIDOR VORA LISTO EN PUERTO ${PORT}
-    🛡️ CORS configurado para Netlify
-    =========================================
-    `);
+    console.log(`✅ SERVIDOR VORA LISTO EN PUERTO ${PORT}`);
 });
 
-// 7. TEST DE CONEXIÓN A DB
+// TEST DB
 pool.query('SELECT 1 + 1 AS test')
     .then(() => console.log("✨ CONEXIÓN CON RAILWAY CONFIRMADA"))
-    .catch(err => console.error("🚨 FALLO DE CONEXIÓN DB:", err.message));
+    .catch(err => console.error("🚨 FALLO DB:", err.message));
