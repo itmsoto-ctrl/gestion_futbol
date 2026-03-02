@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import API_BASE_URL from '../../../apiConfig';
+import API_BASE_URL from '../../apiConfig';
 
 const TeamPortal = () => {
   const { token } = useParams();
