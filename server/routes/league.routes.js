@@ -105,17 +105,46 @@ router.get('/team-portal/:token', async (req, res) => {
     }
 });
 
-// 4. CREAR LIGA
+// 4. CREAR LIGA (VERSIÓN CON PROTECCIÓN DE SEDES DUPLICADAS)
 router.post('/create', verifyToken, async (req, res) => {
-    const { config, schedule } = req.body;
-    const adminId = req.user.id || req.user.adminId;
+    const { 
+        name, teamsCount, duration, hasReturnMatch, hasPlayoffs, 
+        playoffTeams, playoffFormat, startDate, selectedVenues, 
+        registrationConfig, teams, schedule 
+    } = req.body;
+
+    const adminId = req.user.id || req.user.adminId || req.user.userId;
     const inviteToken = crypto.randomBytes(5).toString('hex');
     const connection = await pool.getConnection();
     
     try {
         await connection.beginTransaction();
-        const fieldsConfig = JSON.stringify(config.registrationConfig);
+        const fieldsConfig = JSON.stringify(registrationConfig || {});
 
+        // 1. GESTIÓN INTELIGENTE DE SEDES (Evitar duplicados)
+        const venueIdsMap = {};
+        for (const venue of selectedVenues) {
+            // Si viene del Modal (creada a mano)
+            if (venue.isNew || String(venue.id).startsWith('new_')) {
+                const [vResult] = await connection.execute(
+                    `INSERT INTO venues (name, address, city) VALUES (?, ?, ?)`,
+                    [venue.name, venue.address, venue.city]
+                );
+                venueIdsMap[venue.id] = vResult.insertId; // Guardamos el ID real de MySQL
+            } else {
+                // Si viene del buscador (ya existe)
+                venueIdsMap[venue.id] = venue.id; 
+            }
+        }
+
+        // Actualizamos el JSON de sedes con los IDs reales para guardarlo en la liga
+        const finalVenues = selectedVenues.map(v => ({
+            ...v,
+            id: venueIdsMap[v.id],
+            isNew: false // Limpiamos la bandera
+        }));
+
+        // 2. CREAMOS LA LIGA
         const [leagueResult] = await connection.execute(
             `INSERT INTO leagues (
                 admin_id, name, teams_count, match_minutes, 
@@ -124,17 +153,18 @@ router.post('/create', verifyToken, async (req, res) => {
                 player_fields_config
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                adminId, config.name, config.teamsCount, config.duration,
-                config.hasReturnMatch || 0, config.hasPlayoffs || 0, 
-                config.playoffTeams || 4, config.playoffFormat || 'single', 
-                config.startDate, JSON.stringify(config.selectedVenues), inviteToken,
+                adminId, name, teamsCount, duration,
+                hasReturnMatch ? 1 : 0, hasPlayoffs ? 1 : 0, 
+                playoffTeams || 4, playoffFormat || 'single', 
+                startDate, JSON.stringify(finalVenues), inviteToken,
                 fieldsConfig
             ]
         );
         const leagueId = leagueResult.insertId;
 
+        // 3. CREAMOS LOS EQUIPOS 
         const teamIdsMap = {};
-        for (const team of config.teams) {
+        for (const team of teams) {
             const teamToken = crypto.randomBytes(3).toString('hex').toUpperCase(); 
             const [tResult] = await connection.execute(
                 `INSERT INTO league_teams (league_id, name, team_token, captain_phone) VALUES (?, ?, ?, ?)`,
@@ -143,22 +173,22 @@ router.post('/create', verifyToken, async (req, res) => {
             teamIdsMap[team.name.trim()] = tResult.insertId;
         }
 
-        for (const v of config.selectedVenues) {
-            await connection.execute(
-                `INSERT INTO venues (name, address, city, created_by) VALUES (?, ?, ?, ?)`,
-                [v.name.trim(), v.address || '', v.city || '', adminId]
-            );
-        }
-
+        // 4. CREAMOS EL CALENDARIO (Mapeando sedes y equipos a sus IDs reales)
         if (schedule && schedule.length > 0) {
-            const matchData = schedule.map(item => [
-                leagueId, 
-                teamIdsMap[item.match.home.trim()] || null, 
-                teamIdsMap[item.match.away.trim()] || null, 
-                null, // venue_id simplificado
-                item.dateStr, 
-                item.time
-            ]);
+            const matchData = schedule.map(item => {
+                const homeId = teamIdsMap[item.match.home.trim()];
+                const awayId = teamIdsMap[item.match.away.trim()];
+                const realVenueId = venueIdsMap[item.venue_id]; // 👈 Usamos el ID mapeado (nuevo o existente)
+
+                if (!homeId || !awayId || !realVenueId) {
+                    throw new Error(`Datos incompletos en partido: ${item.match.home} vs ${item.match.away}.`);
+                }
+
+                return [
+                    leagueId, homeId, awayId, realVenueId, item.dateStr, item.time
+                ];
+            });
+
             await connection.query(
                 `INSERT INTO league_matches (league_id, home_team_id, away_team_id, venue_id, match_date, match_time) VALUES ?`,
                 [matchData]
@@ -169,6 +199,7 @@ router.post('/create', verifyToken, async (req, res) => {
         res.status(201).json({ message: "Liga creada con éxito", leagueId });
     } catch (error) {
         await connection.rollback();
+        console.error("🚨 Error creando liga:", error);
         res.status(500).json({ error: error.message });
     } finally {
         connection.release();

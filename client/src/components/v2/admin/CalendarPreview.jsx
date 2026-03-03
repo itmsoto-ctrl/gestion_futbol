@@ -121,13 +121,14 @@ const CalendarPreview = ({ config, onConfirm }) => {
             const matchesToCreate = phase.includes('SEMIFINAL') ? 2 : 1;
             for(let i=0; i < matchesToCreate; i++) {
                 const slot = slotsOfDay[i] || slotsOfDay[0];
+                // En CalendarPreview.jsx
                 generated.push({
-                  type: phase, dateStr, dateObj: new Date(iterDate),
-                  venue: venue.name, fieldName: slot.fieldName, time: slot.start,
-                  match: phase === 'GRAN FINAL' ? { home: 'Finalista A', away: 'Finalista B' } : { home: `${i+1}º Clasif.`, away: `${4-i}º Clasif.` },
-                  round: rounds.length + pIdx + 1,
-                  weekHolidays: getHolidaysDetails(iterDate),
-                  isHoliday: !!HOLIDAYS_2026[dateStr]
+                  type: 'REGULAR',
+                  dateStr,
+                  venue_id: venue.id, // 👈 ENVÍA EL ID, NO SOLO EL NOMBRE
+                  venue: venue.name,
+                  match: currentRoundMatches.shift(), 
+                  // ...
                 });
             }
             assigned = true;

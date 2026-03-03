@@ -53,9 +53,11 @@ const LeagueCreator = () => {
     });
   };
 
+  // Lógica de Sedes
   const confirmAddVenue = () => {
     const newVenue = {
-      id: Date.now(),
+      id: `new_${Date.now()}`, // 👈 Marcamos explícitamente que es un ID temporal
+      isNew: true,             // 👈 Bandera para que el backend sepa que debe insertarla
       name: tempVenue.name,
       address: tempVenue.address,
       city: tempVenue.city,
@@ -263,6 +265,7 @@ const LeagueCreator = () => {
                     if (config.selectedVenues.some(v => v.id === venue.id)) return;
                     const formattedVenue = {
                       id: venue.id,
+                      isNew: false, // 👈 Bandera que indica que YA EXISTE en la base de datos
                       name: venue.name,
                       address: venue.address,
                       city: venue.city,
