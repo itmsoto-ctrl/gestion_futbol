@@ -90,6 +90,7 @@ const LeagueCreator = () => {
   };
 
   // ✅ CORRECCIÓN CRÍTICA DE ENVÍO
+  // --- Lógica de Publicación Corregida ---
   const handlePublishLeague = async (generatedSchedule) => {
     if (!generatedSchedule || generatedSchedule.length === 0) {
       alert("⚠️ El calendario está vacío.");
@@ -98,15 +99,18 @@ const LeagueCreator = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      
-      // 1. Quitamos los IDs manuales de los equipos para evitar error 500 en DB
+
+      // 1. Limpiamos los equipos: enviamos solo el nombre.
+      // La base de datos generará sus propios IDs automáticamente.
       const sanitizedTeams = config.teams.map(t => ({ name: t.name }));
 
-      // 2. Aplanamos el objeto para que el servidor lo reciba correctamente
+      // 2. Aplanamos el objeto (Payload)
+      // Usamos el operador spread (...) para sacar todo de config al nivel principal
       const payload = {
-        ...config,
-        teams: sanitizedTeams,
+        ...config,               // Esto saca name, startDate, hasPlayoffs, etc.
+        teams: sanitizedTeams,   // Sobrescribimos con los equipos limpios
         schedule: generatedSchedule,
+        // Aseguramos que los valores sean booleanos puros si el servidor los requiere
         hasReturnMatch: Boolean(config.hasReturnMatch),
         hasPlayoffs: Boolean(config.hasPlayoffs)
       };
@@ -117,7 +121,7 @@ const LeagueCreator = () => {
           'Content-Type': 'application/json', 
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload) // Enviamos el objeto aplanado
       });
 
       if (response.ok) {
@@ -125,7 +129,7 @@ const LeagueCreator = () => {
         window.location.href = '/admin/dashboard'; 
       } else {
         const errorData = await response.json();
-        alert(`Error del servidor: ${errorData.message || 'Error desconocido'}`);
+        alert(`Error del servidor: ${errorData.message || 'Datos inválidos'}`);
       }
     } catch (error) {
       alert("No se pudo conectar con el servidor de Railway.");
