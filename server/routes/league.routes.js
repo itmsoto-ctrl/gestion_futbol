@@ -31,22 +31,25 @@ router.get('/my-leagues', verifyToken, async (req, res) => {
 
 
 // 2. DETALLE DE LIGA Y SUS EQUIPOS (Para el Dashboard del Admin)
+// 2. DETALLE DE LIGA Y SUS EQUIPOS (Para el Dashboard del Admin)
 router.get('/league-details/:id', verifyToken, async (req, res) => {
     try {
-        const leagueId = req.params.id;
+        const identifier = req.params.id;
 
-        // 1. Obtenemos la información de la liga
+        // 1. Buscamos la liga por ID numérico O por su Token (invite_token)
         const [leagues] = await pool.execute(
-            'SELECT * FROM leagues WHERE id = ?',
-            [leagueId]
+            'SELECT * FROM leagues WHERE id = ? OR invite_token = ?',
+            [identifier, identifier]
         );
 
         if (leagues.length === 0) {
             return res.status(404).json({ message: "Liga no encontrada" });
         }
 
-        // 2. Obtenemos los equipos y calculamos cuántos jugadores tienen
-        // Renombramos team_token a invite_token para que el botón de WhatsApp funcione
+        // 2. Extraemos el ID numérico real para poder buscar sus equipos
+        const realLeagueId = leagues[0].id;
+
+        // 3. Obtenemos los equipos
         const [teams] = await pool.execute(
             `SELECT 
                 t.id, 
@@ -57,10 +60,9 @@ router.get('/league-details/:id', verifyToken, async (req, res) => {
                 (SELECT COUNT(*) FROM league_players WHERE team_id = t.id) AS player_count
              FROM league_teams t
              WHERE t.league_id = ?`,
-            [leagueId]
+            [realLeagueId]
         );
 
-        // 3. Enviamos el paquete exacto que espera LeagueAdminDashboard.jsx
         res.json({
             league: leagues[0],
             teams: teams
@@ -72,7 +74,7 @@ router.get('/league-details/:id', verifyToken, async (req, res) => {
     }
 });
 
-// 3. PORTAL INTELIGENTE (Público) - ¡CORREGIDO!
+
 // 3. PORTAL INTELIGENTE (Público) - Versión Blindada
 router.get('/team-portal/:token', async (req, res) => {
     try {
