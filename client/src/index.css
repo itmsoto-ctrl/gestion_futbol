@@ -2,95 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 1. Fondo Gris VORA Limpio */
 html, body {
   background-color: #665C5A;
   margin: 0;
   padding: 0;
   height: 100%;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
 }
 
-/* 2. Animaciones del Logo */
-
-/* Efecto Pulso de Aura */
-@keyframes pulse-aura {
-  0%, 100% { filter: drop-shadow(0 10px 20px rgba(0,0,0,0.4)) drop-shadow(0 0 0px rgba(163,230,53,0)); }
-  50% { filter: drop-shadow(0 15px 30px rgba(0,0,0,0.5)) drop-shadow(0 0 15px rgba(163,230,53,0.3)); }
+/* EFECTO PULSO + SOMBRA DE PROFUNDIDAD */
+@keyframes elite-pulse {
+  0%, 100% { 
+    filter: drop-shadow(0 8px 12px rgba(0,0,0,0.4)) drop-shadow(0 0 0px rgba(163,230,53,0));
+    transform: scale(1);
+  }
+  50% { 
+    filter: drop-shadow(0 15px 25px rgba(0,0,0,0.6)) drop-shadow(0 0 15px rgba(163,230,53,0.3));
+    transform: scale(1.03);
+  }
 }
 
-/* Efecto Reflejo de Cristal (Shine) */
-@keyframes glass-shine {
-  0% { left: -150%; opacity: 0; }
-  20% { opacity: 0.5; }
-  80% { opacity: 0.5; }
-  100% { left: 150%; opacity: 0; }
+/* EFECTO BARRIDO (SHINE) */
+@keyframes shine-sweep {
+  0% { left: -120%; }
+  100% { left: 120%; }
 }
 
-.logo-container-elite {
+.logo-wrapper-elite {
   position: relative;
-  width: 200px;
-  height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden; /* Corta el shine para que solo se vea sobre el logo */
+  padding: 20px;
+  overflow: hidden; /* Importante para que el shine no se salga */
 }
 
 .logo-main-elite {
-  width: 180px;
-  height: 180px;
+  width: 170px;
+  height: 170px;
   object-fit: contain;
+  animation: elite-pulse 4s infinite ease-in-out;
   z-index: 10;
-  animation: pulse-aura 4s infinite ease-in-out;
 }
 
-/* Capa del Shine (Se inyecta la máscara desde React) */
-.logo-shine-overlay {
+.shine-layer {
   position: absolute;
   top: 0;
-  left: 0;
-  width: 100%;
+  width: 40px;
   height: 100%;
-  z-index: 15;
-  pointer-events: none;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-image: var(--logo-url);
-  mask-image: var(--logo-url);
-}
-
-.logo-shine-overlay::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  width: 40%;
-  height: 100%;
-  background: linear-gradient(
-    to right,
-    transparent,
-    rgba(255, 255, 255, 0.4),
-    transparent
-  );
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
   transform: skewX(-25deg);
-  animation: glass-shine 4s infinite ease-in-out;
+  animation: shine-sweep 3s infinite ease-in-out;
+  z-index: 20;
+  pointer-events: none;
 }
 
-/* 3. Inputs Glassmorphism */
 .glass-input {
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: white;
   transition: all 0.3s ease;
-}
-
-.glass-input:focus {
-  border-color: #a3e635;
-  background: rgba(255, 255, 255, 0.08);
 }
