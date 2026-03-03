@@ -48,18 +48,25 @@ const FutCard = ({ player, size = "large", view = "dashboard" }) => {
 
       <img src={theme.img} alt="Card Base" className="w-[350px] h-auto relative z-10 select-none pointer-events-none" />
       
-      {/* 📸 MAGIA DEL SELFIE AQUÍ */}
-      {player.photo_url && (
-          <div 
-            className="absolute top-[80px] left-[110px] w-[170px] h-[190px] z-[15] overflow-hidden flex items-end justify-center pointer-events-none" 
-            style={{ 
-              maskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)', 
-              WebkitMaskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)' 
-            }}
-          >
-              <img src={player.photo_url} alt="Jugador" className="h-full w-auto object-cover" />
-          </div>
-      )}
+      {/* 📸 FOTO CON DIFUMINADO PROFESIONAL */}
+{player.photo_url && (
+  <div 
+    className="absolute top-[75px] left-[90px] w-[210px] h-[220px] z-[15] overflow-hidden flex items-end justify-center pointer-events-none" 
+    style={{ 
+      // Esta es la clave: el degradado va de negro opaco a transparente
+      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 65%, rgba(0,0,0,0) 98%)', 
+      maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 65%, rgba(0,0,0,0) 98%)',
+      WebkitMaskRepeat: 'no-repeat',
+      maskRepeat: 'no-repeat'
+    }}
+  >
+    <img 
+      src={player.photo_url} 
+      alt="Jugador" 
+      className="h-full w-full object-contain object-bottom" 
+    />
+  </div>
+)}
 
       <div className={`absolute ${pos.val} z-20 text-zinc-800 text-7xl font-black italic tracking-tighter select-none pointer-events-none`}>{rating}</div>
       <div className={`absolute ${pos.pos} z-20 text-zinc-800 text-2xl font-bold uppercase select-none pointer-events-none`}>{player.is_goalkeeper ? 'POR' : (player.position || 'MCO')}</div>
