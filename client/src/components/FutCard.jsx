@@ -45,33 +45,49 @@ const FutCard = ({ player, size = "large", view = "dashboard" }) => {
       {/* 1. Fondo de vídeo (z-0) */}
       <video ref={videoRef} key={theme.video} className="absolute inset-0 z-0 w-full h-full object-cover rounded-[50px]" src={theme.video} muted autoPlay loop playsInline />
 
-      {/* 2. Brillo animado (BAJADO A Z-5 para que no tape el difuminado) */}
+      {/* 2. Brillo animado (z-5) - Pasado atrás para no romper la transparencia */}
       <motion.div animate={{ x: [-500, 500] }} transition={{ repeat: Infinity, duration: 4, ease: "linear", repeatDelay: 3 }} className="absolute inset-0 z-[5] bg-gradient-to-r from-transparent via-white/20 to-transparent w-1/2 -skew-x-12 pointer-events-none" />
 
       {/* 3. Imagen de la carta (z-10) */}
       <img src={theme.img} alt="Card Base" className="w-[350px] h-auto relative z-10 select-none pointer-events-none" />
       
-      {/* 4. Foto con Máscara SVG (z-15) */}
+      {/* 4. Foto con Máscara Reforzada para iOS/Chrome Mobile (z-15) */}
       {player.photo_url && (
         <div className="absolute top-[70px] left-[95px] w-[200px] h-[215px] z-[15] pointer-events-none">
-          <svg width="0" height="0" className="absolute">
+          {/* Definición de la máscara SVG */}
+          <svg width="0" height="0" style={{ position: 'absolute' }}>
             <defs>
-              <mask id="playerMask" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
+              <mask id="playerMask" maskUnits="objectBoundingBox">
                 <linearGradient id="maskGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0" stopColor="white" stopOpacity="1" />
-                  <stop offset="0.7" stopColor="white" stopOpacity="1" />
-                  <stop offset="1" stopColor="white" stopOpacity="0" />
+                  <stop offset="0.65" stopColor="white" stopOpacity="1" />
+                  <stop offset="0.95" stopColor="white" stopOpacity="0" />
                 </linearGradient>
                 <rect width="1" height="1" fill="url(#maskGradient)" />
               </mask>
             </defs>
           </svg>
-          <img 
-            src={player.photo_url} 
-            alt="Jugador" 
-            style={{ mask: 'url(#playerMask)', WebkitMask: 'url(#playerMask)' }}
-            className="w-full h-full object-contain object-bottom brightness-[1.05]" 
-          />
+
+          {/* Contenedor con aislamiento de capa y máscara CSS de respaldo */}
+          <div style={{ 
+            width: '100%', 
+            height: '100%', 
+            WebkitMaskImage: 'linear-gradient(to bottom, black 65%, transparent 98%)',
+            maskImage: 'linear-gradient(to bottom, black 65%, transparent 98%)',
+            isolation: 'isolate' 
+          }}>
+            <img 
+              src={player.photo_url} 
+              alt="Jugador" 
+              style={{ 
+                WebkitMask: 'url(#playerMask)', 
+                mask: 'url(#playerMask)',
+                objectFit: 'contain',
+                objectPosition: 'bottom'
+              }}
+              className="w-full h-full brightness-[1.05] contrast-[1.05]" 
+            />
+          </div>
         </div>
       )}
 
