@@ -89,13 +89,13 @@ const PlayerRegistration = () => {
                 <div className="mt-10 mb-14 animate-in fade-in zoom-in duration-1000">
                     <div 
                         className="logo-trace-wrapper" 
-                        style={{ '--logo-url': "url('/logo-shine.webp')" }}
-                    >
-                        <img 
-                            src="/logo-shine.webp" 
+                        style={{ '--logo-url': `url(${process.env.PUBLIC_URL}/logo-shine.webp)` }}
+                        >
+                           <img 
+                            src={`${process.env.PUBLIC_URL}/logo-shine.webp`}
                             alt="VORA" 
                             className="logo-main" 
-                        />
+                            />
                     </div>
                 </div>
 
