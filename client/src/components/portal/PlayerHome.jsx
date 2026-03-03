@@ -173,7 +173,7 @@ const PlayerHome = () => {
             {/* MODAL 3: PREVIEW FUSIONADO */}
             {photoPreview && (
                 <div className="fixed inset-0 z-50 bg-[#1a1a1a] flex flex-col animate-in fade-in">
-                    <div className="flex-1 flex flex-col items-center justify-center p-6 relative bg-[url('/bg-hero.webp')] bg-cover bg-center">
+                    <div className="flex-1 flex flex-col items-center justify-center p-6 relative bg-cover bg-center" style={{ backgroundImage: "url('/bg-hero.webp')" }}>
                         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
                         <div className="z-10 scale-110 sm:scale-125">
                             <FutCard player={{...playerStats, photo_url: photoPreview}} size="large" view="dashboard" />
