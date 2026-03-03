@@ -64,12 +64,11 @@ const PlayerHome = () => {
         setTempPhoto(null);
     };
 
-    if (loading) return <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center text-lime-400 font-black italic">Cargando...</div>;
+    if (loading) return <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center text-lime-400 font-black italic">Preparando terreno...</div>;
 
     return (
         <div className="min-h-screen bg-[#665C5A] text-white flex flex-col items-center pt-10 relative overflow-hidden">
-            {/* MARCA DE AGUA */}
-            <div className="fixed top-0 left-0 z-[9999] bg-red-600 text-white text-[10px] px-2 py-1 font-mono">V-IOS-LAYOUT-09</div>
+            <div className="fixed top-0 left-0 z-[9999] bg-red-600 text-white text-[10px] px-2 py-1 font-mono">V-LAYOUT-FINAL-10</div>
 
             <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform">
                 <FutCard 
@@ -89,7 +88,6 @@ const PlayerHome = () => {
                 </p>
             )}
 
-            {/* BOTONES FLOTANTES DE CONFIRMACIÓN */}
             {tempPhoto && (
                 <div className="fixed bottom-10 left-0 right-0 z-[100] px-6 flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-10">
                     <button 
@@ -107,7 +105,6 @@ const PlayerHome = () => {
                 </div>
             )}
 
-            {/* MODAL CÁMARA */}
             {isCameraOpen && (
                 <div className="fixed inset-0 z-[60] bg-black flex flex-col">
                     <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">

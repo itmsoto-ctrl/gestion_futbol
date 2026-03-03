@@ -15,24 +15,24 @@ const FutCard = ({ player, size = "large" }) => {
       <motion.div animate={{ x: [-500, 500] }} transition={{ repeat: Infinity, duration: 4, ease: "linear" }} className="absolute inset-0 z-[5] bg-gradient-to-r from-transparent via-white/20 to-transparent w-1/2 -skew-x-12 pointer-events-none" />
       <img src="/oro.png" alt="Card" className="w-[350px] h-auto relative z-10 select-none pointer-events-none" />
       
-      {/* 📸 FOTO MÁS GRANDE Y A LA DERECHA */}
+      {/* 📸 FOTO MÁS ARRIBA, MÁS GRANDE Y A LA DERECHA */}
       {player.photo_url && (
         <div 
-          className="absolute top-[50px] left-[105px] w-[250px] h-[270px] z-[15] pointer-events-none"
+          className="absolute top-[15px] left-[110px] w-[260px] h-[300px] z-[15] pointer-events-none"
           style={{
             backgroundImage: `url(${player.photo_url})`,
             backgroundSize: 'cover',
-            backgroundPosition: 'center 15%', 
+            backgroundPosition: 'center 10%', 
             backgroundRepeat: 'no-repeat',
-            // Máscara radial para fundir los bordes en el nuevo tamaño
-            WebkitMaskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 35%, rgba(0,0,0,0) 85%)',
-            maskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 35%, rgba(0,0,0,0) 85%)',
+            // Máscara radial optimizada para el nuevo tamaño
+            WebkitMaskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 85%)',
+            maskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 85%)',
             filter: 'brightness(1.08) contrast(1.05)'
           }}
         />
       )}
 
-      {/* TEXTOS Y STATS */}
+      {/* TEXTOS Y STATS (Se mantienen en su sitio) */}
       <div className="absolute top-[68px] left-[60px] z-20 text-zinc-800 text-7xl font-black italic tracking-tighter">{rating}</div>
       <div className="absolute top-[140px] left-[80px] z-20 text-zinc-800 text-2xl font-bold uppercase">{player.position || 'DEL'}</div>
       <div className="absolute top-[285px] left-0 w-full text-center z-20 px-4"><span className="text-zinc-900 text-3xl font-black uppercase italic truncate block">{player.name}</span></div>
