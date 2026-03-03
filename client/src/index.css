@@ -2,64 +2,98 @@
 @tailwind components;
 @tailwind utilities;
 
+/* -----------------------------------------------------------
+   1. CONFIGURACIÓN GLOBAL Y COLORES (VORA Gray)
+   ----------------------------------------------------------- */
 html, body {
   background-color: #665C5A;
   margin: 0;
   padding: 0;
   height: 100%;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* EFECTO PULSO + SOMBRA DE PROFUNDIDAD */
-@keyframes elite-pulse {
-  0%, 100% { 
-    filter: drop-shadow(0 8px 12px rgba(0,0,0,0.4)) drop-shadow(0 0 0px rgba(163,230,53,0));
-    transform: scale(1);
-  }
-  50% { 
-    filter: drop-shadow(0 15px 25px rgba(0,0,0,0.6)) drop-shadow(0 0 15px rgba(163,230,53,0.3));
-    transform: scale(1.03);
-  }
-}
-
-/* EFECTO BARRIDO (SHINE) */
-@keyframes shine-sweep {
-  0% { left: -120%; }
-  100% { left: 120%; }
-}
-
-.logo-wrapper-elite {
+/* -----------------------------------------------------------
+   2. EFECTO HALO-SNAKE RESTAURADO (Suave y Circular)
+   ----------------------------------------------------------- */
+.halo-wrapper {
   position: relative;
+  width: 180px; /* Tamaño grande */
+  height: 180px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  overflow: hidden; /* Importante para que el shine no se salga */
+  border-radius: 50%;
+  overflow: hidden;
+  background: #665C5A; /* Mismo gris que el fondo */
+  /* Sombra suave de profundidad */
+  filter: drop-shadow(0 15px 25px rgba(0, 0, 0, 0.3));
 }
 
-.logo-main-elite {
-  width: 170px;
-  height: 170px;
-  object-fit: contain;
-  animation: elite-pulse 4s infinite ease-in-out;
-  z-index: 10;
-}
-
-.shine-layer {
+/* La "Serpiente" de luz (Degradado Suave) */
+.halo-wrapper::before {
+  content: '';
   position: absolute;
-  top: 0;
-  width: 40px;
-  height: 100%;
-  background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
-  transform: skewX(-25deg);
-  animation: shine-sweep 3s infinite ease-in-out;
-  z-index: 20;
-  pointer-events: none;
+  width: 180%;
+  height: 180%;
+  /* Degradado cónico suave y nítido al final */
+  background: conic-gradient(
+    transparent 0%,
+    transparent 70%,   
+    #a3e635 90%,       
+    #ffffff 100%       
+  );
+  animation: rotate-snake 2.5s linear infinite; /* Velocidad elegante */
 }
 
+/* El "Escudo" interior (Tapa el centro para dejar solo el borde fino) */
+.halo-wrapper::after {
+  content: '';
+  position: absolute;
+  inset: 4px; /* Grosor del trazo fino (4px) */
+  background: #665C5A; /* Color de fondo exacto */
+  border-radius: 50%;
+  z-index: 1;
+}
+
+/* El resplandor difuminado (Glow) exterior sutil */
+.halo-glow {
+  position: absolute;
+  inset: -15px;
+  border-radius: 50%;
+  background: #a3e635;
+  filter: blur(30px);
+  opacity: 0.12; /* Brillo muy sutil */
+  z-index: 0;
+}
+
+@keyframes rotate-snake {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* El Logo en sí */
+.logo-img {
+  position: relative;
+  z-index: 10;
+  width: 130px; /* Tamaño grande notable */
+  height: 130px;
+  object-fit: contain;
+}
+
+/* -----------------------------------------------------------
+   3. OTROS ESTILOS (Inputs y Cromo)
+   ----------------------------------------------------------- */
 .glass-input {
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: white;
   transition: all 0.3s ease;
+}
+
+.glass-input:focus {
+  border-color: #a3e635;
+  background: rgba(255, 255, 255, 0.08);
 }
