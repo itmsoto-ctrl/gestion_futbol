@@ -3,113 +3,89 @@ import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 
 const FutCard = ({ player, size = "large" }) => {
   const videoRef = useRef(null);
-  
-  // --- LÓGICA 3D TILT ---
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-
-  // Creamos un efecto de "muelle" para que el movimiento sea fluido y no brusco
   const mouseXSpring = useSpring(x);
   const mouseYSpring = useSpring(y);
 
-  // Transformamos la posición del toque en grados de rotación
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["10deg", "-10deg"]);
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-10deg", "10deg"]);
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["7deg", "-7deg"]);
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-7deg", "7deg"]);
 
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const width = rect.width;
-    const height = rect.height;
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    const xPct = mouseX / width - 0.5;
-    const yPct = mouseY / height - 0.5;
-
-    x.set(xPct);
-    y.set(yPct);
+    x.set((e.clientX - rect.left) / rect.width - 0.5);
+    y.set((e.clientY - rect.top) / rect.height - 0.5);
   };
 
-  const handleMouseLeave = () => {
-    x.set(0);
-    y.set(0);
-  };
+  useEffect(() => { if (videoRef.current) videoRef.current.play().catch(() => {}); }, []);
 
-  useEffect(() => { 
-    if (videoRef.current) videoRef.current.play().catch(() => {}); 
-  }, [player?.photo_url]);
-
-  if (!player) return null;
   const rating = parseInt(player.rating) || 85;
   const scales = { small: "scale-[0.4] -m-24", medium: "scale-[0.7] -m-10", large: "scale-100" };
 
   return (
-    <div 
-        className="perspective-1000" 
-        style={{ perspective: "1200px" }} // Creamos el espacio 3D
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-    >
+    <div className="perspective-1000" style={{ perspective: "1200px" }} onMouseMove={handleMouseMove} onMouseLeave={() => { x.set(0); y.set(0); }}>
       <motion.div 
-          // Animación de entrada y vinculación de los valores 3D
-          initial={{ scale: 0.5, opacity: 0, rotateY: -30, rotateX: 20 }}
-          animate={{ scale: 1, opacity: 1, rotateY: 0, rotateX: 0 }}
-          style={{
-            rotateX,
-            rotateY,
-            transformStyle: "preserve-3d", // Obligatorio para que los hijos hereden el 3D
-          }}
-          transition={{ duration: 1, ease: "backOut" }}
-          className={`relative inline-block ${scales[size]} rounded-[50px] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-700`}
+          style={{ rotateX, rotateY, transformStyle: "preserve-3d", fontFamily: "'Oswald', sans-serif" }}
+          transition={{ duration: 0.5 }}
+          className={`relative inline-block ${scales[size]} rounded-[45px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.5)]`}
       >
-        {/* Capa de Brillo Reactivo al 3D (Z-Index alto para que flote) */}
-        <motion.div 
-            style={{
-                transform: "translateZ(50px)", // El brillo flota por encima de la carta
-            }}
-            className="absolute inset-0 z-30 pointer-events-none bg-gradient-to-tr from-white/10 via-white/5 to-transparent opacity-50"
-        />
-
-        {/* 1. Fondo de vídeo */}
+        {/* FONDO Y VÍDEO */}
         <video ref={videoRef} className="absolute inset-0 z-0 w-full h-full object-cover" src="/particulas_oro.mp4" muted autoPlay loop playsInline />
+        <img src="/oro.png" alt="Card" className="w-[350px] h-auto relative z-10 select-none" />
         
-        {/* 2. Destello animado estándar */}
-        <motion.div animate={{ x: [-500, 500] }} transition={{ repeat: Infinity, duration: 4, ease: "linear" }} className="absolute inset-0 z-[5] bg-gradient-to-r from-transparent via-white/20 to-transparent w-1/2 -skew-x-12 pointer-events-none" />
-        
-        <img src="/oro.png" alt="Card" className="w-[350px] h-auto relative z-10 select-none pointer-events-none" />
-        
-        {/* 📸 FOTO SUBIDA Y A LA DERECHA */}
+        {/* 📸 FOTO JUGADOR (Posicionada como en tu captura de Jose Palomino) */}
         {player.photo_url && (
-          <div 
-            className="absolute top-[15px] left-[110px] w-[260px] h-[300px] z-[15] pointer-events-none"
+          <div className="absolute top-[25px] left-[100px] w-[260px] h-[280px] z-[15] pointer-events-none"
             style={{
               backgroundImage: `url(${player.photo_url})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center 10%', 
-              backgroundRepeat: 'no-repeat',
-              WebkitMaskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 85%)',
-              maskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 85%)',
-              filter: 'brightness(1.08) contrast(1.05)',
-              transform: "translateZ(30px)", // La foto flota un poco por encima del cartón
+              backgroundSize: 'cover', backgroundPosition: 'center 15%', backgroundRepeat: 'no-repeat',
+              WebkitMaskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 45%, rgba(0,0,0,0) 85%)',
+              transform: "translateZ(40px)"
             }}
           />
         )}
 
-        {/* TEXTOS Y STATS CON PROFUNDIDAD */}
-        <div style={{ transform: "translateZ(40px)" }} className="absolute top-[68px] left-[60px] z-20 text-zinc-800 text-7xl font-black italic tracking-tighter">{rating}</div>
-        <div style={{ transform: "translateZ(35px)" }} className="absolute top-[140px] left-[80px] z-20 text-zinc-800 text-2xl font-bold uppercase">{player.position || 'DEL'}</div>
-        <div style={{ transform: "translateZ(40px)" }} className="absolute top-[285px] left-0 w-full text-center z-20 px-4"><span className="text-zinc-900 text-3xl font-black uppercase italic truncate block">{player.name}</span></div>
-        
-        <div style={{ transform: "translateZ(35px)" }} className="absolute top-[340px] left-[58px] z-20 text-left leading-[35px]">
-          <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.pac || 80}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">RIT</span></div>
-          <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.sho || 85}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">TIR</span></div>
-          <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.pas || 72}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">PAS</span></div>
+        {/* 🏆 COLUMNA IZQUIERDA: RATING, POS, BANDERA, ESCUDO */}
+        <div className="absolute top-[55px] left-[45px] z-20 flex flex-col items-center gap-1" style={{ transform: "translateZ(50px)" }}>
+          <div className="text-zinc-800 text-[85px] font-bold leading-[0.8] tracking-tighter">{rating}</div>
+          <div className="text-zinc-800 text-3xl font-medium uppercase tracking-tighter opacity-90">{player.position || 'DEL'}</div>
+          
+          <div className="h-[2px] w-12 bg-zinc-800/20 my-1" /> {/* Separador sutil */}
+          
+          {/* Bandera (Usa una imagen real tuya o placeholder) */}
+          <img src="https://flagcdn.com/w80/es.png" className="w-10 h-auto shadow-sm" alt="Flag" />
+          
+          {/* Escudo Club */}
+          <img src="/logo_club.png" className="w-12 h-12 object-contain mt-1" alt="Club" />
         </div>
-        
-        <div style={{ transform: "translateZ(35px)" }} className="absolute top-[340px] left-[192px] z-20 text-left leading-[35px]">
-          <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.dri || 84}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">REG</span></div>
-          <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.def || 35}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">DEF</span></div>
-          <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.phy || 70}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">FIS</span></div>
+
+        {/* 👤 NOMBRE: Centrado y con fuente extra-bold */}
+        <div style={{ transform: "translateZ(55px)" }} className="absolute top-[278px] left-0 w-full text-center z-30">
+          <span className="text-zinc-900 text-[38px] font-bold uppercase tracking-tighter italic">
+            {player.name}
+          </span>
+        </div>
+
+        {/* 📊 STATS CON LÍNEA DIVISORIA CENTRAL */}
+        <div className="absolute top-[345px] left-0 w-full flex justify-center items-center z-20 px-10" style={{ transform: "translateZ(45px)" }}>
+          
+          {/* Bloque Izquierdo */}
+          <div className="flex flex-col gap-0 text-right pr-6">
+            <div className="flex items-center gap-2"><span className="text-zinc-800 font-bold text-3xl">{player.pac || 80}</span><span className="text-zinc-700 font-medium text-xl opacity-70">RIT</span></div>
+            <div className="flex items-center gap-2"><span className="text-zinc-800 font-bold text-3xl">{player.sho || 85}</span><span className="text-zinc-700 font-medium text-xl opacity-70">TIR</span></div>
+            <div className="flex items-center gap-2"><span className="text-zinc-800 font-bold text-3xl">{player.pas || 72}</span><span className="text-zinc-700 font-medium text-xl opacity-70">PAS</span></div>
+          </div>
+
+          {/* 📏 LA LÍNEA VERTICAL DEL FIFA */}
+          <div className="w-[2px] h-24 bg-zinc-800/20" />
+
+          {/* Bloque Derecho */}
+          <div className="flex flex-col gap-0 text-left pl-6">
+            <div className="flex items-center gap-2"><span className="text-zinc-700 font-medium text-xl opacity-70">REG</span><span className="text-zinc-800 font-bold text-3xl">{player.dri || 84}</span></div>
+            <div className="flex items-center gap-2"><span className="text-zinc-700 font-medium text-xl opacity-70">DEF</span><span className="text-zinc-800 font-bold text-3xl">{player.def || 35}</span></div>
+            <div className="flex items-center gap-2"><span className="text-zinc-700 font-medium text-xl opacity-70">FIS</span><span className="text-zinc-800 font-bold text-3xl">{player.phy || 70}</span></div>
+          </div>
+
         </div>
       </motion.div>
     </div>
