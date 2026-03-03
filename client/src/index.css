@@ -54,24 +54,51 @@
 }
 
 /* El "Escudo" interior: Tapa el centro del gradiente para dejar solo el borde */
+halo-wrapper {
+  position: relative;
+  width: 180px; /* Logo más grande */
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #665C5A; /* Mismo gris que el fondo */
+}
+
+/* La luz que "dibuja" el borde por detrás */
+.halo-wrapper::before {
+  content: '';
+  position: absolute;
+  width: 150%;
+  height: 150%;
+  /* Gradiente más corto y nítido para que parezca una chispa dibujando */
+  background: conic-gradient(
+    transparent 80%, 
+    #ffffff 95%, 
+    #a3e635 100%
+  );
+  animation: rotate-snake 1.5s linear infinite; /* Un poco más rápido */
+}
+
+/* El escudo interior (Mismo gris que el fondo) */
 .halo-wrapper::after {
   content: '';
   position: absolute;
-  inset: 3px; /* Este número define el GROSOR del borde (3px) */
-  background: #09090b; /* Debe ser el MISMO color que el fondo de tu app */
+  inset: 4px; /* Grosor del trazo */
+  background: #665C5A; /* Color de fondo exacto */
   border-radius: 50%;
   z-index: 1;
 }
 
-/* El resplandor difuminado (Glow) exterior */
-.halo-glow {
-  position: absolute;
-  inset: -10px;
-  border-radius: 50%;
-  background: #a3e635;
-  filter: blur(25px);
-  opacity: 0.15; /* Brillo muy sutil */
-  z-index: 0;
+.logo-img {
+  position: relative;
+  z-index: 10;
+  width: 130px; /* Logo notablemente más grande */
+  height: 130px;
+  object-fit: contain;
+  /* Sutil sombra para dar profundidad sobre el gris */
+  filter: drop-shadow(0 10px 15px rgba(0,0,0,0.2));
 }
 
 @keyframes rotate-snake {
@@ -79,14 +106,7 @@
   to { transform: rotate(360deg); }
 }
 
-/* El Logo en sí */
-.logo-img {
-  position: relative;
-  z-index: 10; /* Por encima del "escudo" y de la "serpiente" */
-  width: 90px;
-  height: 90px;
-  object-fit: contain;
-}
+
 
 /* Esto asegura que toda la página, se estire lo que se estire, sea oscura */
 html, body {
