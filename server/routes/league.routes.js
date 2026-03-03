@@ -4,12 +4,10 @@ const pool = require('../config/db');
 const { verifyToken } = require('../middleware/auth.middleware');
 const crypto = require('crypto');
 
-// 1. OBTENER LIGAS DEL ADMIN (Dashboard General)
+// 1. OBTENER LIGAS DEL ADMIN
 router.get('/my-leagues', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id || req.user.adminId || req.user.userId;
-        if (!userId) return res.status(400).json({ error: "Token no válido" });
-
         const [rows] = await pool.execute(
             'SELECT id, name, invite_token, teams_count, match_minutes FROM leagues WHERE admin_id = ?',
             [userId]
@@ -79,7 +77,7 @@ router.get('/team-portal/:token', async (req, res) => {
     }
 });
 
-// 4. CREAR LIGA (Con Gestión de Sedes y Equipos)
+// 4. CREAR LIGA
 router.post('/create', verifyToken, async (req, res) => {
     const { name, teamsCount, duration, startDate, selectedVenues, registrationConfig, teams } = req.body;
     const adminId = req.user.id || req.user.adminId || req.user.userId;
@@ -118,7 +116,7 @@ router.post('/create', verifyToken, async (req, res) => {
 // 5. ACTUALIZAR EQUIPO
 router.patch('/teams/:id', verifyToken, async (req, res) => {
     try {
-        const [result] = await pool.execute(
+        await pool.execute(
             "UPDATE league_teams SET logo = ?, captain_phone = ? WHERE id = ?",
             [req.body.logo_url || null, req.body.captain_phone || null, req.params.id]
         );
@@ -128,7 +126,7 @@ router.patch('/teams/:id', verifyToken, async (req, res) => {
     }
 });
 
-// 7. VINCULAR CAPITÁN
+// 6. VINCULAR CAPITÁN
 router.post('/claim-team', verifyToken, async (req, res) => {
     try {
         const userId = req.user.id || req.user.adminId || req.user.userId;
@@ -139,115 +137,32 @@ router.post('/claim-team', verifyToken, async (req, res) => {
     }
 });
 
-// -----------------------------------------------------------
-// 8. REGISTRO MAESTRO (Aquí ocurre la magia de las 2 tablas)
-// -----------------------------------------------------------
+// 7. VINCULAR JUGADOR EXISTENTE A EQUIPO (Fase 3 del registro)
 router.post('/register-player-full', async (req, res) => {
-    const { 
-        email, password, fullName, dorsal, dni, 
-        teamId, photoUrl, isNewUser 
-    } = req.body;
-
-    const connection = await pool.getConnection();
-    
+    const { email, fullName, dorsal, dni, teamId, photoUrl } = req.body;
     try {
-        await connection.beginTransaction();
+        // Buscamos el ID del usuario que ya debió crearse en el paso anterior
+        const [uRows] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
+        if (uRows.length === 0) return res.status(404).json({ error: "Usuario no registrado en la plataforma." });
+        
+        const userId = uRows[0].id;
 
-        let userId;
-
-        if (isNewUser) {
-            // 8.A CREAR EN TABLA 'users' (Para que exista globalmente)
-            const [userResult] = await connection.execute(
-                'INSERT INTO users (email, password, fullName, dni, photo_url, role) VALUES (?, ?, ?, ?, ?, ?)',
-                [email, password, fullName, dni || null, photoUrl || null, 'player']
-            );
-            userId = userResult.insertId;
-            console.log(`✅ Nuevo usuario creado ID: ${userId}`);
-        } else {
-            // 8.B OBTENER ID SI YA EXISTE
-            const [userRows] = await connection.execute('SELECT id FROM users WHERE email = ?', [email]);
-            if (userRows.length === 0) throw new Error("El usuario debería existir pero no se encontró.");
-            userId = userRows[0].id;
-        }
-
-        // 8.C VINCULAR A LA LIGA (Tabla 'league_players')
-        // Verificamos duplicados en este equipo específico
-        const [existing] = await connection.execute(
+        // Evitar duplicados en el mismo equipo
+        const [existing] = await pool.execute(
             'SELECT id FROM league_players WHERE team_id = ? AND user_id = ?',
             [teamId, userId]
         );
+        if (existing.length > 0) return res.status(400).json({ error: "Ya estás inscrito en este equipo." });
 
-        if (existing.length > 0) {
-            throw new Error("Ya estás registrado en este equipo.");
-        }
-
-        await connection.execute(
-            `INSERT INTO league_players 
-            (team_id, user_id, full_name, dorsal, dni, photo_url, is_pwa) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [teamId, userId, fullName, dorsal, dni || null, photoUrl || null, 1]
+        await pool.execute(
+            `INSERT INTO league_players (team_id, user_id, full_name, dorsal, dni, photo_url, is_pwa) 
+             VALUES (?, ?, ?, ?, ?, ?, 1)`,
+            [teamId, userId, fullName, dorsal, dni || null, photoUrl || null]
         );
 
-        await connection.commit();
-        res.status(201).json({ success: true, message: "Fichaje estrella completado" });
-
-    } catch (error) {
-        await connection.rollback();
-        console.error("🚨 Error en registro:", error.message);
-        res.status(400).json({ error: error.message });
-    } finally {
-        connection.release();
-    }
-});
-
-// 9. CHECK REQUISITOS (Para el flujo de completado de perfil)
-router.get('/check-requirements/:leagueId', verifyToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const [users] = await pool.execute('SELECT fullName, dni, photo_url FROM users WHERE id = ?', [userId]);
-        const [leagues] = await pool.execute('SELECT player_fields_config FROM leagues WHERE id = ?', [req.params.leagueId]);
-        
-        const config = JSON.parse(leagues[0].player_fields_config || '{}');
-        const missing = [];
-        if (config.dni && !users[0].dni) missing.push('dni');
-        if (config.photo && !users[0].photo_url) missing.push('photo');
-
-        res.json({ isComplete: missing.length === 0, missingFields: missing, user: users[0] });
+        res.status(201).json({ success: true, message: "Fichaje completado." });
     } catch (error) {
         res.status(500).json({ error: error.message });
-    }
-});
-
-router.post('/check-email', async (req, res) => {
-    const { email } = req.body;
-    try {
-        const [rows] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
-        res.json({ exists: rows.length > 0 });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-router.post('/register-basic', async (req, res) => {
-    const { email, name, password } = req.body;
-    try {
-        // Importante: El 'role' debe ser 'user' según tu ENUM
-        const [result] = await pool.execute(
-            'INSERT INTO users (email, password, name, role, active) VALUES (?, ?, ?, ?, ?)',
-            [email, password, name, 'user', 1]
-        );
-        
-        res.status(201).json({ 
-            success: true, 
-            message: "Usuario creado correctamente",
-            userId: result.insertId 
-        });
-    } catch (error) {
-        console.error("Error en register-basic:", error);
-        if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ message: "Este email ya existe." });
-        }
-        res.status(500).json({ error: "Error en el servidor al insertar." });
     }
 });
 
