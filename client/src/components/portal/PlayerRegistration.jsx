@@ -12,7 +12,7 @@ const PlayerRegistration = () => {
     const [teamInfo, setTeamInfo] = useState(null);
     const [adminConfig, setAdminConfig] = useState({});
 
-    // Formulario
+    // Estados del Formulario
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [fullName, setFullName] = useState('');
@@ -21,10 +21,10 @@ const PlayerRegistration = () => {
     const [photoUrl, setPhotoUrl] = useState('');
     const [uploading, setUploading] = useState(false);
 
-    // FIX PARA NETLIFY: Construcción dinámica de la ruta
-    const publicBase = process.env.PUBLIC_URL || "";
-    const fileName = "logo-shine.webp";
-    const fullLogoPath = `${publicBase}/${fileName}`;
+    // FIX NETLIFY: Construcción dinámica para evitar errores de módulo
+    const publicDir = process.env.PUBLIC_URL || "";
+    const logoFile = "logo-shine.webp";
+    const fullPath = `${publicDir}/${logoFile}`;
 
     useEffect(() => {
         const savedEmail = localStorage.getItem('vora_user_email');
@@ -38,7 +38,7 @@ const PlayerRegistration = () => {
                     setTeamInfo(data.team);
                     setAdminConfig(data.fieldsConfig || {});
                 }
-            } catch (err) { console.error("Error cargando equipo:", err); }
+            } catch (err) { console.error("Error:", err); }
         };
         fetchTeam();
     }, [token]);
@@ -94,50 +94,49 @@ const PlayerRegistration = () => {
                 })
             });
             if (res.ok) setStep(4);
-            else alert("Error al finalizar");
-        } catch (err) { alert("Fallo de conexión"); }
+            else alert("Error al registrar");
+        } catch (err) { alert("Error"); }
         finally { setLoading(false); }
     };
 
     if (step === 4) return (
         <div className="min-h-screen bg-[#665C5A] flex flex-col items-center justify-center p-6 text-center italic">
-            <CheckCircle size={80} className="text-lime-400 mb-6" />
-            <h1 className="text-3xl text-white font-black uppercase tracking-tighter leading-none">
-                Fichaje Estrella <br/><span className="text-lime-400">Confirmado</span>
-            </h1>
+            <CheckCircle size={80} className="text-lime-400 mb-6 drop-shadow-lg" />
+            <h1 className="text-3xl text-white font-black uppercase tracking-tighter leading-none">Fichaje <br/><span className="text-lime-400">Confirmado</span></h1>
         </div>
     );
 
     return (
-        <div className="min-h-screen bg-[#665C5A] text-white p-6 flex flex-col items-center overflow-x-hidden font-sans">
+        <div className="min-h-screen bg-[#665C5A] text-white p-6 flex flex-col items-center font-sans">
             
-            {/* LOGO CON INYECCIÓN DE VARIABLE CSS PARA BYPASSEAR NETLIFY */}
-            <div className="mt-10 mb-14 animate-in fade-in zoom-in duration-1000">
-                <div 
-                    className="logo-trace-wrapper" 
-                    style={{ "--logo-url": `url(${fullLogoPath})` }}
-                >
+            {/* LOGO CON EFECTOS ELITE (PULSO + SHINE + SOMBRA) */}
+            <div className="mt-8 mb-10 animate-in fade-in zoom-in duration-1000">
+                <div className="logo-container-elite">
+                    {/* El brillo (Shine) que cruza el logo */}
+                    <div 
+                        className="logo-shine-overlay" 
+                        style={{ "--logo-url": `url(${fullPath})` }}
+                    />
+                    {/* El logo con el pulso y la sombra */}
                     <img 
-                        src={fullLogoPath} 
+                        src={fullPath} 
                         alt="VORA" 
-                        className="logo-main" 
+                        className="logo-main-elite" 
                     />
                 </div>
             </div>
 
-            {/* INFO EQUIPO */}
+            {/* BIENVENIDA */}
             {teamInfo && step < 3 && (
-                <div className="w-full max-w-sm mb-12 animate-in fade-in slide-in-from-top duration-700">
-                    <div className="text-center">
-                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-lime-400 mb-2">Fichaje Oficial</p>
-                        <h2 className="text-white text-3xl font-black italic uppercase leading-none tracking-tighter">
-                            {teamInfo.teamName}
-                        </h2>
-                    </div>
+                <div className="w-full max-w-sm mb-10 text-center animate-in fade-in slide-in-from-top duration-700">
+                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-lime-400 mb-2 font-black">Portal del Jugador</p>
+                    <h2 className="text-white text-2xl font-black italic uppercase leading-none tracking-tighter">
+                        {teamInfo.teamName}
+                    </h2>
                 </div>
             )}
 
-            <div className="w-full max-w-sm space-y-6">
+            <div className="w-full max-w-sm">
                 {step === 1 && (
                     <form onSubmit={handleCheckEmail} className="space-y-6 animate-in fade-in">
                         <div className="relative">
@@ -145,10 +144,10 @@ const PlayerRegistration = () => {
                             <input 
                                 required type="email" placeholder="TU EMAIL" value={email} 
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full glass-input p-5 pl-16 rounded-[2rem] outline-none font-bold text-lg placeholder:text-white/20"
+                                className="w-full glass-input p-5 pl-16 rounded-[2rem] outline-none font-bold text-lg"
                             />
                         </div>
-                        <button type="submit" className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-[2.5rem] flex items-center justify-center gap-4 uppercase italic text-xl active:scale-95 transition-all">
+                        <button type="submit" className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-[2.5rem] flex items-center justify-center gap-4 uppercase italic text-xl shadow-2xl shadow-black/20">
                             {loading ? <Loader2 className="animate-spin" /> : <>CONTINUAR <ArrowRight size={24}/></>}
                         </button>
                     </form>
@@ -164,10 +163,10 @@ const PlayerRegistration = () => {
                             onChange={(e) => setPassword(e.target.value)} />
                         {!userExists && (
                             <div className="grid grid-cols-2 gap-3">
-                                <input required placeholder="DORSAL" type="number" className="glass-input p-5 rounded-[2rem] outline-none font-bold text-center placeholder:text-white/20"
+                                <input required placeholder="DORSAL" type="number" className="glass-input p-5 rounded-[2rem] outline-none font-bold text-center"
                                     onChange={(e) => setDorsal(e.target.value)} />
                                 {adminConfig.dni && (
-                                    <input required placeholder="DNI" className="glass-input p-5 rounded-[2rem] outline-none font-bold uppercase text-center placeholder:text-white/20"
+                                    <input required placeholder="DNI" className="glass-input p-5 rounded-[2rem] outline-none font-bold uppercase text-center"
                                         onChange={(e) => setDni(e.target.value.toUpperCase())} />
                                 )}
                             </div>
@@ -179,8 +178,8 @@ const PlayerRegistration = () => {
                 )}
 
                 {step === 3 && (
-                    <div className="flex flex-col items-center animate-in zoom-in-95 w-full">
-                         <div className="relative w-64 h-80 bg-gradient-to-b from-lime-400 to-lime-600 rounded-[2.5rem] p-1 fut-card-shadow">
+                    <div className="flex flex-col items-center animate-in zoom-in-95">
+                         <div className="relative w-64 h-80 bg-gradient-to-b from-lime-400 to-lime-600 rounded-[2.5rem] p-1 shadow-2xl">
                             <div className="bg-zinc-950 w-full h-full rounded-[2.3rem] overflow-hidden relative border border-lime-400/30">
                                 {photoUrl ? (
                                     <img src={photoUrl} className="w-full h-full object-cover" alt="Selfie" />
@@ -192,9 +191,9 @@ const PlayerRegistration = () => {
                                     </div>
                                 )}
                                 <div className="absolute bottom-5 left-0 right-0 px-6 text-left bg-gradient-to-t from-black via-black/90 to-transparent pt-4">
-                                    <p className="text-xl font-black uppercase italic leading-none text-white">{fullName.split(' ')[0] || 'JUGADOR'}</p>
+                                    <p className="text-xl font-black uppercase italic leading-none text-white truncate drop-shadow-lg">{fullName.split(' ')[0] || 'JUGADOR'}</p>
                                     <div className="flex justify-between items-center mt-1">
-                                        <span className="text-2xl font-black text-lime-400 italic leading-none">{dorsal || '00'}</span>
+                                        <span className="text-2xl font-black text-lime-400 italic drop-shadow-lg">{dorsal || '00'}</span>
                                         <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-tighter">{teamInfo?.teamName}</span>
                                     </div>
                                 </div>
@@ -203,9 +202,9 @@ const PlayerRegistration = () => {
                         <button 
                             onClick={handleFinalSubmit}
                             disabled={!photoUrl || uploading || loading}
-                            className="w-full mt-10 bg-lime-400 text-zinc-950 font-black py-6 rounded-[2.5rem] italic text-xl active:scale-95"
+                            className="w-full mt-10 bg-lime-400 text-zinc-950 font-black py-6 rounded-[2.5rem] italic text-xl active:scale-95 shadow-xl shadow-lime-400/10"
                         >
-                            {loading || uploading ? <Loader2 className="animate-spin" /> : "FINALIZAR MI FICHA"}
+                            {loading || uploading ? <Loader2 className="animate-spin" /> : "FINALIZAR FICHA"}
                         </button>
                     </div>
                 )}
