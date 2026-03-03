@@ -53,18 +53,7 @@
   animation: rotate-snake 2s linear infinite;
 }
 
-/* El "Escudo" interior: Tapa el centro del gradiente para dejar solo el borde */
-halo-wrapper {
-  position: relative;
-  width: 180px; /* Logo más grande */
-  height: 180px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  overflow: hidden;
-  background: #665C5A; /* Mismo gris que el fondo */
-}
+
 
 /* La luz que "dibuja" el borde por detrás */
 .halo-wrapper::before {
@@ -126,10 +115,7 @@ html, body {
   animation: pulse-shine 3s infinite ease-in-out;
 }
 
-@keyframes rotate-glow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+
 
 .animate-glow-border {
   position: relative;
@@ -154,3 +140,15 @@ html, body {
   position: relative;
   background: #09090b; /* Zinc 950 para tapar el centro del gradiente */
 }
+
+/* Patrón de Red de Portería */
+.bg-net {
+  background-color: #665C5A;
+  /* Creamos líneas horizontales y verticales muy finas */
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  /* Tamaño del rombo/cuadrado de la red (40px) */
+  background-size: 40px 40px;
+}
+
