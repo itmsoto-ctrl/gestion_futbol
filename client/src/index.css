@@ -8,19 +8,20 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
+  overflow-x: hidden;
 }
 
-/* 2. El Efecto de luz que RECORRE LA SILUETA */
+/* 2. El Efecto de luz que recorre la SILUETA */
 .logo-trace-wrapper {
   position: relative;
-  width: 200px; /* Tamaño grande */
+  width: 200px;
   height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* La estela de luz que gira detrás */
+/* La estela de luz (Serpiente) */
 .logo-trace-wrapper::before {
   content: '';
   position: absolute;
@@ -32,16 +33,19 @@ html, body {
     #a3e635 100%
   );
   animation: rotate-snake 2.5s linear infinite;
-  /* La magia: solo se ve donde hay logo */
-  -webkit-mask-image: url('/logo-shine.webp');
-  mask-image: url('/logo-shine.webp');
+  
+  /* Propiedades de máscara (La imagen se inyecta desde React) */
   -webkit-mask-size: contain;
   mask-size: contain;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
   mask-position: center;
-  filter: blur(1px); /* Para que no sea un corte tan duro */
+  filter: blur(1px);
+
+  /* Estas variables recibirán la URL desde el style inline del JSX */
+  -webkit-mask-image: var(--logo-url);
+  mask-image: var(--logo-url);
 }
 
 /* El logo real encima */
@@ -51,7 +55,6 @@ html, body {
   width: 190px;
   height: 190px;
   object-fit: contain;
-  /* Un pequeño ajuste para que la luz parezca venir de los bordes */
   padding: 4px; 
 }
 
@@ -60,10 +63,14 @@ html, body {
   to { transform: rotate(360deg); }
 }
 
-/* 3. Inputs Glassmorphism sobre Gris */
+/* 3. Estilos de Inputs y Cromo */
 .glass-input {
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: white;
+}
+
+.fut-card-shadow {
+  box-shadow: 0 0 40px rgba(163, 230, 53, 0.25);
 }
