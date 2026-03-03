@@ -139,30 +139,54 @@ router.post('/claim-team', verifyToken, async (req, res) => {
 
 // 7. VINCULAR JUGADOR EXISTENTE A EQUIPO (Fase 3 del registro)
 router.post('/register-player-full', async (req, res) => {
-    const { email, fullName, dorsal, dni, teamId, photoUrl } = req.body;
+    const { email, fullName, dorsal, dni, teamId, phone, photoUrl } = req.body;
+    const connection = await pool.getConnection();
+
     try {
-        // Buscamos el ID del usuario que ya debió crearse en el paso anterior
-        const [uRows] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
-        if (uRows.length === 0) return res.status(404).json({ error: "Usuario no registrado en la plataforma." });
-        
+        await connection.beginTransaction();
+
+        // 1. Obtener el ID del usuario
+        const [uRows] = await connection.execute('SELECT id FROM users WHERE email = ?', [email]);
+        if (uRows.length === 0) throw new Error("Usuario no encontrado");
         const userId = uRows[0].id;
 
-        // Evitar duplicados en el mismo equipo
-        const [existing] = await pool.execute(
+        // 2. ACTUALIZAR TABLA 'users' (Datos de identidad global)
+        // Usamos COALESCE para no borrar datos si vienen vacíos
+        await connection.execute(
+            `UPDATE users SET 
+                dni = IFNULL(?, dni), 
+                phone = IFNULL(?, phone), 
+                photo_url = IFNULL(?, photo_url),
+                name = IFNULL(?, name)
+             WHERE id = ?`,
+            [dni || null, phone || null, photoUrl || null, fullName || null, userId]
+        );
+
+        // 3. INSERTAR EN 'league_players' (Datos puramente deportivos)
+        // Verificamos si ya existe la relación
+        const [existing] = await connection.execute(
             'SELECT id FROM league_players WHERE team_id = ? AND user_id = ?',
             [teamId, userId]
         );
-        if (existing.length > 0) return res.status(400).json({ error: "Ya estás inscrito en este equipo." });
 
-        await pool.execute(
-            `INSERT INTO league_players (team_id, user_id, full_name, dorsal, dni, photo_url, is_pwa) 
-             VALUES (?, ?, ?, ?, ?, ?, 1)`,
-            [teamId, userId, fullName, dorsal, dni || null, photoUrl || null]
-        );
+        if (existing.length === 0) {
+            await connection.execute(
+                `INSERT INTO league_players 
+                (team_id, user_id, full_name, dorsal, status, is_pwa) 
+                VALUES (?, ?, ?, ?, ?, ?)`,
+                [teamId, userId, fullName, dorsal || null, 'active', 1]
+            );
+        }
 
-        res.status(201).json({ success: true, message: "Fichaje completado." });
+        await connection.commit();
+        res.status(201).json({ success: true, message: "Perfil y Fichaje actualizados" });
+
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        await connection.rollback();
+        console.error("🚨 Error en Fichaje Maestro:", error.message);
+        res.status(400).json({ error: error.message });
+    } finally {
+        connection.release();
     }
 });
 
