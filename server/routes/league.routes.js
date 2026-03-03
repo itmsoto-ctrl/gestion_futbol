@@ -30,29 +30,44 @@ router.get('/my-leagues', verifyToken, async (req, res) => {
 });
 
 // 2. DETALLE DE LIGA
-router.get('/:id', verifyToken, async (req, res) => {
+r// 2. DETALLE DE LIGA Y SUS EQUIPOS (Para el Dashboard del Admin)
+router.get('/league-details/:id', verifyToken, async (req, res) => {
     try {
-        const identifier = req.params.id;
-        
-        const [leagueRows] = await pool.execute(
-            'SELECT * FROM leagues WHERE invite_token = ? OR id = ?',
-            [identifier, identifier]
+        const leagueId = req.params.id;
+
+        // 1. Obtenemos la información de la liga
+        const [leagues] = await pool.execute(
+            'SELECT * FROM leagues WHERE id = ?',
+            [leagueId]
         );
 
-        if (leagueRows.length === 0) return res.status(404).json({ message: "Liga no encontrada" });
+        if (leagues.length === 0) {
+            return res.status(404).json({ message: "Liga no encontrada" });
+        }
 
-        const league = leagueRows[0];
-
+        // 2. Obtenemos los equipos y calculamos cuántos jugadores tienen
+        // Renombramos team_token a invite_token para que el botón de WhatsApp funcione
         const [teams] = await pool.execute(
-            `SELECT id, name, team_token, captain_phone, captain_id, logo,
-            (SELECT COUNT(*) FROM league_players WHERE team_id = league_teams.id) as player_count
-            FROM league_teams WHERE league_id = ?`,
-            [league.id]
+            `SELECT 
+                t.id, 
+                t.name, 
+                t.logo_url, 
+                t.team_token AS invite_token, 
+                t.captain_phone,
+                (SELECT COUNT(*) FROM league_players WHERE team_id = t.id) AS player_count
+             FROM league_teams t
+             WHERE t.league_id = ?`,
+            [leagueId]
         );
-        
-        res.json({ ...league, teams });
+
+        // 3. Enviamos el paquete exacto que espera LeagueAdminDashboard.jsx
+        res.json({
+            league: leagues[0],
+            teams: teams
+        });
 
     } catch (error) {
+        console.error("🚨 Error al cargar dashboard de liga:", error);
         res.status(500).json({ error: error.message });
     }
 });
