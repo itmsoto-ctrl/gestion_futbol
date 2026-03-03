@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, X, ShieldCheck, RefreshCw, Check } from 'lucide-react';
+import { Camera, X, ShieldCheck } from 'lucide-react';
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 
 const PlayerHome = () => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    
-    // UI y Cámara
     const [showPromoModal, setShowPromoModal] = useState(false);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
-    const [photoPreview, setPhotoPreview] = useState(null);
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
@@ -20,29 +17,18 @@ const PlayerHome = () => {
         const fetchUserData = async () => {
             try {
                 const savedEmail = localStorage.getItem('userEmail');
-                if (!savedEmail) {
-                    setLoading(false);
-                    return; 
-                }
-
+                if (!savedEmail) { setLoading(false); return; }
                 const res = await fetch(`${API_BASE_URL}/api/auth/check-email`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: savedEmail })
                 });
                 const data = await res.json();
-                
                 if (data.exists) {
                     setUser(data);
-                    if (!data.photo_url) {
-                        setTimeout(() => setShowPromoModal(true), 1000);
-                    }
+                    if (!data.photo_url) setTimeout(() => setShowPromoModal(true), 1000);
                 }
-            } catch (err) {
-                console.error("Error cargando perfil:", err);
-            } finally {
-                setLoading(false);
-            }
+            } catch (err) { console.error("Error:", err); } finally { setLoading(false); }
         };
         fetchUserData();
         return () => stopCamera();
@@ -52,15 +38,10 @@ const PlayerHome = () => {
         setShowPromoModal(false);
         setIsCameraOpen(true);
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'user' } 
-            });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
             streamRef.current = stream;
             if (videoRef.current) videoRef.current.srcObject = stream;
-        } catch (err) {
-            alert("Necesitamos permisos de cámara para crear tu carta.");
-            setIsCameraOpen(false);
-        }
+        } catch (err) { alert("Error de cámara"); setIsCameraOpen(false); }
     };
 
     const stopCamera = () => {
@@ -75,124 +56,59 @@ const PlayerHome = () => {
             canvasRef.current.height = videoRef.current.videoHeight;
             context.drawImage(videoRef.current, 0, 0);
             const imageDataUrl = canvasRef.current.toDataURL('image/jpeg');
-            setPhotoPreview(imageDataUrl);
+            
+            // DIRECTO A LA TARJETA:
+            setUser(prev => ({ ...prev, photo_url: imageDataUrl }));
             stopCamera();
+            setShowPromoModal(false);
         }
     };
 
-    const savePhoto = async () => {
-        // Blindaje: Actualizamos el usuario y cerramos modales con un leve delay
-        setUser(prev => ({ ...prev, photo_url: photoPreview }));
-        setTimeout(() => {
-            setPhotoPreview(null);
-            setShowPromoModal(false);
-        }, 150);
-        console.log("Foto aceptada y vinculada");
-    };
-
-    const playerStats = {
-        name: user?.name || 'VORA PLAYER',
-        rating: 85,
-        position: 'DEL',
-        is_goalkeeper: false,
-        photo_url: photoPreview || user?.photo_url, 
-        pac: 80, sho: 85, pas: 72, dri: 84, def: 35, phy: 70
-    };
-
-    if (loading) return <div className="min-h-screen bg-[#665C5A] flex items-center justify-center text-lime-400 font-black italic uppercase">Cargando vestuario...</div>;
+    if (loading) return <div className="min-h-screen bg-[#665C5A] flex items-center justify-center text-lime-400 font-black italic">Cargando...</div>;
 
     return (
-        <div className="min-h-screen bg-[#665C5A] text-white font-sans relative overflow-x-hidden pb-10">
-            
-            {/* MARCA DE AGUA PARA CONTROLAR EL DEPLOY EN MÓVIL */}
-            <div className="fixed top-0 left-0 z-[9999] bg-red-600 text-white text-[10px] px-2 py-1 font-mono font-bold">
-                V-DEBUG-SELFIE-03
-            </div>
+        <div className="min-h-screen bg-[#665C5A] text-white relative overflow-x-hidden pb-10">
+            <div className="fixed top-0 left-0 z-[9999] bg-red-600 text-white text-[10px] px-2 py-1 font-mono">V-DIRECT-PHOTO-04</div>
 
             <div className="p-6 flex flex-col items-center pt-10">
                 <div onClick={() => !user?.photo_url && setShowPromoModal(true)} className="cursor-pointer">
-                    {/* KEY Dinámica para forzar el re-render cuando cambia la foto */}
                     <FutCard 
-                        key={user?.photo_url || photoPreview || 'default'} 
-                        player={playerStats} 
+                        key={user?.photo_url || 'empty'} 
+                        player={{
+                            name: user?.name || 'JUGADOR',
+                            rating: 85,
+                            photo_url: user?.photo_url,
+                            pac: 80, sho: 85, pas: 72, dri: 84, def: 35, phy: 70
+                        }} 
                         size="large" 
-                        view="dashboard" 
                     />
                 </div>
-                {!user?.photo_url && (
-                    <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-lime-400 animate-pulse text-center">
-                        ¡Toca la carta para añadir tu foto!
-                    </p>
-                )}
             </div>
 
-            <div className="p-6 max-w-sm mx-auto w-full">
-                <div className="bg-white/5 p-4 rounded-2xl border border-white/10 flex items-center gap-4">
-                    <ShieldCheck className="text-lime-400" />
-                    <div>
-                        <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">Identidad Global</p>
-                        <p className="font-bold text-sm italic uppercase tracking-tighter truncate w-48">{user?.email || 'Sin vincular'}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* MODAL 1: PROMO */}
+            {/* MODAL PROMO */}
             {showPromoModal && (
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowPromoModal(false)} />
-                    <div className="relative w-full max-w-md bg-[#2a2a2a] rounded-[2.5rem] p-8 text-center shadow-2xl border border-white/10">
-                        <button onClick={() => setShowPromoModal(false)} className="absolute top-6 right-6 text-white/20 hover:text-white"><X size={24} /></button>
-                        <div className="w-20 h-20 bg-lime-400 rounded-full mx-auto mb-6 flex items-center justify-center shadow-[0_0_30px_rgba(163,230,53,0.4)]">
-                            <Camera size={32} className="text-black" />
-                        </div>
-                        <h2 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-4">
-                            Vive la experiencia <br/> <span className="text-lime-400 text-4xl">VORA</span>
-                        </h2>
-                        <button onClick={startCamera} className="w-full bg-white text-black font-black py-5 rounded-[2rem] uppercase italic text-xl active:scale-95 transition-all mt-4">
-                            ¡HACERME EL SELFIE!
-                        </button>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+                    <div className="bg-[#2a2a2a] rounded-[2.5rem] p-8 text-center border border-white/10 w-full max-w-md">
+                        <h2 className="text-3xl font-black italic uppercase mb-6">Tu Carta VORA</h2>
+                        <button onClick={startCamera} className="w-full bg-lime-400 text-black font-black py-5 rounded-[2rem] uppercase italic">¡HACERME EL SELFIE!</button>
                     </div>
                 </div>
             )}
 
-            {/* MODAL 2: CÁMARA */}
-            <div className={`fixed inset-0 z-[60] bg-black flex flex-col transition-all duration-300 ${isCameraOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
-                <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-                    <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover opacity-80" />
-                    <canvas ref={canvasRef} className="hidden" />
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-64 h-80 border-2 border-lime-400/80 border-dashed rounded-[3rem]"></div>
+            {/* MODAL CÁMARA */}
+            {isCameraOpen && (
+                <div className="fixed inset-0 z-[60] bg-black flex flex-col">
+                    <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
+                        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                        <canvas ref={canvasRef} className="hidden" />
+                        <button onClick={stopCamera} className="absolute top-6 right-6 text-white bg-black/50 p-3 rounded-full"><X /></button>
                     </div>
-                    <button onClick={stopCamera} className="absolute top-6 right-6 text-white bg-black/50 p-3 rounded-full"><X size={24} /></button>
-                </div>
-                <div className="h-40 bg-[#1a1a1a] pb-8 flex items-center justify-center">
-                    <button onClick={capturePhoto} className="w-20 h-20 bg-lime-400 rounded-full border-4 border-white/20 flex items-center justify-center shadow-[0_0_30px_rgba(163,230,53,0.4)] active:scale-90 transition-all">
-                        <Camera size={32} className="text-black" />
-                    </button>
-                </div>
-            </div>
-
-            {/* MODAL 3: PREVIEW FUSIONADO */}
-            {photoPreview && (
-                <div className="fixed inset-0 z-[70] bg-[#1a1a1a] flex flex-col animate-in fade-in">
-                    <div className="flex-1 flex flex-col items-center justify-center p-6 relative bg-cover bg-center" style={{ backgroundImage: "url('/bg-hero.webp')" }}>
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-                        <div className="z-10 scale-110">
-                            <FutCard player={{...playerStats, photo_url: photoPreview}} size="large" view="dashboard" />
-                        </div>
-                    </div>
-                    <div className="h-48 bg-[#2a2a2a] rounded-t-[2.5rem] p-6 flex flex-col justify-center gap-4 z-20">
-                        <button onClick={savePhoto} className="w-full bg-lime-400 text-black font-black py-4 rounded-[2rem] uppercase italic flex items-center justify-center gap-2 text-lg active:scale-95 transition-all">
-                            <Check size={24} /> ACEPTAR FOTO
-                        </button>
-                        <button onClick={() => { setPhotoPreview(null); startCamera(); }} className="w-full bg-white/10 text-white font-black py-4 rounded-[2rem] uppercase italic flex items-center justify-center gap-2 text-lg active:scale-95 transition-all">
-                            <RefreshCw size={20} /> REPETIR
-                        </button>
+                    <div className="h-32 bg-[#1a1a1a] flex items-center justify-center">
+                        <button onClick={capturePhoto} className="w-20 h-20 bg-lime-400 rounded-full flex items-center justify-center"><Camera size={32} className="text-black" /></button>
                     </div>
                 </div>
             )}
         </div>
     );
 };
-
 export default PlayerHome;

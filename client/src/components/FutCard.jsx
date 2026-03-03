@@ -1,106 +1,44 @@
 import React, { useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
-const FutCard = ({ player, size = "large", view = "dashboard" }) => {
+const FutCard = ({ player, size = "large" }) => {
   const videoRef = useRef(null);
-  
-  useEffect(() => {
-    if (videoRef.current) {
-      const playPromise = videoRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => { console.warn("AutoPlay bloqueado:", error); });
-      }
-    }
-  }, [player?.rating]);
+  useEffect(() => { if (videoRef.current) videoRef.current.play().catch(() => {}); }, [player?.photo_url]);
 
   if (!player) return null;
-
-  const rating = parseInt(player.rating) || 60;
-
-  const getCardTheme = (r) => {
-    if (r >= 90) return { img: '/leyenda.png', video: '/particulas_leyenda.mp4', glow: "shadow-[0_0_40px_rgba(52,211,153,0.6)]", label: "LEYENDA" };
-    if (r >= 80) return { img: '/oro.png', video: '/particulas_oro.mp4', glow: "shadow-[0_0_30px_rgba(251,191,36,0.5)]", label: "ORO" };
-    if (r >= 70) return { img: '/plata.png', video: '/particulas_plata.mp4', glow: "shadow-[0_0_20px_rgba(255,255,255,0.3)]", label: "PLATA" };
-    return { img: '/bronce.png', video: '/particulas_bronce.mp4', glow: "shadow-xl", label: "BRONCE" };
-  };
-
-  const theme = getCardTheme(rating);
-
-  const getPos = () => {
-    if (view === 'voting') return { val: "top-[68px] left-[30px]", pos: "top-[140px] left-[40px]", nom: "top-[240px]", statsY: "top-[266px]", statsX_Izq: "left-[28px]", statsX_Der: "left-[152px]" };
-    if (view === 'selection') return { val: "top-[68px] left-[60px]", pos: "top-[140px] left-[80px]", nom: "top-[285px]", statsY: "top-[340px]", statsX_Izq: "left-[58px]", statsX_Der: "left-[192px]" };
-    return { val: "top-[68px] left-[60px]", pos: "top-[140px] left-[80px]", nom: "top-[285px]", statsY: "top-[340px]", statsX_Izq: "left-[58px]", statsX_Der: "left-[192px]" };
-  };
-
-  const pos = getPos();
+  const rating = parseInt(player.rating) || 85;
   const scales = { small: "scale-[0.4] -m-24", medium: "scale-[0.7] -m-10", large: "scale-100" };
 
   return (
-    <motion.div 
-        initial={view === 'dashboard' ? { scale: 0, opacity: 0 } : {}}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        className={`relative inline-block ${scales[size]} rounded-[50px] overflow-hidden ${theme.glow} transition-all duration-700`}
-    >
-      {/* 1. Fondo (z-0) */}
-      <video ref={videoRef} key={theme.video} className="absolute inset-0 z-0 w-full h-full object-cover rounded-[50px]" src={theme.video} muted autoPlay loop playsInline />
-
-      {/* 2. Brillo (z-5) */}
-      <motion.div animate={{ x: [-500, 500] }} transition={{ repeat: Infinity, duration: 4, ease: "linear", repeatDelay: 3 }} className="absolute inset-0 z-[5] bg-gradient-to-r from-transparent via-white/20 to-transparent w-1/2 -skew-x-12 pointer-events-none" />
-
-      {/* 3. Carta Base (z-10) */}
-      <img src={theme.img} alt="Card Base" className="w-[350px] h-auto relative z-10 select-none pointer-events-none" />
+    <motion.div className={`relative inline-block ${scales[size]} rounded-[50px] overflow-hidden shadow-2xl transition-all duration-700`}>
+      <video ref={videoRef} className="absolute inset-0 z-0 w-full h-full object-cover" src="/particulas_oro.mp4" muted autoPlay loop playsInline />
+      <motion.div animate={{ x: [-500, 500] }} transition={{ repeat: Infinity, duration: 4, ease: "linear" }} className="absolute inset-0 z-[5] bg-gradient-to-r from-transparent via-white/20 to-transparent w-1/2 -skew-x-12 pointer-events-none" />
+      <img src="/oro.png" alt="Card" className="w-[350px] h-auto relative z-10 pointer-events-none" />
       
-      {/* 4. Foto con Máscara Blindada para iPhone (z-15) */}
       {player.photo_url && (
-        <div className="absolute top-[70px] left-[95px] w-[200px] h-[215px] z-[15] pointer-events-none">
-          <svg width="0" height="0" style={{ position: 'absolute' }}>
-            <defs>
-              <mask id="playerMask" maskUnits="objectBoundingBox">
-                <linearGradient id="maskGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="white" stopOpacity="1" />
-                  <stop offset="0.7" stopColor="white" stopOpacity="1" />
-                  <stop offset="1" stopColor="white" stopOpacity="0" />
-                </linearGradient>
-                <rect width="1" height="1" fill="url(#maskGradient)" />
-              </mask>
-            </defs>
-          </svg>
+        <div className="absolute top-[70px] left-[95px] w-[200px] h-[215px] z-[15] pointer-events-none" style={{ isolation: 'isolate' }}>
           <div style={{ 
-            width: '100%', 
-            height: '100%', 
-            WebkitMaskImage: 'linear-gradient(to bottom, black 70%, transparent 95%)',
-            maskImage: 'linear-gradient(to bottom, black 70%, transparent 95%)',
-            isolation: 'isolate' 
+            width: '100%', height: '100%', 
+            WebkitMaskImage: 'linear-gradient(to bottom, black 65%, transparent 98%)',
+            maskImage: 'linear-gradient(to bottom, black 65%, transparent 98%)'
           }}>
-            <img 
-              src={player.photo_url} 
-              alt="Jugador" 
-              style={{ WebkitMask: 'url(#playerMask)', mask: 'url(#playerMask)', objectFit: 'contain', objectPosition: 'bottom' }}
-              className="w-full h-full brightness-[1.05] contrast-[1.05]" 
-            />
+            <img src={player.photo_url} alt="Jugador" className="w-full h-full object-contain object-bottom brightness-[1.05] contrast-[1.05]" />
           </div>
         </div>
       )}
 
-      {/* 5. UI (z-20) */}
-      <div className={`absolute ${pos.val} z-20 text-zinc-800 text-7xl font-black italic tracking-tighter select-none pointer-events-none`}>{rating}</div>
-      <div className={`absolute ${pos.pos} z-20 text-zinc-800 text-2xl font-bold uppercase select-none pointer-events-none`}>{player.is_goalkeeper ? 'POR' : (player.position || 'MCO')}</div>
-      <div className={`absolute ${pos.nom} left-0 w-full text-center px-4 z-20 select-none pointer-events-none`}><span className="text-zinc-900 text-3xl font-black uppercase italic truncate block">{player.name}</span></div>
+      <div className="absolute top-[68px] left-[60px] z-20 text-zinc-800 text-7xl font-black italic">{rating}</div>
+      <div className="absolute top-[140px] left-[80px] z-20 text-zinc-800 text-2xl font-bold uppercase">{player.position || 'DEL'}</div>
+      <div className="absolute top-[285px] left-0 w-full text-center z-20 px-4"><span className="text-zinc-900 text-3xl font-black uppercase italic truncate block">{player.name}</span></div>
       
-      <div className={`absolute ${pos.statsY} ${pos.statsX_Izq} z-20 text-left leading-[35px] select-none pointer-events-none`}>
-        <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.pac || 60}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">RIT</span></div>
-        <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.sho || 60}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">TIR</span></div>
-        <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.pas || 60}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">PAS</span></div>
+      {/* Stats Simplificadas */}
+      <div className="absolute top-[340px] left-[58px] z-20 text-left leading-[35px] text-zinc-800 font-black text-3xl">
+        <div>{player.pac || 80}</div><div>{player.sho || 85}</div><div>{player.pas || 72}</div>
       </div>
-      
-      <div className={`absolute ${pos.statsY} ${pos.statsX_Der} z-20 text-left leading-[35px] select-none pointer-events-none`}>
-        <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.dri || 60}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">REG</span></div>
-        <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.def || 60}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">DEF</span></div>
-        <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.phy || 60}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">FIS</span></div>
+      <div className="absolute top-[340px] left-[192px] z-20 text-left leading-[35px] text-zinc-800 font-black text-3xl">
+        <div>{player.dri || 84}</div><div>{player.def || 35}</div><div>{player.phy || 70}</div>
       </div>
     </motion.div>
   );
 };
-
 export default FutCard;
