@@ -9,12 +9,20 @@ const { verifyToken } = require('../middleware/auth.middleware');
 // 1. AUTENTICACIÓN Y REGISTRO
 // ==========================================
 
-// Comprobar si un email ya está registrado
+// Comprobar si un email ya está registrado y devolver sus datos
 router.post('/check-email', async (req, res) => {
     const { email } = req.body;
     try {
-        const [rows] = await db.execute('SELECT id FROM users WHERE email = ?', [email]);
-        res.json({ exists: rows.length > 0 });
+        // 🔥 EL CAMBIO CLAVE: SELECT * para traernos el DNI, teléfono, etc.
+        const [rows] = await db.execute('SELECT * FROM users WHERE email = ?', [email]);
+        
+        if (rows.length > 0) {
+            // Si existe, enviamos 'exists: true' y esparcimos TODOS los datos del usuario
+            res.json({ exists: true, ...rows[0] });
+        } else {
+            // Si no existe, solo enviamos que no existe
+            res.json({ exists: false });
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

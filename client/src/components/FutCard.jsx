@@ -18,60 +18,18 @@ const FutCard = ({ player, size = "large", view = "dashboard" }) => {
   const rating = parseInt(player.rating) || 60;
 
   const getCardTheme = (r) => {
-    // CORRECCIÓN: Ahora carga '/leyenda.png' en vez de '/oro.png'
-    if (r >= 90) return {
-      img: '/leyenda.png', 
-      video: '/particulas_leyenda.mp4',
-      glow: "shadow-[0_0_40px_rgba(52,211,153,0.6)]",
-      label: "LEYENDA"
-    };
-    if (r >= 80) return {
-      img: '/oro.png',
-      video: '/particulas_oro.mp4',
-      glow: "shadow-[0_0_30px_rgba(251,191,36,0.5)]",
-      label: "ORO"
-    };
-    if (r >= 70) return {
-      img: '/plata.png',
-      video: '/particulas_plata.mp4',
-      glow: "shadow-[0_0_20px_rgba(255,255,255,0.3)]",
-      label: "PLATA"
-    };
-    return {
-      img: '/bronce.png',
-      video: '/particulas_bronce.mp4',
-      glow: "shadow-xl",
-      label: "BRONCE"
-    };
+    if (r >= 90) return { img: '/leyenda.png', video: '/particulas_leyenda.mp4', glow: "shadow-[0_0_40px_rgba(52,211,153,0.6)]", label: "LEYENDA" };
+    if (r >= 80) return { img: '/oro.png', video: '/particulas_oro.mp4', glow: "shadow-[0_0_30px_rgba(251,191,36,0.5)]", label: "ORO" };
+    if (r >= 70) return { img: '/plata.png', video: '/particulas_plata.mp4', glow: "shadow-[0_0_20px_rgba(255,255,255,0.3)]", label: "PLATA" };
+    return { img: '/bronce.png', video: '/particulas_bronce.mp4', glow: "shadow-xl", label: "BRONCE" };
   };
 
   const theme = getCardTheme(rating);
 
   const getPos = () => {
-    if (view === 'voting') {
-      return { 
-        val: "top-[68px] left-[30px]", pos: "top-[140px] left-[40px]", nom: "top-[240px]", 
-        statsY: "top-[266px]", statsX_Izq: "left-[28px]", statsX_Der: "left-[152px]"
-      };
-    }
-    
-    // --- AJUSTE ESPECÍFICO SELECCIÓN ---
-    if (view === 'selection') {
-      return { 
-        val: "top-[68px] left-[60px]", 
-        pos: "top-[140px] left-[80px]", 
-        nom: "top-[285px]", // Bajado para no pisar la silueta
-        statsY: "top-[340px]", 
-        statsX_Izq: "left-[58px]", 
-        statsX_Der: "left-[192px]"
-      };
-    }
-
-    // DASHBOARD / POR DEFECTO
-    return { 
-      val: "top-[68px] left-[60px]", pos: "top-[140px] left-[80px]", nom: "top-[285px]", 
-      statsY: "top-[340px]", statsX_Izq: "left-[58px]", statsX_Der: "left-[192px]"
-    };
+    if (view === 'voting') return { val: "top-[68px] left-[30px]", pos: "top-[140px] left-[40px]", nom: "top-[240px]", statsY: "top-[266px]", statsX_Izq: "left-[28px]", statsX_Der: "left-[152px]" };
+    if (view === 'selection') return { val: "top-[68px] left-[60px]", pos: "top-[140px] left-[80px]", nom: "top-[285px]", statsY: "top-[340px]", statsX_Izq: "left-[58px]", statsX_Der: "left-[192px]" };
+    return { val: "top-[68px] left-[60px]", pos: "top-[140px] left-[80px]", nom: "top-[285px]", statsY: "top-[340px]", statsX_Izq: "left-[58px]", statsX_Der: "left-[192px]" };
   };
 
   const pos = getPos();
@@ -84,39 +42,28 @@ const FutCard = ({ player, size = "large", view = "dashboard" }) => {
         transition={{ duration: 0.5 }}
         className={`relative inline-block ${scales[size]} rounded-[50px] overflow-hidden ${theme.glow} transition-all duration-700`}
     >
-      
-      <video 
-        ref={videoRef}
-        key={theme.video}
-        className="absolute inset-0 z-0 w-full h-full object-cover rounded-[50px]"
-        src={theme.video}
-        muted
-        autoPlay
-        loop
-        playsInline
-      />
+      <video ref={videoRef} key={theme.video} className="absolute inset-0 z-0 w-full h-full object-cover rounded-[50px]" src={theme.video} muted autoPlay loop playsInline />
 
-      <motion.div 
-        animate={{ x: [-500, 500] }}
-        transition={{ repeat: Infinity, duration: 4, ease: "linear", repeatDelay: 3 }}
-        className="absolute inset-0 z-30 bg-gradient-to-r from-transparent via-white/30 to-transparent w-1/2 -skew-x-12 pointer-events-none"
-      />
+      <motion.div animate={{ x: [-500, 500] }} transition={{ repeat: Infinity, duration: 4, ease: "linear", repeatDelay: 3 }} className="absolute inset-0 z-30 bg-gradient-to-r from-transparent via-white/30 to-transparent w-1/2 -skew-x-12 pointer-events-none" />
 
       <img src={theme.img} alt="Card Base" className="w-[350px] h-auto relative z-10 select-none pointer-events-none" />
       
-      <div className={`absolute ${pos.val} z-20 text-zinc-800 text-7xl font-black italic tracking-tighter select-none pointer-events-none`}>
-        {rating}
-      </div>
-      
-      <div className={`absolute ${pos.pos} z-20 text-zinc-800 text-2xl font-bold uppercase select-none pointer-events-none`}>
-        {player.is_goalkeeper ? 'POR' : (player.position || 'MCO')}
-      </div>
+      {/* 📸 MAGIA DEL SELFIE AQUÍ */}
+      {player.photo_url && (
+          <div 
+            className="absolute top-[80px] left-[110px] w-[170px] h-[190px] z-[15] overflow-hidden flex items-end justify-center pointer-events-none" 
+            style={{ 
+              maskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)', 
+              WebkitMaskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)' 
+            }}
+          >
+              <img src={player.photo_url} alt="Jugador" className="h-full w-auto object-cover" />
+          </div>
+      )}
 
-      <div className={`absolute ${pos.nom} left-0 w-full text-center px-4 z-20 select-none pointer-events-none`}>
-        <span className="text-zinc-900 text-3xl font-black uppercase italic truncate block">
-          {player.name}
-        </span>
-      </div>
+      <div className={`absolute ${pos.val} z-20 text-zinc-800 text-7xl font-black italic tracking-tighter select-none pointer-events-none`}>{rating}</div>
+      <div className={`absolute ${pos.pos} z-20 text-zinc-800 text-2xl font-bold uppercase select-none pointer-events-none`}>{player.is_goalkeeper ? 'POR' : (player.position || 'MCO')}</div>
+      <div className={`absolute ${pos.nom} left-0 w-full text-center px-4 z-20 select-none pointer-events-none`}><span className="text-zinc-900 text-3xl font-black uppercase italic truncate block">{player.name}</span></div>
       
       <div className={`absolute ${pos.statsY} ${pos.statsX_Izq} z-20 text-left leading-[35px] select-none pointer-events-none`}>
         <div className="flex items-center gap-5"><span className="text-zinc-800 font-black text-3xl w-7">{player.pac || 60}</span><span className="text-zinc-700 font-bold text-[22px] uppercase opacity-70">RIT</span></div>

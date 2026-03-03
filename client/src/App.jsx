@@ -6,21 +6,22 @@ import AdminLogin from './components/v2/auth/AdminLogin';
 import AdminDashboardV2 from './components/v2/admin/AdminDashboardV2';
 import LeagueAdminDashboard from './components/LeagueAdminDashboard';
 import ProtectedRoute from './components/v2/auth/ProtectedRoute';
+import PlayerHome from './components/portal/PlayerHome'; // <--- NUEVO IMPORT
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* 🔓 RUTAS PÚBLICAS (Sin bloqueos) */}
+        {/* 🔓 RUTAS PÚBLICAS */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/join/:token" element={<PlayerRegistration />} />
         <Route path="/complete-profile" element={<CompleteProfile />} />
+        <Route path="/player-home" element={<PlayerHome />} /> {/* <--- NUEVA RUTA */}
         
-        {/* 🔒 RUTAS PROTEGIDAS (Solo con Login) */}
+        {/* 🔒 RUTAS PROTEGIDAS */}
         <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboardV2 /></ProtectedRoute>} />
         <Route path="/admin/league/:id" element={<ProtectedRoute><LeagueAdminDashboard /></ProtectedRoute>} />
 
-        {/* Redirección por defecto */}
         <Route path="/" element={<AdminLogin />} />
       </Routes>
     </Router>
