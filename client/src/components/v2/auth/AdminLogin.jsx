@@ -1,6 +1,6 @@
-// src/components/v2/auth/AdminLogin.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
 import API_BASE_URL from '../../../apiConfig'; 
 
 const AdminLogin = () => {
@@ -9,71 +9,77 @@ const AdminLogin = () => {
   const [loading, setLoading] = useState(false);
   const [credentials, setCredentials] = useState({ email: '', password: '' });
 
+  const inviteToken = searchParams.get('token');
+  const destination = searchParams.get('dest');
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: credentials.email,
-          password: credentials.password
-        })
+      const res = await axios.post(`${API_BASE_URL}/api/auth/login`, {
+        email: credentials.email,
+        password: credentials.password
       });
 
-      const data = await response.json();
+      if (res.data.token) {
+        const token = res.data.token;
+        localStorage.setItem('token', token);
 
-      if (response.ok) {
-        localStorage.setItem('token', data.token); 
-        
-        // 🔄 Lógica de retorno: si hay token de invitación, vuelve al portal
-        const inviteToken = searchParams.get('token');
+        // 🚀 LÓGICA DE RETORNO PARA EFRAÍN
         if (inviteToken) {
-            navigate(`/join/${inviteToken}`);
+          // 1. Si es capitán, lo vinculamos en la DB antes de seguir
+          if (destination === 'claim') {
+            try {
+              // Primero obtenemos el ID del equipo con el token
+              const portalRes = await axios.get(`${API_BASE_URL}/api/leagues/team-portal/${inviteToken}`);
+              const teamId = portalRes.data.team.id;
+              const leagueId = portalRes.data.team.league_id;
+
+              await axios.post(`${API_BASE_URL}/api/leagues/claim-team`, 
+                { teamId },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+
+              // 2. Lo mandamos al selfie con los datos necesarios
+              navigate('/complete-profile', { 
+                state: { leagueId, teamId, inviteToken } 
+              });
+              return;
+            } catch (err) {
+              console.error("Error en vínculo:", err);
+            }
+          }
+          // Si es invitación normal, al portal de nuevo
+          navigate(`/join/${inviteToken}`);
         } else {
-            navigate('/admin/dashboard');
+          // Si es login normal del administrador
+          navigate('/admin/dashboard');
         }
-      } else {
-        alert(data.message || "Credenciales incorrectas");
       }
     } catch (error) {
-      alert("Error: No se pudo conectar con el servidor");
+      alert("Error al entrar. Revisa tus credenciales.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex flex-col justify-center items-center p-6 font-sans">
-      <div className="w-full max-w-md bg-zinc-900/50 p-8 rounded-[2.5rem] border border-zinc-800 shadow-2xl backdrop-blur-sm text-center">
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+      <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 p-8 rounded-[3rem] shadow-2xl">
         <img src="/logo-shine.webp" alt="VORA" className="h-10 mx-auto mb-10" />
-        <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-8 text-white">
-            Acceso <span className="text-lime-400">VORA ID</span>
-        </h2>
-
-        <form onSubmit={handleLogin} className="space-y-6 text-left">
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase font-bold text-zinc-500 ml-2 tracking-widest">Email / Usuario</label>
-            <input 
-              type="text" required
-              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-2xl py-4 px-6 focus:border-lime-400 outline-none transition-all text-white"
-              onChange={(e) => setCredentials({...credentials, email: e.target.value})}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase font-bold text-zinc-500 ml-2 tracking-widest">Contraseña</label>
-            <input 
-              type="password" required
-              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-2xl py-4 px-6 focus:border-lime-400 outline-none transition-all text-white"
-              onChange={(e) => setCredentials({...credentials, password: e.target.value})}
-            />
-          </div>
-          <button 
-            type="submit" disabled={loading}
-            className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-2xl text-xl uppercase italic active:scale-95 transition-all disabled:opacity-50"
-          >
+        <form onSubmit={handleLogin} className="space-y-6">
+          <input 
+            type="email" placeholder="EMAIL" required
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-white font-bold outline-none focus:border-lime-400"
+            onChange={(e) => setCredentials({...credentials, email: e.target.value})}
+          />
+          <input 
+            type="password" placeholder="CONTRASEÑA" required
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-white font-bold outline-none focus:border-lime-400"
+            onChange={(e) => setCredentials({...credentials, password: e.target.value})}
+          />
+          <button type="submit" disabled={loading} className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-2xl uppercase italic">
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
