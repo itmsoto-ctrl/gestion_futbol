@@ -174,26 +174,35 @@ router.post('/create', verifyToken, async (req, res) => {
         }
 
         // 4. CREAMOS EL CALENDARIO (Mapeando sedes y equipos a sus IDs reales)
-        if (schedule && schedule.length > 0) {
-            const matchData = schedule.map(item => {
-                const homeId = teamIdsMap[item.match.home.trim()];
-                const awayId = teamIdsMap[item.match.away.trim()];
-                const realVenueId = venueIdsMap[item.venue_id]; // 👈 Usamos el ID mapeado (nuevo o existente)
+       // 4. CREAR EL CALENDARIO (Mapeando sedes y equipos a sus IDs reales)
+       if (schedule && schedule.length > 0) {
+        const matchData = schedule.map(item => {
+            // Usamos || null para que los "Finalista A" o "1º Clasif" no rompan el servidor
+            const homeId = teamIdsMap[item.match.home.trim()] || null;
+            const awayId = teamIdsMap[item.match.away.trim()] || null;
+            
+            // La sede sí o sí tiene que existir
+            const realVenueId = venueIdsMap[item.venue_id]; 
 
-                if (!homeId || !awayId || !realVenueId) {
-                    throw new Error(`Datos incompletos en partido: ${item.match.home} vs ${item.match.away}.`);
-                }
+            if (!realVenueId) {
+                throw new Error(`Sede no encontrada para el partido del ${item.dateStr}`);
+            }
 
-                return [
-                    leagueId, homeId, awayId, realVenueId, item.dateStr, item.time
-                ];
-            });
+            return [
+                leagueId, 
+                homeId, 
+                awayId, 
+                realVenueId, 
+                item.dateStr, 
+                item.time
+            ];
+        });
 
-            await connection.query(
-                `INSERT INTO league_matches (league_id, home_team_id, away_team_id, venue_id, match_date, match_time) VALUES ?`,
-                [matchData]
-            );
-        }
+        await connection.query(
+            `INSERT INTO league_matches (league_id, home_team_id, away_team_id, venue_id, match_date, match_time) VALUES ?`,
+            [matchData]
+        );
+    }
 
         await connection.commit();
         res.status(201).json({ message: "Liga creada con éxito", leagueId });
