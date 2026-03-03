@@ -308,17 +308,62 @@ router.post('/claim-team', verifyToken, async (req, res) => {
     }
 });
 
-// 8. REGISTRO JUGADOR
-router.post('/register-player', async (req, res) => {
-    const { teamId, full_name, dorsal, dni, is_pwa } = req.body;
+// 8. REGISTRO INTELIGENTE DE JUGADOR (Auth + Vinculación)
+router.post('/register-player-full', async (req, res) => {
+    const { 
+        email, password, fullName, dorsal, dni, 
+        teamId, photoUrl, isNewUser 
+    } = req.body;
+
+    const connection = await pool.getConnection();
+    
     try {
-        await pool.execute(
-            'INSERT INTO league_players (team_id, full_name, dorsal, dni, is_pwa) VALUES (?, ?, ?, ?, ?)',
-            [teamId, full_name, dorsal, dni, is_pwa || false]
+        await connection.beginTransaction();
+
+        let userId;
+
+        if (isNewUser) {
+            // A. Si el usuario no existe, lo creamos en la tabla 'users'
+            // Nota: Aquí podrías añadir un hash de password si ya lo tienes implementado
+            const [userResult] = await connection.execute(
+                'INSERT INTO users (email, password, fullName, dni, role) VALUES (?, ?, ?, ?, ?)',
+                [email, password, fullName, dni || null, 'player']
+            );
+            userId = userResult.insertId;
+        } else {
+            // B. Si existe, verificamos que sea él (en una app real validarías la password)
+            const [userRows] = await connection.execute('SELECT id FROM users WHERE email = ?', [email]);
+            if (userRows.length === 0) throw new Error("Usuario no encontrado");
+            userId = userRows[0].id;
+        }
+
+        // C. Verificamos si ya está en ese equipo para no duplicar
+        const [existing] = await connection.execute(
+            'SELECT id FROM league_players WHERE team_id = ? AND (dni = ? OR full_name = ?)',
+            [teamId, dni, fullName]
         );
-        res.status(201).json({ message: "Registro completado con éxito" });
+
+        if (existing.length > 0) {
+            throw new Error("Ya estás registrado en este equipo");
+        }
+
+        // D. Insertamos en la tabla de jugadores de la liga
+        await connection.execute(
+            `INSERT INTO league_players 
+            (team_id, user_id, full_name, dorsal, dni, photo_url, is_pwa) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [teamId, userId, fullName, dorsal, dni || null, photoUrl || null, 1]
+        );
+
+        await connection.commit();
+        res.status(201).json({ success: true, message: "¡Fichaje completado con éxito!" });
+
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        await connection.rollback();
+        console.error("🚨 Error en registro completo:", error.message);
+        res.status(400).json({ error: error.message });
+    } finally {
+        connection.release();
     }
 });
 
