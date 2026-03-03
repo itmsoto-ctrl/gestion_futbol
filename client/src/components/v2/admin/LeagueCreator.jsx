@@ -101,7 +101,7 @@ const LeagueCreator = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/leagues/create', {
+      const response = await fetch(`${API_BASE_URL}/api/leagues/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ config, schedule: generatedSchedule })
