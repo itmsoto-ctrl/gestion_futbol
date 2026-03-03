@@ -6,13 +6,12 @@ import LeagueDataForm from './LeagueDataForm';
 
 const PlayerRegistration = () => {
     const { token } = useParams();
-    const [step, setStep] = useState(1); // 1: Email, 2: Registro, 3: Form Liga, 4: Éxito
+    const [step, setStep] = useState(1); 
     const [loading, setLoading] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false); // Anti-duplicados
+    const [isSubmitting, setIsSubmitting] = useState(false); 
     const [teamInfo, setTeamInfo] = useState(null);
     const [fieldsConfig, setFieldsConfig] = useState({});
     
-    // Estados de datos
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
@@ -23,7 +22,6 @@ const PlayerRegistration = () => {
 
     const logoUrl = "/logo-shine.webp";
 
-    // 1. CARGAR CONTEXTO
     useEffect(() => {
         const fetchTeam = async () => {
             try {
@@ -38,18 +36,18 @@ const PlayerRegistration = () => {
         fetchTeam();
     }, [token]);
 
-    // 2. LÓGICA DE DECISIÓN (Solo se dispara por acciones del usuario)
+    // LÓGICA DE DECISIÓN CORREGIDA: "Congelamos" el paso si ya estamos en el 3
     const determineNextStep = (userData = null) => {
+        if (step === 3) return; // BLOQUEO: Si ya estamos dentro, no re-evaluar
+
         const needsDorsal = fieldsConfig.number;
         const needsDni = fieldsConfig.dni && !(userData?.dni || dni);
         const needsPhone = fieldsConfig.phone && !(userData?.phone || phone);
         const needsAge = fieldsConfig.age;
 
-        // Si falta cualquier dato requerido por el admin, vamos al componente de liga
         if (needsDorsal || needsDni || needsPhone || needsAge) {
             setStep(3);
         } else {
-            // Si ya está todo, fichaje directo
             handleJoinLeague(
                 email, 
                 userData?.name || name, 
@@ -61,7 +59,6 @@ const PlayerRegistration = () => {
         }
     };
 
-    // 3. PASO 1: CHECK EMAIL
     const handleCheckEmail = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -73,7 +70,6 @@ const PlayerRegistration = () => {
             });
             const data = await res.json();
             if (data.exists) {
-                // Pre-cargamos datos para la evaluación
                 setName(data.name || '');
                 setDni(data.dni || '');
                 setPhone(data.phone || '');
@@ -85,7 +81,6 @@ const PlayerRegistration = () => {
         finally { setLoading(false); }
     };
 
-    // 4. PASO 2: REGISTRO BASE (Protegido contra doble clic)
     const handleCreateUser = async (e) => {
         e.preventDefault();
         if (isSubmitting) return;
@@ -111,7 +106,6 @@ const PlayerRegistration = () => {
         }
     };
 
-    // 5. PASO 3: FICHAJE FINAL
     const handleJoinLeague = async (uEmail, uName, uDni, uDorsal, uPhone, uAge) => {
         setLoading(true);
         try {
@@ -129,7 +123,6 @@ const PlayerRegistration = () => {
                 })
             });
             if (res.ok) {
-                // Guardamos el email para que el PlayerHome sepa quién es el usuario
                 localStorage.setItem('userEmail', uEmail);
                 setStep(4);
             } else {
@@ -140,7 +133,7 @@ const PlayerRegistration = () => {
     };
 
     if (step === 4) return (
-        <div className="min-h-screen bg-[#665C5A] flex flex-col items-center justify-center p-6 text-center text-white italic">
+        <div className="min-h-screen bg-[#665C5A] flex flex-col items-center justify-center p-6 text-center text-white italic animate-in zoom-in">
             <CheckCircle size={80} className="text-lime-400 mb-6 drop-shadow-xl" />
             <h1 className="text-3xl font-black uppercase tracking-tighter leading-none italic">¡REGISTRO <br/> EXITOSO!</h1>
             <p className="mt-4 opacity-70 uppercase text-xs font-bold tracking-widest">Ya estás dentro de {teamInfo?.teamName}</p>
@@ -150,7 +143,6 @@ const PlayerRegistration = () => {
     return (
         <div className="min-h-screen bg-[#665C5A] text-white p-6 flex flex-col items-center font-sans overflow-x-hidden">
             
-            {/* Logo dinámico: desaparece en el formulario de inscripción */}
             {step < 3 ? (
                 <div className="mt-8 mb-6 relative logo-container-shine">
                     <div className="logo-shine-overlay" style={{ "--logo-url": `url(${logoUrl})` }} />
