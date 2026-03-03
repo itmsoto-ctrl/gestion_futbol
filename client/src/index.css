@@ -2,153 +2,142 @@
 @tailwind components;
 @tailwind utilities;
 
+/* -----------------------------------------------------------
+   1. CONFIGURACIÓN GLOBAL Y COLORES
+   ----------------------------------------------------------- */
+:root {
+  --vora-lime: #a3e635;
+  --vora-gray: #665C5A;
+}
+
+html, body {
+  background-color: var(--vora-gray);
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow-x: hidden;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* -----------------------------------------------------------
+   2. EFECTO RED DE PORTERÍA (Textura de Fondo)
+   ----------------------------------------------------------- */
+.bg-net {
+  background-color: var(--vora-gray);
+  /* Líneas finas horizontales y verticales para crear la malla */
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.08) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1.5px, transparent 1.5px);
+  background-size: 50px 50px;
+  background-attachment: fixed;
+}
+
+/* -----------------------------------------------------------
+   3. EFECTO LUZ DE CONTORNO (Dibuja la silueta del logo)
+   ----------------------------------------------------------- */
+@keyframes draw-outline {
+  0% {
+    filter: drop-shadow(0 0 2px var(--vora-lime)) brightness(1);
+  }
+  50% {
+    /* El brillo emana de la forma real del PNG/WEBP */
+    filter: drop-shadow(0 0 12px var(--vora-lime)) 
+            drop-shadow(0 0 25px #ffffff) 
+            brightness(1.2);
+  }
+  100% {
+    filter: drop-shadow(0 0 2px var(--vora-lime)) brightness(1);
+  }
+}
+
+.logo-contour-draw {
+  width: 180px; /* Tamaño grande pedido */
+  height: 180px;
+  object-fit: contain;
+  /* Esta animación hace que la luz "bañe" los bordes del logo */
+  animation: draw-outline 3s infinite ease-in-out;
+  transition: all 0.5s ease;
+}
+
+.logo-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+
+/* -----------------------------------------------------------
+   4. ANIMACIONES ADICIONALES (Shine & Rotate)
+   ----------------------------------------------------------- */
 @keyframes shine {
   0% { transform: translateX(-150%) skewX(-25deg); }
   100% { transform: translateX(150%) skewX(-25deg); }
 }
 
 .animate-shine {
-  animation: shine 1s ease-in-out;
+  position: relative;
+  overflow: hidden;
 }
 
+.animate-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  animation: shine 2s infinite;
+}
+
+/* -----------------------------------------------------------
+   5. UTILIDADES DE PERSPECTIVA Y PROPIEDADES
+   ----------------------------------------------------------- */
 @layer utilities {
   .perspective-1000 {
     perspective: 1000px;
   }
 }
 
-/* Registramos la propiedad del ángulo para que CSS sepa animarla correctamente */
+/* Propiedad para animaciones de ángulo complejas si fueran necesarias */
 @property --angle {
   syntax: '<angle>';
   initial-value: 0deg;
   inherits: false;
 }
 
-
-.halo-wrapper {
-  position: relative;
-  width: 130px;
-  height: 130px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* El contenedor debe ser un poco más grande que el logo */
-  border-radius: 50%;
-  overflow: hidden; /* Cortamos el exceso del gradiente para que solo se vea en el borde */
-  background: #09090b; /* Fondo oscuro (Zinc-950) */
+/* -----------------------------------------------------------
+   6. INPUTS Y COMPONENTES (Glassmorphism)
+   ----------------------------------------------------------- */
+/* Inputs que dejan ver la red de fondo ligeramente */
+input::placeholder {
+  color: rgba(255, 255, 255, 0.3) !important;
+  font-weight: 500;
 }
 
-/* La "Serpiente" de luz */
-.halo-wrapper::before {
-  content: '';
-  position: absolute;
-  width: 180%; /* Mucho más grande para que al girar siempre cubra el borde */
-  height: 180%;
-  background: conic-gradient(
-    transparent 0%,
-    transparent 70%,   /* 70% del círculo es invisible (esto crea el efecto de "estela") */
-    #a3e635 90%,       /* Color lima */
-    #ffffff 100%       /* La punta de la luz es blanca para que brille más */
-  );
-  animation: rotate-snake 2s linear infinite;
+.glass-input {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
 }
 
-
-
-/* La luz que "dibuja" el borde por detrás */
-.halo-wrapper::before {
-  content: '';
-  position: absolute;
-  width: 150%;
-  height: 150%;
-  /* Gradiente más corto y nítido para que parezca una chispa dibujando */
-  background: conic-gradient(
-    transparent 80%, 
-    #ffffff 95%, 
-    #a3e635 100%
-  );
-  animation: rotate-snake 1.5s linear infinite; /* Un poco más rápido */
+.glass-input:focus {
+  border-color: var(--vora-lime);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 20px rgba(163, 230, 53, 0.1);
 }
 
-/* El escudo interior (Mismo gris que el fondo) */
-.halo-wrapper::after {
-  content: '';
-  position: absolute;
-  inset: 4px; /* Grosor del trazo */
-  background: #665C5A; /* Color de fondo exacto */
-  border-radius: 50%;
-  z-index: 1;
+/* -----------------------------------------------------------
+   7. CARTA FUT TEAM (Cromo)
+   ----------------------------------------------------------- */
+.fut-card-shadow {
+  box-shadow: 0 0 40px rgba(163, 230, 53, 0.25),
+              inset 0 0 20px rgba(255, 255, 255, 0.1);
 }
-
-.logo-img {
-  position: relative;
-  z-index: 10;
-  width: 130px; /* Logo notablemente más grande */
-  height: 130px;
-  object-fit: contain;
-  /* Sutil sombra para dar profundidad sobre el gris */
-  filter: drop-shadow(0 10px 15px rgba(0,0,0,0.2));
-}
-
-@keyframes rotate-snake {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-
-
-/* Esto asegura que toda la página, se estire lo que se estire, sea oscura */
-html, body {
-  background-color: #030712; /* Este es el código de gray-950 */
-  margin: 0;
-  padding: 0;
-  height: 100%;
-}
-
-@keyframes pulse-shine {
-  0% { filter: drop-shadow(0 0 5px rgba(163, 230, 53, 0.2)); }
-  50% { filter: drop-shadow(0 0 20px rgba(163, 230, 53, 0.5)); }
-  100% { filter: drop-shadow(0 0 5px rgba(163, 230, 53, 0.2)); }
-}
-
-.logo-shine {
-  animation: pulse-shine 3s infinite ease-in-out;
-}
-
-
-
-.animate-glow-border {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-center: center;
-}
-
-.animate-glow-border::before {
-  content: "";
-  position: absolute;
-  width: 200%;
-  height: 200%;
-  background: conic-gradient(transparent, transparent, transparent, #a3e635);
-  animation: rotate-glow 4s linear infinite;
-  z-index: 0;
-}
-
-.animate-glow-border > img {
-  z-index: 10;
-  position: relative;
-  background: #09090b; /* Zinc 950 para tapar el centro del gradiente */
-}
-
-/* Patrón de Red de Portería */
-.bg-net {
-  background-color: #665C5A;
-  /* Creamos líneas horizontales y verticales muy finas */
-  background-image: 
-    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
-  /* Tamaño del rombo/cuadrado de la red (40px) */
-  background-size: 40px 40px;
-}
-
