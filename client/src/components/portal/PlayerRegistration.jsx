@@ -86,15 +86,18 @@ const PlayerRegistration = () => {
         <div className="min-h-screen bg-[#665C5A] text-white p-6 flex flex-col items-center overflow-x-hidden">
             
             {/* LOGO CON EFECTO DE LUZ SIGUIENDO EL CONTORNO */}
-            <div className="mt-10 mb-14 animate-in fade-in zoom-in duration-1000">
-                <div className="logo-trace-wrapper">
-                    <img 
-                        src="/logo-shine.webp" 
-                        alt="VORA" 
-                        className="logo-main" 
-                    />
+                <div className="mt-10 mb-14 animate-in fade-in zoom-in duration-1000">
+                    <div 
+                        className="logo-trace-wrapper" 
+                        style={{ '--logo-url': "url('/logo-shine.webp')" }}
+                    >
+                        <img 
+                            src="/logo-shine.webp" 
+                            alt="VORA" 
+                            className="logo-main" 
+                        />
+                    </div>
                 </div>
-            </div>
 
             {/* INFO EQUIPO */}
             {teamInfo && step < 3 && (
