@@ -133,4 +133,20 @@ router.post('/join-team-by-token', verifyToken, async (req, res) => {
     }
 });
 
+// Comprobar si un email ya está registrado
+router.post('/check-email', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const [rows] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
+        
+        if (rows.length > 0) {
+            return res.json({ exists: true });
+        }
+        res.json({ exists: false });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
 module.exports = router;
