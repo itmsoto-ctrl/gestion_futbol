@@ -45,26 +45,35 @@ const FutCard = ({ player, size = "large" }) => {
           />
         )}
 
-        {/* 🏆 COLUMNA IZQUIERDA: RATING, POS, BANDERA, ESCUDO */}
-        <div className="absolute top-[55px] left-[45px] z-20 flex flex-col items-center gap-1" style={{ transform: "translateZ(50px)" }}>
-          <div className="text-zinc-800 text-[85px] font-bold leading-[0.8] tracking-tighter">{rating}</div>
-          <div className="text-zinc-800 text-3xl font-medium uppercase tracking-tighter opacity-90">{player.position || 'DEL'}</div>
-          
-          <div className="h-[2px] w-12 bg-zinc-800/20 my-1" /> {/* Separador sutil */}
-          
-          {/* Bandera (Usa una imagen real tuya o placeholder) */}
-          <img src="https://flagcdn.com/w80/es.png" className="w-10 h-auto shadow-sm" alt="Flag" />
-          
-          {/* Escudo Club */}
-          <img src="/logo_club.png" className="w-12 h-12 object-contain mt-1" alt="Club" />
-        </div>
+        {/* 🏆 COLUMNA IZQUIERDA: RATING Y POSICIÓN */}
+<div className="absolute top-[55px] left-[43px] z-20 flex flex-col items-center gap-0 text-zinc-800" style={{ transform: "translateZ(50px)" }}>
+  {/* El Rating: Forzamos que sea más estrecho con scaleX */}
+  <div className="text-[92px] font-bold leading-[0.7] tracking-[-0.06em]" 
+       style={{ transform: "scaleX(0.85)", transformOrigin: "center" }}>
+    {rating}
+  </div>
+  {/* La Posición: Un poco más pequeña para que no se pegue */}
+  <div className="text-[28px] font-bold uppercase tracking-[-0.02em] mt-1" 
+       style={{ transform: "scaleX(0.9)" }}>
+    {player.position || 'DEL'}
+  </div>
+  
+  <div className="h-[2px] w-12 bg-zinc-800/30 my-2" /> 
+  <img src="https://flagcdn.com/w80/es.png" className="w-10 h-auto shadow-sm" alt="Flag" />
+  <img src="/logo_club.png" className="w-12 h-12 object-contain mt-1" alt="Club" />
+</div>
 
-        {/* 👤 NOMBRE: Centrado y con fuente extra-bold */}
-        <div style={{ transform: "translateZ(55px)" }} className="absolute top-[278px] left-0 w-full text-center z-30">
-          <span className="text-zinc-900 text-[38px] font-bold uppercase tracking-tighter italic">
-            {player.name}
-          </span>
-        </div>
+{/* 👤 NOMBRE: Estilo FIFA real */}
+<div style={{ transform: "translateZ(60px)" }} className="absolute top-[278px] left-0 w-full text-center z-30 px-2">
+  <span className="text-zinc-900 text-[40px] font-bold uppercase italic tracking-[-0.04em] leading-none"
+        style={{ 
+            display: 'inline-block', 
+            transform: "scaleX(0.88)", 
+            textShadow: '0.5px 0.5px 0px rgba(0,0,0,0.1)' 
+        }}>
+    {player.name}
+  </span>
+</div>
 
         {/* 📊 STATS CON LÍNEA DIVISORIA CENTRAL */}
         <div className="absolute top-[345px] left-0 w-full flex justify-center items-center z-20 px-10" style={{ transform: "translateZ(45px)" }}>
