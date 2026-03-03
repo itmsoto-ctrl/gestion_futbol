@@ -12,6 +12,11 @@ const PlayerRegistration = () => {
     const [teamInfo, setTeamInfo] = useState(null);
     const [fieldsConfig, setFieldsConfig] = useState({});
     
+    // ESTADO NUEVO: "Congela" los campos que realmente faltan
+    const [requiredFields, setRequiredFields] = useState({
+        dorsal: false, dni: false, phone: false, age: false
+    });
+    
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
@@ -36,16 +41,23 @@ const PlayerRegistration = () => {
         fetchTeam();
     }, [token]);
 
-    // LÓGICA DE DECISIÓN CORREGIDA: "Congelamos" el paso si ya estamos en el 3
     const determineNextStep = (userData = null) => {
-        if (step === 3) return; // BLOQUEO: Si ya estamos dentro, no re-evaluar
+        if (step === 3) return; 
 
-        const needsDorsal = fieldsConfig.number;
-        const needsDni = fieldsConfig.dni && !(userData?.dni || dni);
-        const needsPhone = fieldsConfig.phone && !(userData?.phone || phone);
-        const needsAge = fieldsConfig.age;
+        // Calculamos qué falta exactamente
+        const needsDorsal = !!fieldsConfig.number;
+        const needsDni = !!(fieldsConfig.dni && !(userData?.dni || dni));
+        const needsPhone = !!(fieldsConfig.phone && !(userData?.phone || phone));
+        const needsAge = !!(fieldsConfig.age && !(userData?.age || age));
 
         if (needsDorsal || needsDni || needsPhone || needsAge) {
+            // Guardamos en estado fijo lo que vamos a pedirle en el formulario
+            setRequiredFields({
+                dorsal: needsDorsal,
+                dni: needsDni,
+                phone: needsPhone,
+                age: needsAge
+            });
             setStep(3);
         } else {
             handleJoinLeague(
@@ -54,7 +66,7 @@ const PlayerRegistration = () => {
                 userData?.dni || dni, 
                 null, 
                 userData?.phone || phone, 
-                null
+                userData?.age || age
             );
         }
     };
@@ -192,7 +204,7 @@ const PlayerRegistration = () => {
                         handleJoinLeague(email, name, dni, dorsal, phone, age); 
                     }}>
                         <LeagueDataForm 
-                            fieldsConfig={fieldsConfig}
+                            requiredFields={requiredFields} // Usamos el nuevo estado blindado
                             dorsal={dorsal} setDorsal={setDorsal}
                             dni={dni} setDni={setDni}
                             phone={phone} setPhone={setPhone}

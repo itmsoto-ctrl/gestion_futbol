@@ -1,7 +1,7 @@
 import React from 'react';
-import { ClipboardList, Hash, CreditCard, Phone, ArrowRight, Loader2, UserCheck } from 'lucide-react';
+import { Hash, CreditCard, Phone, ArrowRight, Loader2, UserCheck, Calendar } from 'lucide-react';
 
-const LeagueDataForm = ({ fieldsConfig, dorsal, setDorsal, dni, setDni, phone, setPhone, age, setAge, loading, teamName }) => {
+const LeagueDataForm = ({ requiredFields, dorsal, setDorsal, dni, setDni, phone, setPhone, age, setAge, loading, teamName }) => {
     return (
         <div className="animate-in slide-in-from-bottom duration-500 w-full max-w-sm">
             <div className="mb-8">
@@ -17,8 +17,8 @@ const LeagueDataForm = ({ fieldsConfig, dorsal, setDorsal, dni, setDni, phone, s
             </div>
 
             <div className="space-y-4">
-                {/* DATO DE LIGA: El dorsal es específico de league_players */}
-                {fieldsConfig.number && (
+                
+                {requiredFields.dorsal && (
                     <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase ml-4 text-white/40 italic">Dorsal en este equipo</label>
                         <div className="relative">
@@ -30,26 +30,37 @@ const LeagueDataForm = ({ fieldsConfig, dorsal, setDorsal, dni, setDni, phone, s
                     </div>
                 )}
 
-                {/* DATOS DE IDENTIDAD: DNI y Teléfono van a la tabla USERS */}
-                {fieldsConfig.dni && !dni && (
+                {requiredFields.dni && (
                     <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase ml-4 text-white/40 italic">Identificación Global (DNI/NIE)</label>
                         <div className="relative">
                             <CreditCard className="absolute left-6 top-1/2 -translate-y-1/2 text-lime-400/50" size={18} />
-                            <input required placeholder="TU DNI" value={dni} 
+                            <input required placeholder="TU IDENTIFICACIÓN" value={dni} 
                                 onChange={(e) => setDni(e.target.value.toUpperCase())}
                                 className="w-full bg-white/5 border border-white/10 p-5 pl-14 rounded-[1.5rem] outline-none font-bold text-lg focus:border-lime-400/50 transition-all" />
                         </div>
                     </div>
                 )}
 
-                {fieldsConfig.phone && !phone && (
+                {requiredFields.phone && (
                     <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase ml-4 text-white/40 italic">Teléfono de contacto</label>
                         <div className="relative">
                             <Phone className="absolute left-6 top-1/2 -translate-y-1/2 text-lime-400/50" size={18} />
                             <input required type="tel" placeholder="NÚMERO" value={phone} 
                                 onChange={(e) => setPhone(e.target.value)}
+                                className="w-full bg-white/5 border border-white/10 p-5 pl-14 rounded-[1.5rem] outline-none font-bold text-lg focus:border-lime-400/50 transition-all" />
+                        </div>
+                    </div>
+                )}
+
+                {requiredFields.age && (
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase ml-4 text-white/40 italic">Edad</label>
+                        <div className="relative">
+                            <Calendar className="absolute left-6 top-1/2 -translate-y-1/2 text-lime-400/50" size={18} />
+                            <input required type="number" placeholder="AÑOS" value={age} 
+                                onChange={(e) => setAge(e.target.value)}
                                 className="w-full bg-white/5 border border-white/10 p-5 pl-14 rounded-[1.5rem] outline-none font-bold text-lg focus:border-lime-400/50 transition-all" />
                         </div>
                     </div>
