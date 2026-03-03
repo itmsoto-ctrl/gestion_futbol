@@ -1,49 +1,18 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { useDropzone } from 'react-dropzone';
-import { Mail, ArrowRight, Loader2, User, Lock, Hash, CreditCard, Camera, CheckCircle, ClipboardList } from 'lucide-react';
+import React, { useState } from 'react';
+import { Mail, User, Lock, Loader2, CheckCircle } from 'lucide-react';
 import API_BASE_URL from '../../apiConfig';
 
 const PlayerRegistration = () => {
-    const { token } = useParams();
-    const [step, setStep] = useState(1);
+    const [step, setStep] = useState(1); // 1: Email, 2: Registro, 3: Éxito
     const [loading, setLoading] = useState(false);
-    const [userExists, setUserExists] = useState(false);
-    const [teamInfo, setTeamInfo] = useState(null);
-    const [adminConfig, setAdminConfig] = useState({});
-
+    
     const [email, setEmail] = useState('');
+    const [name, setName] = useState(''); // Ajustado a 'name'
     const [password, setPassword] = useState('');
-    const [fullName, setFullName] = useState('');
-    const [dorsal, setDorsal] = useState('');
-    const [dni, setDni] = useState('');
-    const [photoUrl, setPhotoUrl] = useState('');
-    const [uploading, setUploading] = useState(false);
-
-    const publicBase = process.env.PUBLIC_URL || "";
-    const logoUrl = `${publicBase}/logo-shine.webp`;
-
-    useEffect(() => {
-        const savedEmail = localStorage.getItem('vora_user_email');
-        if (savedEmail) setEmail(savedEmail);
-
-        const fetchTeam = async () => {
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/leagues/team-portal/${token}`);
-                const data = await res.json();
-                if (res.ok) {
-                    setTeamInfo(data.team);
-                    setAdminConfig(data.fieldsConfig || {});
-                }
-            } catch (err) { console.error(err); }
-        };
-        fetchTeam();
-    }, [token]);
 
     const handleCheckEmail = async (e) => {
         e.preventDefault();
         setLoading(true);
-        localStorage.setItem('vora_user_email', email);
         try {
             const res = await fetch(`${API_BASE_URL}/api/auth/check-email`, {
                 method: 'POST',
@@ -51,164 +20,78 @@ const PlayerRegistration = () => {
                 body: JSON.stringify({ email })
             });
             const data = await res.json();
-            setUserExists(data.exists);
 
-            // SALTO LÓGICO: Si existe, saltamos la creación de cuenta (Step 2)
             if (data.exists) {
-                if (adminConfig.dni || adminConfig.dorsal) setStep(3);
-                else setStep(4);
+                alert("¡Ya estás en VORA! Identifícate para continuar.");
+                // Aquí definiremos luego el paso de Login
             } else {
                 setStep(2);
             }
-        } catch (err) { alert("Error de conexión"); }
-        finally { setLoading(false); }
-    };
-
-    const handleNextAfterRegister = (e) => {
-        e.preventDefault();
-        if (adminConfig.dni || adminConfig.dorsal) setStep(3);
-        else setStep(4);
-    };
-
-    const onDrop = useCallback(async (acceptedFiles) => {
-        const file = acceptedFiles[0];
-        if (file) {
-            setUploading(true);
-            const data = new FormData();
-            data.append('file', file);
-            data.append('upload_preset', 'vora_players');
-            try {
-                const res = await fetch(`https://api.cloudinary.com/v1_1/dqoplz61y/image/upload`, {
-                    method: 'POST', body: data
-                });
-                const fileData = await res.json();
-                setPhotoUrl(fileData.secure_url);
-            } catch (err) { console.error(err); }
-            finally { setUploading(false); }
+        } catch (err) {
+            alert("Error de conexión");
+        } finally {
+            setLoading(false);
         }
-    }, []);
+    };
 
-    const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: {'image/*': []}, multiple: false });
-
-    const handleFinalSubmit = async () => {
+    const handleCreateUser = async (e) => {
+        e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/api/leagues/register-player-full`, {
+            const res = await fetch(`${API_BASE_URL}/api/auth/register-basic`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email, password, fullName, dorsal, dni,
-                    teamId: teamInfo?.id,
-                    photoUrl,
-                    isNewUser: !userExists // Crucial para que el backend inserte en 'users'
-                })
+                body: JSON.stringify({ email, name, password }) // Enviamos 'name'
             });
-            if (res.ok) setStep(5);
-            else alert("Error al registrar");
-        } catch (err) { alert("Error de red"); }
-        finally { setLoading(false); }
+
+            if (res.ok) {
+                setStep(3);
+            } else {
+                const error = await res.json();
+                alert(error.message || "Error al crear la cuenta");
+            }
+        } catch (err) {
+            alert("Fallo en el registro");
+        } finally {
+            setLoading(false);
+        }
     };
 
-    if (step === 5) return (
-        <div className="min-h-screen bg-[#665C5A] flex flex-col items-center justify-center p-6 text-center animate-in zoom-in">
+    if (step === 3) return (
+        <div className="min-h-screen bg-[#665C5A] flex flex-col items-center justify-center p-6 text-center text-white">
             <CheckCircle size={80} className="text-lime-400 mb-6" />
-            <h1 className="text-3xl text-white font-black uppercase tracking-tighter italic">¡FICHAJE <br/><span className="text-lime-400">COMPLETADO!</span></h1>
+            <h1 className="text-3xl font-black uppercase italic italic">¡REGISTRO OK!</h1>
+            <p className="mt-2 opacity-70">Email: {email}</p>
         </div>
     );
 
     return (
-        <div className="min-h-screen bg-[#665C5A] text-white p-6 flex flex-col items-center overflow-x-hidden font-sans">
-            
-            <div className="mt-6 mb-8 relative flex items-center justify-center">
-                <div className="halo-glow"></div>
-                <div className="halo-wrapper">
-                    <img src={logoUrl} alt="VORA" className="logo-img" />
-                </div>
+        <div className="min-h-screen bg-[#665C5A] text-white p-6 flex flex-col items-center font-sans">
+            <div className="mt-10 mb-10">
+                <img src="/logo-shine.webp" alt="VORA" className="w-40" />
             </div>
 
             <div className="w-full max-w-sm">
-                {/* STEP 1: EMAIL */}
                 {step === 1 && (
-                    <form onSubmit={handleCheckEmail} className="space-y-6 animate-in fade-in">
-                        <div className="text-center mb-4">
-                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-lime-400">Bienvenido a VORA</p>
-                            <h2 className="text-white text-2xl font-black italic uppercase tracking-tighter">{teamInfo?.teamName}</h2>
-                        </div>
-                        <div className="relative">
-                            <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-white/30" size={20} />
-                            <input required type="email" placeholder="TU EMAIL" value={email} onChange={(e) => setEmail(e.target.value)}
-                                className="w-full glass-input p-5 pl-16 rounded-[2rem] outline-none font-bold text-lg" />
-                        </div>
-                        <button type="submit" className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-[2.5rem] uppercase italic text-xl active:scale-95 shadow-xl">
+                    <form onSubmit={handleCheckEmail} className="space-y-6">
+                        <input required type="email" placeholder="TU EMAIL" value={email} onChange={(e) => setEmail(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 p-5 rounded-[2rem] outline-none font-bold" />
+                        <button type="submit" className="w-full bg-lime-400 text-black font-black py-5 rounded-[2.5rem] uppercase italic">
                             {loading ? <Loader2 className="animate-spin mx-auto" /> : "CONTINUAR"}
                         </button>
                     </form>
                 )}
 
-                {/* STEP 2: CREAR CUENTA (Solo nuevos) */}
                 {step === 2 && (
-                    <form onSubmit={handleNextAfterRegister} className="space-y-4 animate-in slide-in-from-right">
-                        <div className="text-center mb-4">
-                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-lime-400">Nueva Cuenta</p>
-                            <h2 className="text-white text-xl font-bold uppercase tracking-tighter">Configura tu acceso</h2>
-                        </div>
-                        <input required placeholder="NOMBRE COMPLETO" className="w-full glass-input p-5 rounded-[2rem] outline-none font-bold uppercase"
-                            onChange={(e) => setFullName(e.target.value.toUpperCase())} />
-                        <input required type="password" placeholder="ELIGE UNA CONTRASEÑA" className="w-full glass-input p-5 rounded-[2rem] outline-none font-bold"
-                            onChange={(e) => setPassword(e.target.value)} />
-                        <button className="w-full bg-white text-black font-black py-5 rounded-[2.5rem] mt-4 italic uppercase active:scale-95">
-                            SIGUIENTE
+                    <form onSubmit={handleCreateUser} className="space-y-4">
+                        <input required placeholder="NOMBRE Y APELLIDOS" value={name} onChange={(e) => setName(e.target.value.toUpperCase())}
+                            className="w-full bg-white/5 border border-white/10 p-5 rounded-[2rem] outline-none font-bold" />
+                        <input required type="password" placeholder="CONTRASEÑA" value={password} onChange={(e) => setPassword(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 p-5 rounded-[2rem] outline-none font-bold" />
+                        <button type="submit" className="w-full bg-white text-black font-black py-5 rounded-[2.5rem] uppercase italic mt-4">
+                            {loading ? <Loader2 className="animate-spin mx-auto" /> : "REGISTRARME"}
                         </button>
                     </form>
-                )}
-
-                {/* STEP 3: DATOS DE LIGA (DINÁMICO) */}
-                {step === 3 && (
-                    <form onSubmit={(e) => { e.preventDefault(); setStep(4); }} className="space-y-4 animate-in slide-in-from-right">
-                        <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 mb-4 text-center">
-                            <ClipboardList className="mx-auto text-lime-400 mb-2" size={24} />
-                            <p className="text-xs font-bold text-white/60 uppercase">Datos de Inscripción</p>
-                        </div>
-                        <input required type="number" placeholder="TU DORSAL" className="w-full glass-input p-5 rounded-[2rem] outline-none font-bold text-center"
-                            onChange={(e) => setDorsal(e.target.value)} />
-                        {adminConfig.dni && (
-                            <input required placeholder="DNI / NIE / PASAPORTE" className="w-full glass-input p-5 rounded-[2rem] outline-none font-bold uppercase text-center"
-                                onChange={(e) => setDni(e.target.value.toUpperCase())} />
-                        )}
-                        <button className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-[2.5rem] mt-4 italic uppercase active:scale-95">
-                            CONFIRMAR DATOS
-                        </button>
-                    </form>
-                )}
-
-                {/* STEP 4: HOME / CROMO */}
-                {step === 4 && (
-                    <div className="flex flex-col items-center animate-in zoom-in-95">
-                         <div className="relative w-64 h-80 bg-gradient-to-b from-lime-400 to-lime-600 rounded-[2.5rem] p-1 shadow-2xl">
-                            <div className="bg-zinc-950 w-full h-full rounded-[2.3rem] overflow-hidden relative border border-lime-400/30">
-                                {photoUrl ? (
-                                    <img src={photoUrl} className="w-full h-full object-cover" alt="Selfie" />
-                                ) : (
-                                    <div {...getRootProps()} className="flex flex-col items-center cursor-pointer h-full justify-center text-center opacity-60">
-                                        <input {...getInputProps()} capture="user" />
-                                        <Camera className="text-white mb-3" size={32} />
-                                        <p className="text-[10px] font-black uppercase text-white italic">FOTO PARA TU FICHA</p>
-                                    </div>
-                                )}
-                                <div className="absolute bottom-5 left-0 right-0 px-6 text-left bg-gradient-to-t from-black via-black/90 to-transparent pt-4">
-                                    <p className="text-xl font-black uppercase italic text-white truncate drop-shadow-lg">{fullName || 'JUGADOR'}</p>
-                                    <div className="flex justify-between items-center mt-1">
-                                        <span className="text-2xl font-black text-lime-400 italic drop-shadow-lg">{dorsal || '00'}</span>
-                                        <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-tighter">{teamInfo?.teamName}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <button onClick={handleFinalSubmit} disabled={!photoUrl || uploading || loading}
-                            className="w-full mt-10 bg-lime-400 text-zinc-950 font-black py-6 rounded-[2.5rem] italic text-xl active:scale-95 shadow-xl">
-                            {loading || uploading ? <Loader2 className="animate-spin mx-auto" /> : "FINALIZAR REGISTRO"}
-                        </button>
-                    </div>
                 )}
             </div>
         </div>

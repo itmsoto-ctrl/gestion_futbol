@@ -218,4 +218,37 @@ router.get('/check-requirements/:leagueId', verifyToken, async (req, res) => {
     }
 });
 
+router.post('/check-email', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const [rows] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
+        res.json({ exists: rows.length > 0 });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/register-basic', async (req, res) => {
+    const { email, name, password } = req.body;
+    try {
+        // Importante: El 'role' debe ser 'user' según tu ENUM
+        const [result] = await pool.execute(
+            'INSERT INTO users (email, password, name, role, active) VALUES (?, ?, ?, ?, ?)',
+            [email, password, name, 'user', 1]
+        );
+        
+        res.status(201).json({ 
+            success: true, 
+            message: "Usuario creado correctamente",
+            userId: result.insertId 
+        });
+    } catch (error) {
+        console.error("Error en register-basic:", error);
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ message: "Este email ya existe." });
+        }
+        res.status(500).json({ error: "Error en el servidor al insertar." });
+    }
+});
+
 module.exports = router;
