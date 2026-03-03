@@ -54,7 +54,7 @@ router.get('/league-details/:id', verifyToken, async (req, res) => {
             `SELECT 
                 t.id, 
                 t.name, 
-                t.logo_url, 
+                t.logo, 
                 t.team_token AS invite_token, 
                 t.captain_phone,
                 (SELECT COUNT(*) FROM league_players WHERE team_id = t.id) AS player_count
