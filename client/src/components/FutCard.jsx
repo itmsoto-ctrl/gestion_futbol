@@ -15,23 +15,22 @@ const FutCard = ({ player, size = "large" }) => {
       <motion.div animate={{ x: [-500, 500] }} transition={{ repeat: Infinity, duration: 4, ease: "linear" }} className="absolute inset-0 z-[5] bg-gradient-to-r from-transparent via-white/20 to-transparent w-1/2 -skew-x-12 pointer-events-none" />
       <img src="/oro.png" alt="Card" className="w-[350px] h-auto relative z-10 select-none pointer-events-none" />
       
-      {/* 📸 FOTO CON MÉTODO DE FONDO (MÁXIMA COMPATIBILIDAD IOS) */}
-      {player.photo_url && (
-        <div 
-          className="absolute top-[68px] left-[95px] w-[200px] h-[215px] z-[15] pointer-events-none"
-          style={{
-            // La foto se pone como fondo del div
-            backgroundImage: `url(${player.photo_url})`,
-            backgroundSize: 'contain',
-            backgroundPosition: 'bottom center',
-            backgroundRepeat: 'no-repeat',
-            // Aplicamos la máscara al div directamente
-            WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 95%)',
-            maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 95%)',
-            filter: 'brightness(1.05) contrast(1.05)'
-          }}
-        />
-      )}
+      {/* 📸 FOTO CON DIFUMINADO EN LOS 4 BORDES (ADIÓS AL CUADRADO) */}
+{player.photo_url && (
+  <div 
+    className="absolute top-[65px] left-[75px] w-[200px] h-[220px] z-[15] pointer-events-none"
+    style={{
+      backgroundImage: `url(${player.photo_url})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center 20%', // Sube un poco la cara para que no la tape el rating
+      backgroundRepeat: 'no-repeat',
+      // Esta máscara crea un óvalo invisible que funde los 4 bordes
+      WebkitMaskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 85%)',
+      maskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 85%)',
+      filter: 'brightness(1.1) contrast(1.1)'
+    }}
+  />
+)}
 
       {/* TEXTOS Y STATS (Igual que antes) */}
       <div className="absolute top-[68px] left-[60px] z-20 text-zinc-800 text-7xl font-black italic tracking-tighter">{rating}</div>

@@ -82,11 +82,23 @@ const PlayerHome = () => {
                 />
             </div>
 
-            {!tempPhoto && (
-                <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-lime-400 animate-pulse">
-                    {user?.photo_url ? "Toca para cambiar foto" : "Toca para añadir foto"}
-                </p>
-            )}
+            {/* 🔘 BOTONES FLOTANTES DE CONFIRMACIÓN */}
+{tempPhoto && (
+    <div className="fixed bottom-10 left-0 right-0 z-[100] px-6 flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-10">
+        <button 
+            onClick={handleAccept} 
+            className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-[0_10px_30px_rgba(163,230,53,0.5)] active:scale-95 transition-all"
+        >
+            ¡ESTÁ DE LOCOS!
+        </button>
+        <button 
+            onClick={startCamera} 
+            className="w-full bg-white/20 backdrop-blur-md text-white font-black py-4 rounded-2xl uppercase italic border border-white/20 active:scale-95 transition-all"
+        >
+            REPETIR SELFIE
+        </button>
+    </div>
+)}
 
             {/* BOTONES TRAS CAPTURA */}
             {tempPhoto && (
