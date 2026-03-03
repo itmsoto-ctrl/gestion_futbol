@@ -2,142 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
-/* -----------------------------------------------------------
-   1. CONFIGURACIÓN GLOBAL Y COLORES
-   ----------------------------------------------------------- */
-:root {
-  --vora-lime: #a3e635;
-  --vora-gray: #665C5A;
-}
-
+/* 1. Fondo Gris Limpio */
 html, body {
-  background-color: var(--vora-gray);
+  background-color: #665C5A;
   margin: 0;
   padding: 0;
   height: 100%;
-  overflow-x: hidden;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* -----------------------------------------------------------
-   2. EFECTO RED DE PORTERÍA (Textura de Fondo)
-   ----------------------------------------------------------- */
-.bg-net {
-  background-color: var(--vora-gray);
-  /* Líneas finas horizontales y verticales para crear la malla */
-  background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.08) 1.5px, transparent 1.5px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1.5px, transparent 1.5px);
-  background-size: 50px 50px;
-  background-attachment: fixed;
-}
-
-/* -----------------------------------------------------------
-   3. EFECTO LUZ DE CONTORNO (Dibuja la silueta del logo)
-   ----------------------------------------------------------- */
-@keyframes draw-outline {
-  0% {
-    filter: drop-shadow(0 0 2px var(--vora-lime)) brightness(1);
-  }
-  50% {
-    /* El brillo emana de la forma real del PNG/WEBP */
-    filter: drop-shadow(0 0 12px var(--vora-lime)) 
-            drop-shadow(0 0 25px #ffffff) 
-            brightness(1.2);
-  }
-  100% {
-    filter: drop-shadow(0 0 2px var(--vora-lime)) brightness(1);
-  }
-}
-
-.logo-contour-draw {
-  width: 180px; /* Tamaño grande pedido */
-  height: 180px;
-  object-fit: contain;
-  /* Esta animación hace que la luz "bañe" los bordes del logo */
-  animation: draw-outline 3s infinite ease-in-out;
-  transition: all 0.5s ease;
-}
-
-.logo-container {
+/* 2. El Efecto de luz que RECORRE LA SILUETA */
+.logo-trace-wrapper {
   position: relative;
+  width: 200px; /* Tamaño grande */
+  height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px;
 }
 
-/* -----------------------------------------------------------
-   4. ANIMACIONES ADICIONALES (Shine & Rotate)
-   ----------------------------------------------------------- */
-@keyframes shine {
-  0% { transform: translateX(-150%) skewX(-25deg); }
-  100% { transform: translateX(150%) skewX(-25deg); }
-}
-
-.animate-shine {
-  position: relative;
-  overflow: hidden;
-}
-
-.animate-shine::after {
-  content: "";
+/* La estela de luz que gira detrás */
+.logo-trace-wrapper::before {
+  content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    to right,
-    transparent,
-    rgba(255, 255, 255, 0.2),
-    transparent
+  width: 150%;
+  height: 150%;
+  background: conic-gradient(
+    transparent 70%, 
+    #ffffff 90%, 
+    #a3e635 100%
   );
-  animation: shine 2s infinite;
+  animation: rotate-snake 2.5s linear infinite;
+  /* La magia: solo se ve donde hay logo */
+  -webkit-mask-image: url('/logo-shine.webp');
+  mask-image: url('/logo-shine.webp');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  filter: blur(1px); /* Para que no sea un corte tan duro */
 }
 
-/* -----------------------------------------------------------
-   5. UTILIDADES DE PERSPECTIVA Y PROPIEDADES
-   ----------------------------------------------------------- */
-@layer utilities {
-  .perspective-1000 {
-    perspective: 1000px;
-  }
+/* El logo real encima */
+.logo-main {
+  position: relative;
+  z-index: 10;
+  width: 190px;
+  height: 190px;
+  object-fit: contain;
+  /* Un pequeño ajuste para que la luz parezca venir de los bordes */
+  padding: 4px; 
 }
 
-/* Propiedad para animaciones de ángulo complejas si fueran necesarias */
-@property --angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
+@keyframes rotate-snake {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* -----------------------------------------------------------
-   6. INPUTS Y COMPONENTES (Glassmorphism)
-   ----------------------------------------------------------- */
-/* Inputs que dejan ver la red de fondo ligeramente */
-input::placeholder {
-  color: rgba(255, 255, 255, 0.3) !important;
-  font-weight: 500;
-}
-
+/* 3. Inputs Glassmorphism sobre Gris */
 .glass-input {
   background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
-}
-
-.glass-input:focus {
-  border-color: var(--vora-lime);
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 20px rgba(163, 230, 53, 0.1);
-}
-
-/* -----------------------------------------------------------
-   7. CARTA FUT TEAM (Cromo)
-   ----------------------------------------------------------- */
-.fut-card-shadow {
-  box-shadow: 0 0 40px rgba(163, 230, 53, 0.25),
-              inset 0 0 20px rgba(255, 255, 255, 0.1);
+  color: white;
 }
