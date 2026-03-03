@@ -108,7 +108,10 @@ const PlayerHome = () => {
 
     return (
         <div className="min-h-screen bg-[#665C5A] text-white font-sans relative overflow-x-hidden pb-10">
-            
+            /* MARCA DE VERSIÓN TEMPORAL */}
+        <div className="fixed top-0 left-0 z-[9999] bg-red-600 text-white text-[10px] px-2 py-1 font-mono">
+            V-TEST-SVG-MASK-01
+        </div>
             <div className="p-6 flex flex-col items-center pt-10">
                 <div onClick={() => !user?.photo_url && setShowPromoModal(true)} className="cursor-pointer">
                     <FutCard player={playerStats} size="large" view="dashboard" />
