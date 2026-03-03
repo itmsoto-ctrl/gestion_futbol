@@ -38,7 +38,7 @@ const PlayerRegistration = () => {
                     setTeamInfo(data.team);
                     setAdminConfig(data.fieldsConfig || {});
                 }
-            } catch (err) { console.error(err); }
+            } catch (err) { console.error("Error:", err); }
         };
         fetchTeam();
     }, [token]);
@@ -61,7 +61,7 @@ const PlayerRegistration = () => {
             const data = await res.json();
             setUserExists(data.exists);
             setStep(2);
-        } catch (err) { alert("Error de conexión"); }
+        } catch (err) { alert("Error de red"); }
         finally { setLoading(false); }
     };
 
@@ -105,8 +105,8 @@ const PlayerRegistration = () => {
     };
 
     if (step === 5) return (
-        <div className="min-h-screen bg-[#665C5A] flex flex-col items-center justify-center p-6 text-center animate-in zoom-in">
-            <CheckCircle size={80} className="text-lime-400 mb-6" />
+        <div className="min-h-screen bg-[#665C5A] flex flex-col items-center justify-center p-6 text-center italic animate-in zoom-in">
+            <CheckCircle size={80} className="text-lime-400 mb-6 drop-shadow-lg" />
             <h1 className="text-3xl text-white font-black uppercase tracking-tighter leading-none italic">Fichaje <br/><span className="text-lime-400">Confirmado</span></h1>
         </div>
     );
@@ -114,24 +114,27 @@ const PlayerRegistration = () => {
     return (
         <div className="min-h-screen bg-[#665C5A] text-white p-6 flex flex-col items-center font-sans overflow-x-hidden">
             
-            {/* LOGO CON EFECTO HALO-SNAKE RESTAURADO (SUAVE) */}
+            {/* LOGO CON EFECTO CRISTAL/SHINE (REFLEJO DE DIAMANTE) */}
             <div className="mt-6 mb-8 animate-in fade-in zoom-in duration-1000">
-                <div className="relative flex items-center justify-center">
-                    <div className="halo-glow"></div> {/* Brillo exterior sutil */}
-                    <div className="halo-wrapper"> {/* Contenedor con la serpiente girando */}
-                        <img 
-                            src={logoUrl} 
-                            alt="VORA" 
-                            className="logo-img" 
-                        />
-                    </div>
+                <div className="logo-container-shine">
+                    {/* El brillo (Shine) que cruza el logo */}
+                    <div 
+                        className="logo-shine-overlay" 
+                        style={{ "--logo-url": `url(${logoUrl})` }}
+                    />
+                    {/* El logo con la sombra y el humo */}
+                    <img 
+                        src={logoUrl} 
+                        alt="VORA" 
+                        className="logo-main-shine" 
+                    />
                 </div>
             </div>
 
             {/* HEADER DINÁMICO */}
             {teamInfo && step < 4 && (
                 <div className="w-full max-w-sm mb-10 text-center animate-in fade-in duration-700">
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-lime-400 mb-1 font-black">
+                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-lime-400 mb-2 font-black">
                         {step === 1 && "Bienvenido"}
                         {step === 2 && (userExists ? "Identifícate" : "Crea tu cuenta")}
                         {step === 3 && "Datos de Liga"}
@@ -163,13 +166,13 @@ const PlayerRegistration = () => {
                         {!userExists && (
                             <div className="relative">
                                 <User className="absolute left-6 top-1/2 -translate-y-1/2 text-white/30" size={20} />
-                                <input required placeholder="NOMBRE COMPLETO" className="w-full glass-input p-5 pl-16 rounded-[2rem] outline-none font-bold uppercase"
+                                <input required placeholder="NOMBRE COMPLETO" className="w-full glass-input p-5 pl-16 rounded-[2rem] outline-none font-bold uppercase placeholder:text-white/20"
                                     onChange={(e) => setFullName(e.target.value.toUpperCase())} />
                             </div>
                         )}
                         <div className="relative">
                             <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-white/30" size={20} />
-                            <input required type="password" placeholder="CONTRASEÑA" className="w-full glass-input p-5 pl-16 rounded-[2rem] outline-none font-bold"
+                            <input required type="password" placeholder="TU CONTRASEÑA" className="w-full glass-input p-5 pl-16 rounded-[2rem] outline-none font-bold placeholder:text-white/20"
                                 onChange={(e) => setPassword(e.target.value)} />
                         </div>
                         <button className="w-full bg-white text-black font-black py-5 rounded-[2.5rem] mt-4 italic uppercase text-lg active:scale-95 transition-all">
@@ -187,17 +190,17 @@ const PlayerRegistration = () => {
                         </div>
                         <div className="relative">
                             <Hash className="absolute left-6 top-1/2 -translate-y-1/2 text-white/30" size={20} />
-                            <input required type="number" placeholder="DORSAL PREFERIDO" className="w-full glass-input p-5 pl-16 rounded-[2rem] outline-none font-bold"
+                            <input required type="number" placeholder="DORSAL PREFERIDO" className="w-full glass-input p-5 pl-16 rounded-[2rem] outline-none font-bold text-centerplaceholder:text-white/20"
                                 onChange={(e) => setDorsal(e.target.value)} />
                         </div>
                         {adminConfig.dni && (
                             <div className="relative">
                                 <CreditCard className="absolute left-6 top-1/2 -translate-y-1/2 text-white/30" size={20} />
-                                <input required placeholder="DNI / NIE / PASAPORTE" className="w-full glass-input p-5 pl-16 rounded-[2rem] outline-none font-bold uppercase"
+                                <input required placeholder="DNI / NIE / PASAPORTE" className="w-full glass-input p-5 pl-16 rounded-[2rem] outline-none font-bold uppercase text-center placeholder:text-white/20"
                                     onChange={(e) => setDni(e.target.value.toUpperCase())} />
                             </div>
                         )}
-                        <button className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-[2.5rem] mt-4 italic uppercase text-lg active:scale-95 transition-all">
+                        <button className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-[2.5rem] mt-4 italic uppercase text-lg active:scale-95 transition-all shadow-xl shadow-lime-400/10">
                             CONFIRMAR DATOS
                         </button>
                     </form>
@@ -211,7 +214,7 @@ const PlayerRegistration = () => {
                                 {photoUrl ? (
                                     <img src={photoUrl} className="w-full h-full object-cover" alt="Selfie" />
                                 ) : (
-                                    <div {...getRootProps()} className="flex flex-col items-center cursor-pointer h-full justify-center text-centeropacity-60">
+                                    <div {...getRootProps()} className="flex flex-col items-center cursor-pointer h-full justify-center text-center opacity-60">
                                         <input {...getInputProps()} capture="user" />
                                         <Camera className="text-white/40 mb-3" size={32} />
                                         <p className="text-[10px] font-black uppercase text-white leading-tight italic">TOCA PARA <br/> TU FOTO DE FICHA</p>

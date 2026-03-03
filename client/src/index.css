@@ -15,71 +15,75 @@ html, body {
 }
 
 /* -----------------------------------------------------------
-   2. EFECTO HALO-SNAKE RESTAURADO (Suave y Circular)
+   2. EFECTO CRISTAL/SHINE (Reflejo de Diamante)
    ----------------------------------------------------------- */
-.halo-wrapper {
+@keyframes glass-shine {
+  0% { left: -150%; opacity: 0; }
+  20% { opacity: 0.5; }
+  80% { opacity: 0.5; }
+  100% { left: 150%; opacity: 0; }
+}
+
+.logo-container-shine {
   position: relative;
-  width: 180px; /* Tamaño grande */
-  height: 180px;
+  width: 200px; /* Tamaño grande notable */
+  height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  overflow: hidden;
-  background: #665C5A; /* Mismo gris que el fondo */
-  /* Sombra suave de profundidad */
-  filter: drop-shadow(0 15px 25px rgba(0, 0, 0, 0.3));
+  overflow: hidden; /* Importante para que el shine no se salga */
+  
+  /* --- SOMBRA Y HUMO (Profundidad) --- */
+  filter: 
+    /* 1. Sombra oscura de profundidad */
+    drop-shadow(0 15px 25px rgba(0, 0, 0, 0.4))
+    /* 2. Sutil halo Lima (Humo) */
+    drop-shadow(0 5px 10px rgba(163, 230, 53, 0.15));
 }
 
-/* La "Serpiente" de luz (Degradado Suave) */
-.halo-wrapper::before {
-  content: '';
-  position: absolute;
-  width: 180%;
-  height: 180%;
-  /* Degradado cónico suave y nítido al final */
-  background: conic-gradient(
-    transparent 0%,
-    transparent 70%,   
-    #a3e635 90%,       
-    #ffffff 100%       
-  );
-  animation: rotate-snake 2.5s linear infinite; /* Velocidad elegante */
-}
-
-/* El "Escudo" interior (Tapa el centro para dejar solo el borde fino) */
-.halo-wrapper::after {
-  content: '';
-  position: absolute;
-  inset: 4px; /* Grosor del trazo fino (4px) */
-  background: #665C5A; /* Color de fondo exacto */
-  border-radius: 50%;
-  z-index: 1;
-}
-
-/* El resplandor difuminado (Glow) exterior sutil */
-.halo-glow {
-  position: absolute;
-  inset: -15px;
-  border-radius: 50%;
-  background: #a3e635;
-  filter: blur(30px);
-  opacity: 0.12; /* Brillo muy sutil */
-  z-index: 0;
-}
-
-@keyframes rotate-snake {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* El Logo en sí */
-.logo-img {
-  position: relative;
-  z-index: 10;
-  width: 130px; /* Tamaño grande notable */
-  height: 130px;
+.logo-main-shine {
+  width: 180px;
+  height: 180px;
   object-fit: contain;
+  z-index: 10;
+}
+
+/* Capa del Shine (Se inyecta la máscara desde React) */
+.logo-shine-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 15;
+  pointer-events: none; /* No interfiere con clics */
+  
+  /* Configuración de la Máscara de Recorte (Usando la variable CSS) */
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-image: var(--logo-url);
+  mask-image: var(--logo-url);
+}
+
+/* La banda de luz diagonal */
+.logo-shine-overlay::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 35%; /* Grosor de la banda de luz */
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(255, 255, 255, 0.45), /* Brillo suave pero nítido */
+    transparent
+  );
+  transform: skewX(-25deg); /* Diagonal */
+  animation: glass-shine 4s infinite ease-in-out; /* Velocidad elegante */
 }
 
 /* -----------------------------------------------------------
