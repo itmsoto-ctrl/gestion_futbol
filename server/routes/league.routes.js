@@ -30,13 +30,12 @@ router.get('/my-leagues', verifyToken, async (req, res) => {
 });
 
 
-// 2. DETALLE DE LIGA Y SUS EQUIPOS (Para el Dashboard del Admin)
-// 2. DETALLE DE LIGA Y SUS EQUIPOS (Para el Dashboard del Admin)
+// 2. DETALLE DE LIGA, EQUIPOS Y JUGADORES (Visión Modo ... - Adaptado a DB Real)
+// 2. DETALLE DE LIGA, EQUIPOS Y JUGADORES (Visión Modo Dios)
 router.get('/league-details/:id', verifyToken, async (req, res) => {
     try {
         const identifier = req.params.id;
 
-        // 1. Buscamos la liga por ID numérico O por su Token (invite_token)
         const [leagues] = await pool.execute(
             'SELECT * FROM leagues WHERE id = ? OR invite_token = ?',
             [identifier, identifier]
@@ -46,30 +45,37 @@ router.get('/league-details/:id', verifyToken, async (req, res) => {
             return res.status(404).json({ message: "Liga no encontrada" });
         }
 
-        // 2. Extraemos el ID numérico real para poder buscar sus equipos
         const realLeagueId = leagues[0].id;
 
-        // 3. Obtenemos los equipos
+        // 1. Extraemos los equipos (Usando el nombre exacto de tu columna: 'logo')
         const [teams] = await pool.execute(
             `SELECT 
-                t.id, 
-                t.name, 
-                t.logo, 
-                t.team_token AS invite_token, 
-                t.captain_phone,
-                (SELECT COUNT(*) FROM league_players WHERE team_id = t.id) AS player_count
-             FROM league_teams t
+                id, name, logo, team_token AS invite_token, captain_phone
+             FROM league_teams 
+             WHERE league_id = ?`,
+            [realLeagueId]
+        );
+
+        // 2. Extraemos los jugadores
+        const [players] = await pool.execute(
+            `SELECT 
+                p.team_id, p.dorsal, p.is_captain, p.full_name AS fullName, p.dni, p.photo_url
+             FROM league_players p
+             JOIN league_teams t ON p.team_id = t.id
              WHERE t.league_id = ?`,
             [realLeagueId]
         );
 
-        res.json({
-            league: leagues[0],
-            teams: teams
-        });
+        const teamsWithPlayers = teams.map(team => ({
+            ...team,
+            player_count: players.filter(p => p.team_id === team.id).length,
+            players: players.filter(p => p.team_id === team.id)
+        }));
+
+        res.json({ league: leagues[0], teams: teamsWithPlayers });
 
     } catch (error) {
-        console.error("🚨 Error al cargar dashboard de liga:", error);
+        console.error("🚨 Error en league-details:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -232,17 +238,34 @@ router.post('/create', verifyToken, async (req, res) => {
     }
 });
 
-// 5. ACTUALIZAR EQUIPO
-router.patch('/teams/:teamId', verifyToken, async (req, res) => {
-    const { logo, captain_phone } = req.body;
+// 5. VER columnas
+// 5. ACTUALIZAR EQUIPO (LOGO Y TELÉFONO)
+router.patch('/teams/:id', verifyToken, async (req, res) => {
+    const teamId = req.params.id;
+    const { logo_url, captain_phone } = req.body;
+
+    // 🔍 LOGS PARA RAILWAY (Mira la consola de Railway al pulsar guardar)
+    console.log(`>>> ACTUALIZANDO EQUIPO ID: ${teamId}`);
+    console.log(`>>> DATA RECIBIDA: logo=${logo_url}, phone=${captain_phone}`);
+
     try {
-        await pool.execute(
-            'UPDATE league_teams SET logo = ?, captain_phone = ? WHERE id = ?',
-            [logo || null, captain_phone || null, req.params.teamId]
-        );
-        res.json({ message: "Datos del equipo actualizados" });
+        // Usamos una consulta directa para evitar fallos de desestructuración
+        const sql = "UPDATE league_teams SET logo = ?, captain_phone = ? WHERE id = ?";
+        const params = [logo_url || null, captain_phone || null, teamId];
+
+        const [result] = await pool.execute(sql, params);
+
+        if (result.affectedRows === 0) {
+            console.error("❌ No se encontró el equipo para actualizar");
+            return res.status(404).json({ error: "Equipo no encontrado" });
+        }
+
+        console.log("✅ UPDATE EXITOSO EN DB");
+        return res.json({ success: true, message: "Actualizado correctamente" });
+
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error("🚨 ERROR CRÍTICO EN UPDATE:", error.message);
+        return res.status(500).json({ error: error.message });
     }
 });
 

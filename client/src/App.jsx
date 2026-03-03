@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import JoinLeague from './components/portal/JoinLeague';
+import PlayerRegistration from './components/portal/PlayerRegistration';
 import CompleteProfile from './components/portal/CompleteProfile';
 import AdminLogin from './components/v2/auth/AdminLogin';
 import AdminDashboardV2 from './components/v2/admin/AdminDashboardV2';
@@ -13,7 +13,7 @@ function App() {
       <Routes>
         {/* 🔓 RUTAS PÚBLICAS (Sin bloqueos) */}
         <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/join/:token" element={<JoinLeague />} />
+        <Route path="/join/:token" element={<PlayerRegistration />} />
         <Route path="/complete-profile" element={<CompleteProfile />} />
         
         {/* 🔒 RUTAS PROTEGIDAS (Solo con Login) */}
