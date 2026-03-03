@@ -74,8 +74,8 @@ const CalendarPreview = ({ config, onConfirm }) => {
     let iterDate = toLocalDate(config.startDate);
     let roundIdx = 0;
 
+    // --- FASE REGULAR ---
     while (roundIdx < rounds.length) {
-      // ✅ CORRECCIÓN: Capturamos el valor para evitar el error no-loop-func
       const currentRoundNumber = roundIdx + 1;
       const dayKey = DAYS_MAP[iterDate.getDay()];
       const dateStr = iterDate.toISOString().split('T')[0];
@@ -87,10 +87,15 @@ const CalendarPreview = ({ config, onConfirm }) => {
           venue.slots?.filter(s => s.day === dayKey).forEach(slot => {
             if (currentRoundMatches.length > 0) {
               generated.push({
-                type: 'REGULAR', dateStr, dateObj: new Date(iterDate),
-                venue: venue.name, fieldName: slot.fieldName, time: slot.start,
+                type: 'REGULAR', 
+                dateStr, 
+                dateObj: new Date(iterDate),
+                venue_id: venue.id, // ✅ ID inyectado correctamente
+                venue: venue.name, 
+                fieldName: slot.fieldName, 
+                time: slot.start,
                 match: currentRoundMatches.shift(), 
-                round: currentRoundNumber, // 👈 Usamos la constante
+                round: currentRoundNumber,
                 weekHolidays: getHolidaysDetails(iterDate),
                 isHoliday: !!HOLIDAYS_2026[dateStr]
               });
@@ -102,7 +107,7 @@ const CalendarPreview = ({ config, onConfirm }) => {
       iterDate.setDate(iterDate.getDate() + 1);
     }
 
-    // Playoff Logic...
+    // --- FASE DE PLAYOFFS ---
     if (config.hasPlayoffs === 1 && config.selectedVenues.length > 0) {
       const phases = [];
       if (config.playoffTeams === 4) phases.push('SEMIFINAL IDA');
@@ -119,16 +124,21 @@ const CalendarPreview = ({ config, onConfirm }) => {
             const venue = config.selectedVenues[0];
             const slotsOfDay = venue.slots.filter(s => s.day === dayKey);
             const matchesToCreate = phase.includes('SEMIFINAL') ? 2 : 1;
+            
             for(let i=0; i < matchesToCreate; i++) {
                 const slot = slotsOfDay[i] || slotsOfDay[0];
-                // En CalendarPreview.jsx
                 generated.push({
-                  type: 'REGULAR',
-                  dateStr,
-                  venue_id: venue.id, // 👈 ENVÍA EL ID, NO SOLO EL NOMBRE
-                  venue: venue.name,
-                  match: currentRoundMatches.shift(), 
-                  // ...
+                  type: phase, 
+                  dateStr, 
+                  dateObj: new Date(iterDate),
+                  venue_id: venue.id, // ✅ ID inyectado correctamente en Playoffs
+                  venue: venue.name, 
+                  fieldName: slot.fieldName, 
+                  time: slot.start,
+                  match: phase === 'GRAN FINAL' ? { home: 'Finalista A', away: 'Finalista B' } : { home: `${i+1}º Clasif.`, away: `${4-i}º Clasif.` }, // ✅ Texto estático, nada de variables indefinidas
+                  round: rounds.length + pIdx + 1,
+                  weekHolidays: getHolidaysDetails(iterDate),
+                  isHoliday: !!HOLIDAYS_2026[dateStr]
                 });
             }
             assigned = true;
