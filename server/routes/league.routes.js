@@ -29,8 +29,8 @@ router.get('/my-leagues', verifyToken, async (req, res) => {
     }
 });
 
-// 2. DETALLE DE LIGA
-r// 2. DETALLE DE LIGA Y SUS EQUIPOS (Para el Dashboard del Admin)
+
+// 2. DETALLE DE LIGA Y SUS EQUIPOS (Para el Dashboard del Admin)
 router.get('/league-details/:id', verifyToken, async (req, res) => {
     try {
         const leagueId = req.params.id;
