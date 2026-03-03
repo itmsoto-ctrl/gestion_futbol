@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import API_BASE_URL from '../../../apiConfig'; // 👈 AÑADE ESTA LÍNEA AQUÍ
 import CalendarPreview from './CalendarPreview';
 import VenueSelector from '../shared/VenueSearch'; // ✅ Importación corregida
 
