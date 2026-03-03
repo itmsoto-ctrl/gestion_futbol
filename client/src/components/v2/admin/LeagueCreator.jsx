@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import API_BASE_URL from '../../../apiConfig'; // 👈 AÑADE ESTA LÍNEA AQUÍ
+import API_BASE_URL from '../../../apiConfig'; // ✅ Añadido para producción
 import CalendarPreview from './CalendarPreview';
-import VenueSelector from '../shared/VenueSearch'; // ✅ Importación corregida
+import VenueSelector from '../shared/VenueSearch';
 
 const LeagueCreator = () => {
   const [step, setStep] = useState(1);
@@ -21,7 +21,6 @@ const LeagueCreator = () => {
     playoffFormat: 'single', 
     teams: Array(6).fill("").map((_, i) => ({ id: i, name: `Equipo ${i + 1}` })),
     selectedVenues: [],
-    // ✅ Estado de Requisitos del Jugador
     registrationConfig: {
       fullName: true,
       dni: false,
@@ -32,7 +31,6 @@ const LeagueCreator = () => {
     }
   });
 
-  // --- Lógica de Equipos ---
   const handleTeamsCountChange = (count) => {
     const val = parseInt(count) || 0;
     const newTeams = Array(val).fill("").map((_, i) => ({
@@ -47,7 +45,6 @@ const LeagueCreator = () => {
     setConfig({ ...config, teams: newTeams });
   };
 
-  // ✅ Toggle de Requisitos (Mejorada legibilidad)
   const toggleRegistrationField = (field) => {
     if (field === 'fullName') return;
     setConfig({
@@ -56,7 +53,6 @@ const LeagueCreator = () => {
     });
   };
 
-  // --- Lógica de Sedes ---
   const confirmAddVenue = () => {
     const newVenue = {
       id: Date.now(),
@@ -93,7 +89,7 @@ const LeagueCreator = () => {
     setConfig({ ...config, selectedVenues: config.selectedVenues.filter(v => v.id !== venueId) });
   };
 
-  // --- Lógica de Publicación ---
+  // ✅ CORRECCIÓN CRÍTICA DE ENVÍO
   const handlePublishLeague = async (generatedSchedule) => {
     if (!generatedSchedule || generatedSchedule.length === 0) {
       alert("⚠️ El calendario está vacío.");
@@ -102,17 +98,37 @@ const LeagueCreator = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
+      
+      // 1. Quitamos los IDs manuales de los equipos para evitar error 500 en DB
+      const sanitizedTeams = config.teams.map(t => ({ name: t.name }));
+
+      // 2. Aplanamos el objeto para que el servidor lo reciba correctamente
+      const payload = {
+        ...config,
+        teams: sanitizedTeams,
+        schedule: generatedSchedule,
+        hasReturnMatch: Boolean(config.hasReturnMatch),
+        hasPlayoffs: Boolean(config.hasPlayoffs)
+      };
+
       const response = await fetch(`${API_BASE_URL}/api/leagues/create`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ config, schedule: generatedSchedule })
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify(payload)
       });
+
       if (response.ok) {
         alert(`¡GOL! Liga creada con éxito.`);
         window.location.href = '/admin/dashboard'; 
+      } else {
+        const errorData = await response.json();
+        alert(`Error del servidor: ${errorData.message || 'Error desconocido'}`);
       }
     } catch (error) {
-      alert("No se pudo conectar con el servidor.");
+      alert("No se pudo conectar con el servidor de Railway.");
     } finally {
       setLoading(false);
     }
@@ -120,8 +136,6 @@ const LeagueCreator = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-4 md:p-8 pb-32 font-sans relative">
-      
-      {/* MODAL DETALLES SEDE */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md p-8 rounded-[2.5rem] space-y-6">
@@ -150,42 +164,18 @@ const LeagueCreator = () => {
             </div>
           </header>
 
-          {/* PASO 1: REGLAS + NOMBRE + REQUISITOS */}
           {step === 1 && (
             <div className="space-y-6 animate-in slide-in-from-right duration-300">
-              
-              {/* NOMBRE DE LA LIGA */}
               <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
                 <label className="text-[10px] uppercase font-bold text-zinc-500 mb-2 block tracking-widest">Nombre de la Competición</label>
-                <input 
-                  type="text" 
-                  className="w-full bg-zinc-800 border-none rounded-2xl py-4 px-6 text-xl font-black text-white outline-none focus:ring-2 ring-lime-400 uppercase" 
-                  value={config.name} 
-                  onChange={(e) => setConfig({...config, name: e.target.value})} 
-                  placeholder="Ej: Torneo Clausura 2026"
-                />
+                <input type="text" className="w-full bg-zinc-800 border-none rounded-2xl py-4 px-6 text-xl font-black text-white outline-none focus:ring-2 ring-lime-400 uppercase" value={config.name} onChange={(e) => setConfig({...config, name: e.target.value})} placeholder="Ej: Torneo Clausura 2026" />
               </div>
 
-              {/* REQUISITOS JUGADOR (Diseño mejorado para lectura) */}
               <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
                 <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-4 tracking-widest">Datos Obligatorios del Jugador</label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {Object.keys(config.registrationConfig).map((field) => (
-                    <button
-                      key={field}
-                      onClick={() => toggleRegistrationField(field)}
-                      className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase transition-all border ${
-                        config.registrationConfig[field] 
-                        ? 'bg-lime-400 text-zinc-950 border-lime-400 shadow-[0_0_15px_rgba(163,230,53,0.2)]' 
-                        : 'bg-zinc-800/50 text-zinc-300 border-zinc-700/50 hover:border-zinc-500 hover:text-white'
-                      }`}
-                    >
-                      {field === 'fullName' ? 'Nombre' : 
-                       field === 'dni' ? 'DNI / NIE' : 
-                       field === 'phone' ? 'Teléfono' : 
-                       field === 'photo' ? 'Foto Ficha' : 
-                       field === 'age' ? 'Edad' : 'Dorsal'}
-                    </button>
+                    <button key={field} onClick={() => toggleRegistrationField(field)} className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase transition-all border ${config.registrationConfig[field] ? 'bg-lime-400 text-zinc-950 border-lime-400 shadow-[0_0_15px_rgba(163,230,53,0.2)]' : 'bg-zinc-800/50 text-zinc-300 border-zinc-700/50 hover:border-zinc-500 hover:text-white'}`}>{field === 'fullName' ? 'Nombre' : field === 'dni' ? 'DNI / NIE' : field === 'phone' ? 'Teléfono' : field === 'photo' ? 'Foto Ficha' : field === 'age' ? 'Edad' : 'Dorsal'}</button>
                   ))}
                 </div>
               </div>
@@ -204,7 +194,6 @@ const LeagueCreator = () => {
                 </div>
               </div>
 
-              {/* SELECTOR PLAYOFFS */}
               <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 space-y-4">
                 <div className="flex justify-between items-center">
                   <label className="text-[10px] uppercase font-bold text-zinc-500">¿Incluir Playoffs?</label>
@@ -212,7 +201,6 @@ const LeagueCreator = () => {
                     <div className={`absolute top-1 w-4 h-4 bg-zinc-950 rounded-full transition-all ${config.hasPlayoffs ? 'left-7' : 'left-1'}`} />
                   </button>
                 </div>
-                
                 {config.hasPlayoffs === 1 && (
                   <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800 animate-in fade-in zoom-in">
                     <div>
@@ -240,7 +228,6 @@ const LeagueCreator = () => {
             </div>
           )}
 
-          {/* PASO 2: EQUIPOS */}
           {step === 2 && (
             <div className="space-y-6 animate-in slide-in-from-right duration-300">
               <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
@@ -263,7 +250,6 @@ const LeagueCreator = () => {
             </div>
           )}
 
-          {/* PASO 3: SEDES */}
           {step === 3 && (
             <div className="space-y-6 animate-in slide-in-from-right duration-300">
               <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
@@ -323,7 +309,6 @@ const LeagueCreator = () => {
             </div>
           )}
 
-          {/* PASO 4: CALENDARIO */}
           {step === 4 && (
             <div className="animate-in zoom-in duration-300">
               <CalendarPreview config={config} onConfirm={(finalSchedule) => handlePublishLeague(finalSchedule)} />
@@ -333,7 +318,6 @@ const LeagueCreator = () => {
           )}
         </div>
 
-        {/* SIDEBAR RESUMEN */}
         <div className="hidden lg:block">
           <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2rem] sticky top-10 shadow-2xl">
             <h3 className="text-lime-400 font-black italic uppercase mb-6 text-sm tracking-widest text-center border-b border-zinc-800 pb-4 leading-none">Resumen</h3>
@@ -343,9 +327,6 @@ const LeagueCreator = () => {
               <div className="flex justify-between items-end border-b border-zinc-800 pb-2"><span className="text-[10px] text-zinc-500 uppercase font-bold">Equipos</span><span className="text-xl font-black">{config.teamsCount}</span></div>
               <div className="flex justify-between items-end border-b border-zinc-800 pb-2"><span className="text-[10px] text-zinc-500 uppercase font-bold">Playoffs</span><span className="text-sm font-bold text-lime-400">{config.hasPlayoffs ? `TOP ${config.playoffTeams}` : 'NO'}</span></div>
               <div className="flex justify-between items-end border-b border-zinc-800 pb-2"><span className="text-[10px] text-zinc-500 uppercase font-bold">Sedes</span><span className="text-sm font-bold text-white">{config.selectedVenues.length}</span></div>
-            </div>
-            <div className="mt-8 p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
-              <p className="text-[8px] text-zinc-600 uppercase font-bold text-center leading-relaxed">Configura los requisitos y sedes para generar el cuadrante oficial de la liga.</p>
             </div>
           </div>
         </div>
