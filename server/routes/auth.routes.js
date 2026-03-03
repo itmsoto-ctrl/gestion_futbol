@@ -24,23 +24,21 @@ router.post('/check-email', async (req, res) => {
 router.post('/register-basic', async (req, res) => {
     const { email, name, password } = req.body;
     try {
-        // Importante: Hasheamos la password para que sea seguro
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
+        // 1. Doble check manual antes de insertar
+        const [exists] = await db.execute('SELECT id FROM users WHERE email = ?', [email]);
+        if (exists.length > 0) {
+            // Si ya existe, simplemente devolvemos el ID sin error para que el flujo siga
+            return res.status(200).json({ success: true, userId: exists[0].id, message: "Usuario ya existente" });
+        }
 
+        // 2. Si no existe, insertamos
         const [result] = await db.execute(
             'INSERT INTO users (email, password, name, role, active) VALUES (?, ?, ?, "user", 1)',
-            [email, hashedPassword, name]
+            [email, password, name]
         );
-        
-        res.status(201).json({ 
-            success: true, 
-            message: "Usuario creado", 
-            userId: result.insertId 
-        });
+        res.status(201).json({ success: true, userId: result.insertId });
     } catch (error) {
-        if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: "Email ya registrado" });
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: "Error en el servidor de registro" });
     }
 });
 
