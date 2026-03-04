@@ -182,9 +182,15 @@ router.get('/user-profile', async (req, res) => {
     const { email } = req.query;
     try {
         const query = `
-            SELECT id, email, name, photo_url, dni, position, country_code 
-            FROM users 
-            WHERE email = ?
+        SELECT 
+        u.*, 
+        l.name AS league_name, 
+        t.name AS team_name, 
+        t.logo_url AS team_logo 
+    FROM users u
+    LEFT JOIN league_teams t ON u.team_id = t.id
+    LEFT JOIN leagues l ON t.league_id = l.id
+    WHERE u.email = ?;
         `;
         const [rows] = await db.execute(query, [email]);
 
