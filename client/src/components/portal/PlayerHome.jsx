@@ -210,7 +210,7 @@ const PlayerHome = () => {
                     }}
                     style={{ transformStyle: "preserve-3d" }}
                     // ✅ CORRECCIÓN: Escala ajustada y margen superior suavizado para mejor proporción
-                    className="cursor-pointer transform scale-[0.54] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_45px_50px_rgba(0,0,0,0.8)] mt-[-90px]"
+                    className="cursor-pointer transform scale-[0.45] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_45px_50px_rgba(0,0,0,0.8)] mt-[-90px]"
                 >
                     <FutCard player={user} />
                     <div className="absolute -bottom-10 left-0 w-full text-center">
