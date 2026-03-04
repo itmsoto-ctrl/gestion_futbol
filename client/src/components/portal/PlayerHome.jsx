@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2, UploadCloud, User, IdCard, Hash, Target, MapPin } from 'lucide-react';
+import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2, UploadCloud, User } from 'lucide-react';
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
@@ -55,7 +55,6 @@ const PlayerHome = () => {
                 const data = await res.json();
 
                 if (data) {
-                    // --- LÓGICA DE STATS INCORPORADA ---
                     const statsBase = data.stats ? 
                         (typeof data.stats === 'string' ? JSON.parse(data.stats) : data.stats) : 
                         { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 };
@@ -154,7 +153,7 @@ const PlayerHome = () => {
                     email: user.email,
                     photo_url: finalPhotoUrl,
                     ...formData,
-                    stats: user.stats // ✅ Stats guardados en el búnker
+                    stats: user.stats
                 })
             });
 
@@ -242,7 +241,8 @@ const PlayerHome = () => {
                             </select>
                         </div>
                     </div>
-                    <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl active:scale-95 transition-all disabled:opacity-30">
+                    {/* Botón de confirmar actualizado con sonido y vibración */}
+                    <button onClick={handleConfirm} disabled={uploading || !formData.name} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl active:scale-95 transition-all disabled:opacity-30">
                         {uploading ? <Loader2 className="animate-spin m-auto" /> : "CONFIRMAR FICHA"}
                     </button>
                     <button onClick={() => setView('SELFIE')} className="w-full mt-2 py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Volver a la foto</button>
@@ -251,46 +251,45 @@ const PlayerHome = () => {
         );
     }
 
-    // --- VISTA C: HOME PREMIUM (OPTIMIZADA MÓVIL) ---
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
             
-            {/* SIDEBAR CON PWA INTEGRADO */}
-            <aside className="w-16 sm:w-20 bg-red-950/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 sm:space-y-8 z-50">
-                <button className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg"><Home size={24} /></button>
-                <button className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Calendar size={24} /></button>
-                <button className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Trophy size={24} /></button>
+            {/* SIDEBAR CON SOMBRA BLANCA DIFUMINADA */}
+            <aside className="w-16 sm:w-20 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 sm:space-y-8 z-50">
+                <button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-[0_0_15px_rgba(255,255,255,0.15)]"><Home size={24} /></button>
+                <button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Calendar size={24} /></button>
+                <button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Trophy size={24} /></button>
                 
-                {/* 📲 REEMPLAZO DINÁMICO: Si se puede instalar, sale la nube; si no, el icono de estadísticas */}
                 {showInstallBtn ? (
-                    <button onClick={handleInstallClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_15px_rgba(163,230,53,0.3)] animate-pulse">
+                    <button onClick={() => { playClick(); handleInstallClick(); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse">
                         <UploadCloud size={24} />
                     </button>
                 ) : (
-                    <button className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><BarChart2 size={24} /></button>
+                    <button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><BarChart2 size={24} /></button>
                 )}
                 
-                <button onClick={() => setShowTutorial(true)} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={24} /></button>
+                <button onClick={() => { playClick(); setShowTutorial(true); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Settings size={24} /></button>
             </aside>
 
-            {showTutorial && <WelcomeTutorial user={user} onFinish={() => setShowTutorial(false)} />}
+            {showTutorial && <WelcomeTutorial user={user} onFinish={() => { playClick(); setShowTutorial(false); }} />}
 
             <main className="flex-1 flex flex-col items-center justify-start relative px-4 sm:px-6 overflow-y-auto pt-6 sm:pt-10 pb-6">
                 
-                {/* 🃏 CROMO EMPUJADO HACIA ARRIBA (AJUSTADO PELÍN ABAJO) */}
+                {/* CROMO JUNTADO AL SLIDER */}
                 <div 
-                    onClick={() => setView('SELFIE')} 
-                    className="cursor-pointer transform scale-[0.65] sm:scale-85 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-10px] sm:mt-[-5px]" // ✅ CORREGIDO: Bajado pelín (antes mt-[-40px])
+                    onClick={() => { playClick(); setView('SELFIE'); }} 
+                    className="cursor-pointer transform scale-[0.6] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-110px] sm:mt-[-90px]"
                 >
                     <FutCard player={user} size="large" />
-                    <div className="absolute -bottom-8 left-0 w-full text-center">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 animate-pulse">Toca para editar tu ficha</p>
+                    <div className="absolute -bottom-10 left-0 w-full text-center">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 animate-pulse">Toca para editar tu ficha</p>
                     </div>
                 </div>
 
-                {/* ⚽ SLIDER DE PARTIDOS (MODULAR) */}
-                {/* ✅ CORREGIDO: Borrado el bloque estático antiguo y estático, dejando solo el Slider */}
-                <MatchSlider matches={matches} />
+                {/* SLIDER DE PARTIDOS CON EVENTO DE SONIDO */}
+                <div onClick={onSlideChange} className="w-full flex justify-center">
+                    <MatchSlider matches={matches} />
+                </div>
                 
             </main>
         </div>
