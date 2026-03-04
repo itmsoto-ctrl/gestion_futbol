@@ -10,12 +10,10 @@ import MatchSlider from '../player/MatchSlider';
 import useInteractionSounds from '../../hooks/useInteractionSounds';
 
 const PlayerHome = () => {
-    // 🔊 Hooks de sonido y navegación
     const { playClick, playSwipe, playOpen } = useInteractionSounds();
     const navigate = useNavigate();
     const { showInstallBtn, handleInstallClick } = usePWAInstall();
     
-    // 📊 Estados de la App
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('HOME'); 
@@ -24,13 +22,8 @@ const PlayerHome = () => {
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
     
-    // 📝 Formulario con todos los campos necesarios
     const [formData, setFormData] = useState({ 
-        name: '', 
-        dni: '', 
-        dorsal: '', 
-        position: 'DEL', 
-        country_code: 'es' 
+        name: '', dni: '', dorsal: '', position: 'DEL', country_code: 'es' 
     });
     
     const [matches, setMatches] = useState([]);
@@ -38,7 +31,6 @@ const PlayerHome = () => {
     const canvasRef = useRef(null);
     const streamRef = useRef(null);
 
-    // 📳 Función maestra para Sonido + Vibración + Acción
     const handleAction = (type, fn) => {
         if (window.navigator.vibrate) window.navigator.vibrate(20);
         if (type === 'click') playClick();
@@ -58,11 +50,7 @@ const PlayerHome = () => {
                     const statsBase = data.stats ? (typeof data.stats === 'string' ? JSON.parse(data.stats) : data.stats) : { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 };
                     setUser({ ...data, stats: statsBase });
                     setFormData({ 
-                        name: data.name || '', 
-                        dni: data.dni || '', 
-                        dorsal: data.dorsal || '', 
-                        position: data.position || 'DEL', 
-                        country_code: data.country_code || 'es' 
+                        name: data.name || '', dni: data.dni || '', dorsal: data.dorsal || '', position: data.position || 'DEL', country_code: data.country_code || 'es' 
                     });
                     
                     if (data.tutorial_seen === 0) { setShowTutorial(true); setView('SELFIE'); }
@@ -114,15 +102,14 @@ const PlayerHome = () => {
 
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-amber-400 font-black italic tracking-widest uppercase">Accediendo...</div>;
 
-    // --- VISTA A: SELFIE / CÁMARA ---
     if (view === 'SELFIE') {
         return (
             <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-10 px-6 relative overflow-hidden">
-                <div onClick={() => handleAction('click')} className="cursor-pointer active:scale-95 transition-transform drop-shadow-2xl transform scale-[0.80]">
+                <div onClick={() => handleAction('click')} className="cursor-pointer active:scale-95 transition-transform drop-shadow-2xl transform scale-[0.85]">
                     <FutCard player={{ ...user, name: formData.name || 'JUGADOR', photo_url: tempPhoto || user?.photo_url }} />
                 </div>
                 <div className="flex flex-col w-full gap-4 mt-8">
-                    <button onClick={() => handleAction('click', () => setView('FORM'))} className="w-full bg-white/5 border border-white/10 text-white font-black py-4 rounded-2xl uppercase italic flex items-center justify-center gap-3 active:bg-white/10 transition-all">
+                    <button onClick={() => handleAction('click', () => setView('FORM'))} className="w-full bg-white/5 border border-white/10 text-white font-black py-4 rounded-2xl uppercase italic flex items-center justify-center gap-3">
                         <User size={18} className="text-amber-400"/> GESTIONAR DATOS
                     </button>
                     <button onClick={() => handleAction('click', () => setView('HOME'))} className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Omitir por ahora</button>
@@ -131,41 +118,37 @@ const PlayerHome = () => {
         );
     }
 
-    // --- VISTA B: FORMULARIO ---
     if (view === 'FORM') {
         return (
             <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-8 px-6 pb-6">
                 <div className="w-full max-w-md space-y-6">
                     <h2 className="text-2xl font-black uppercase italic text-amber-400 text-center tracking-tighter">Ficha Técnica</h2>
-                    
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2 space-y-1">
                             <label className="text-[10px] font-black uppercase text-white/40 ml-2">Nombre en Carta</label>
                             <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-zinc-900 border border-white/10 rounded-xl py-3 px-4 font-bold uppercase focus:border-amber-400 outline-none text-white transition-colors" />
                         </div>
                         <div className="col-span-2 space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">DNI / Pasaporte</label>
+                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">DNI / Documento</label>
                             <input type="text" value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value})} className="w-full bg-zinc-900 border border-white/10 rounded-xl py-3 px-4 font-bold uppercase focus:border-amber-400 outline-none text-white transition-colors" />
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-black uppercase text-white/40 ml-2">Posición</label>
                             <select value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full bg-zinc-900 border border-white/10 rounded-xl py-3 px-4 font-bold outline-none text-white uppercase transition-colors">
-                                {['POR', 'LD', 'DFC', 'LI', 'MCD', 'MC', 'MCO', 'MD', 'MI', 'ED', 'EI', 'DC'].map(pos => <option key={pos} value={pos} className="bg-zinc-900">{pos}</option>)}
+                                {['POR', 'LD', 'DFC', 'LI', 'MCD', 'MC', 'MCO', 'MD', 'MI', 'ED', 'EI', 'DC'].map(pos => <option key={pos} value={pos} className="bg-[#1a1a1a]">{pos}</option>)}
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">País</label>
+                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">Nacionalidad</label>
                             <select value={formData.country_code} onChange={(e) => setFormData({...formData, country_code: e.target.value})} className="w-full bg-zinc-900 border border-white/10 rounded-xl py-3 px-4 font-bold outline-none text-white transition-colors">
                                 <option value="es">ESPAÑA 🇪🇸</option>
                                 <option value="ar">ARGENTINA 🇦🇷</option>
                                 <option value="br">BRASIL 🇧🇷</option>
-                                <option value="fr">FRANCIA 🇫🇷</option>
                                 <option value="pt">PORTUGAL 🇵🇹</option>
                             </select>
                         </div>
                     </div>
-
-                    <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-amber-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl active:scale-95 transition-all disabled:opacity-30">
+                    <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-amber-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl active:scale-95 transition-all">
                         {uploading ? <Loader2 className="animate-spin m-auto" /> : "CONFIRMAR FICHA"}
                     </button>
                     <button onClick={() => handleAction('click', () => setView('SELFIE'))} className="w-full py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Volver a la foto</button>
@@ -174,43 +157,26 @@ const PlayerHome = () => {
         );
     }
 
-    // --- VISTA C: HOME (Ajuste de escala y balanceo) ---
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
-            
             <aside className="w-16 sm:w-20 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 z-50">
                 <button onClick={() => handleAction('click')} className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-[0_0_15px_rgba(255,255,255,0.15)]"><Home size={24} /></button>
                 <button onClick={() => handleAction('click')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 transition-all"><Calendar size={24} /></button>
                 <button onClick={() => handleAction('click')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 transition-all"><Trophy size={24} /></button>
-                
                 {showInstallBtn && (
-                    <button onClick={() => handleAction('click', handleInstallClick)} className="w-12 h-12 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse">
-                        <UploadCloud size={24} />
-                    </button>
+                    <button onClick={() => handleAction('click', handleInstallClick)} className="w-12 h-12 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse"><UploadCloud size={24} /></button>
                 )}
-                
                 <button onClick={() => handleAction('open', () => setShowTutorial(true))} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto transition-all"><Settings size={24} /></button>
             </aside>
 
-            {showTutorial && <WelcomeTutorial user={user} onFinish={() => handleAction('click', () => setShowTutorial(false))} />}
-
             <main className="flex-1 flex flex-col items-center justify-start relative px-4 overflow-y-auto pt-6 pb-6">
-                
-                {/* 🃏 CROMO REDUCIDO (Escala 0.54) Y BALANCEADO */}
                 <motion.div 
                     onClick={() => handleAction('open', () => setView('SELFIE'))} 
-                    animate={{ 
-                        rotateY: [-10, 10, -10], 
-                        rotateX: [2, -2, 2] 
-                    }}
-                    transition={{ 
-                        duration: 8, 
-                        repeat: Infinity, 
-                        ease: "easeInOut" 
-                    }}
+                    animate={{ rotateY: [-10, 10, -10], rotateX: [2, -2, 2] }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
                     style={{ transformStyle: "preserve-3d" }}
-                    // ✅ CORRECCIÓN: Escala ajustada y margen superior suavizado para mejor proporción
-                    className="cursor-pointer transform scale-[0.45] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_45px_50px_rgba(0,0,0,0.8)] mt-[-90px]"
+                    // ✅ ESCALA FIJADA EN 0.5 Y MARGEN AJUSTADO PARA PROPORCIÓN
+                    className="cursor-pointer transform scale-[0.5] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_45px_50px_rgba(0,0,0,0.8)] mt-[-120px]"
                 >
                     <FutCard player={user} />
                     <div className="absolute -bottom-10 left-0 w-full text-center">
@@ -218,12 +184,9 @@ const PlayerHome = () => {
                     </div>
                 </motion.div>
 
-                {/* ⚽ SLIDER DE PARTIDOS */}
                 <div onTouchStart={() => handleAction('swipe')} className="w-full flex justify-center mt-6">
                     <MatchSlider matches={matches} />
                 </div>
-                
-                <canvas ref={canvasRef} className="hidden" />
             </main>
         </div>
     );

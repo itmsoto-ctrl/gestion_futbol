@@ -2,21 +2,20 @@ import React, { useRef, useEffect, useState, memo } from 'react';
 import { motion, animate } from 'framer-motion';
 import useInteractionSounds from '../hooks/useInteractionSounds';
 
-// Usamos memo para que el contador no se re-renderice si el padre no cambia
 const RatingCounter = memo(({ targetValue, onComplete }) => {
+  // 🛡️ Inicialización inteligente: si ya animó, empieza directamente en el valor final
   const [displayValue, setDisplayValue] = useState(() => {
-    const done = sessionStorage.getItem('vora_rating_done');
-    return done === 'true' ? targetValue : 0;
+    return sessionStorage.getItem('vora_rating_done') === 'true' ? targetValue : 0;
   });
   
   const { playScore } = useInteractionSounds();
   const animatedRef = useRef(false);
 
   useEffect(() => {
-    const done = sessionStorage.getItem('vora_rating_done');
+    const isDone = sessionStorage.getItem('vora_rating_done');
     
-    // 🛡️ BLOQUEO: Si ya animó, si el valor es 0 o si ya hay una animación en curso, abortamos.
-    if (done === 'true' || targetValue === 0 || animatedRef.current) {
+    // Si ya se hizo o el valor no es válido, no hacemos nada
+    if (isDone === 'true' || targetValue === 0 || animatedRef.current) {
       setDisplayValue(targetValue);
       if (onComplete) onComplete();
       return;
@@ -57,14 +56,14 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
     <div className="relative select-none" style={{ width: '350px', height: '504px', perspective: "2000px" }}>
       <motion.div
         animate={{ 
-          rotateY: isFlipped ? 180 : [-6, 6, -6], 
+          rotateY: isFlipped ? 180 : [-7, 7, -7], 
           rotateX: [2, -2, 2],
           y: [0, -5, 0] 
         }}
         transition={{ 
-          rotateY: isFlipped ? { duration: 0.8 } : { duration: 10, repeat: Infinity, ease: "easeInOut" },
-          rotateX: { duration: 8, repeat: Infinity, ease: "easeInOut" },
-          y: { duration: 5, repeat: Infinity, ease: "easeInOut" }
+          rotateY: isFlipped ? { duration: 0.8 } : { duration: 8, repeat: Infinity, ease: "easeInOut" },
+          rotateX: { duration: 6, repeat: Infinity, ease: "easeInOut" },
+          y: { duration: 4, repeat: Infinity, ease: "easeInOut" }
         }}
         style={{ width: '100%', height: '100%', transformStyle: "preserve-3d" }}
         onClick={onFlip}
@@ -85,7 +84,7 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
 
           <div className="absolute top-[60px] left-[45px] z-20 flex flex-col items-center text-[#3a2d0f] font-bold font-oswald text-center">
             <motion.div 
-              animate={isRatingDone ? { scale: [1, 1.15, 1], filter: ["brightness(1)", "brightness(2)", "brightness(1)"] } : {}}
+              animate={isRatingDone ? { scale: [1, 1.2, 1], filter: ["brightness(1)", "brightness(2.2)", "brightness(1)"] } : {}}
               className="text-[85px] leading-[0.7] font-black tracking-tighter"
             >
               <RatingCounter targetValue={rating} onComplete={() => setIsRatingDone(true)} />
