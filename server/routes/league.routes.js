@@ -77,18 +77,29 @@ router.get('/team-portal/:token', async (req, res) => {
     }
 });
 
-// 4. CREAR LIGA
+// 4. CREAR LIGA (Versión Blindada)
 router.post('/create', verifyToken, async (req, res) => {
-    const { name, teamsCount, duration, startDate, selectedVenues, registrationConfig, teams, schedule } = req.body;
-    const adminId = req.user.id || req.user.adminId || req.user.userId;
+    // 🛡️ 1. Valores por defecto para evitar undefined
+    const name = req.body.name || 'Liga Sin Nombre';
+    const teamsCount = req.body.teamsCount || 0;
+    const duration = req.body.duration || 60;
+    const startDate = req.body.startDate || new Date().toISOString().split('T')[0];
+    const selectedVenues = req.body.selectedVenues || [];
+    const registrationConfig = req.body.registrationConfig || {};
+    const teams = req.body.teams || [];
+    const schedule = req.body.schedule || [];
+    
+    // 🛡️ 2. Protección del ID de administrador
+    const adminId = req.user?.id || req.user?.adminId || req.user?.userId || null; 
+
     const connection = await pool.getConnection();
     
     try {
         await connection.beginTransaction();
         const inviteToken = crypto.randomBytes(5).toString('hex');
-        const fieldsConfig = JSON.stringify(registrationConfig || {});
+        const fieldsConfig = JSON.stringify(registrationConfig);
 
-        // 1. Insertar la Liga
+        // 🛡️ 3. Insertar Liga (Asegurando que no hay undefined en el JSON)
         const [leagueResult] = await connection.execute(
             `INSERT INTO leagues (admin_id, name, teams_count, match_minutes, start_date, playing_days, invite_token, player_fields_config) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -96,30 +107,33 @@ router.post('/create', verifyToken, async (req, res) => {
         );
         const leagueId = leagueResult.insertId;
 
-        // 2. Insertar los Equipos y crear el Mapa de IDs
-        // teamIdMap vinculará el temp_id del frontend (0, 1, 2...) con el id real de la base de datos
         const teamIdMap = {}; 
 
         for (const team of teams) {
             const teamToken = crypto.randomBytes(3).toString('hex').toUpperCase(); 
+            const teamName = team.name ? team.name.trim() : 'Equipo Desconocido';
+            const teamPhone = team.phone || null; // Forzamos null explícito
             
             const [teamResult] = await connection.execute(
                 `INSERT INTO league_teams (league_id, name, team_token, captain_phone) VALUES (?, ?, ?, ?)`,
-                [leagueId, team.name.trim(), teamToken, team.phone || null]
+                [leagueId, teamName, teamToken, teamPhone]
             );
             
-            // Mapeamos el ID temporal al ID real autogenerado
-            teamIdMap[team.temp_id] = teamResult.insertId; 
+            // Atrapamos el ID temporal ya venga como temp_id o como id
+            const mappedId = team.temp_id !== undefined ? team.temp_id : team.id;
+            teamIdMap[mappedId] = teamResult.insertId; 
         }
 
-        // 3. Traducir e Insertar el Calendario
         if (schedule && schedule.length > 0) {
             for (const match of schedule) {
-                // Traducimos los IDs temporales del frontend usando nuestro diccionario
-                const realHomeId = teamIdMap[match.home];
-                const realAwayId = teamIdMap[match.away];
+                // 🛡️ 4. Protección al leer el calendario (por si home/away son objetos o enteros)
+                const homeTempId = typeof match.home === 'object' ? match.home?.id : match.home;
+                const awayTempId = typeof match.away === 'object' ? match.away?.id : match.away;
+
+                // Si no encuentra el mapeo, forzamos null (?? null) en vez de undefined
+                const realHomeId = teamIdMap[homeTempId] ?? null; 
+                const realAwayId = teamIdMap[awayTempId] ?? null;
                 
-                // Extraemos datos adicionales del match (con valores por defecto por si acaso)
                 const matchDate = match.date || startDate;
                 const matchVenue = match.venue || 'Por definir';
 
@@ -135,7 +149,7 @@ router.post('/create', verifyToken, async (req, res) => {
         res.status(201).json({ message: "Liga creada", leagueId });
     } catch (error) {
         await connection.rollback();
-        console.error("Error al crear la liga:", error);
+        console.error("🚨 Error al crear la liga:", error);
         res.status(500).json({ error: error.message });
     } finally {
         connection.release();
