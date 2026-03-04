@@ -4,6 +4,7 @@ import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2,
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
+import WelcomeTutorial from './WelcomeTutorial'; // 👈 Importamos el nuevo componente
 
 const PlayerHome = () => {
     const navigate = useNavigate();
@@ -139,6 +140,9 @@ const PlayerHome = () => {
     };
 
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic tracking-widest">PREPARANDO VESTUARIO...</div>;
+
+    / --- RENDERIZADO DEL TUTORIAL (Paso Prioritario) ---
+    if (showTutorial) return <WelcomeTutorial user={user} onFinish={finishTutorial} />;
 
     // --- VISTA A: SELFIE ---
     if (view === 'SELFIE') {
