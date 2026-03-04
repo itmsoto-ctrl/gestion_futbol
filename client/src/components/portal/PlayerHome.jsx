@@ -47,7 +47,13 @@ const PlayerHome = () => {
                 const data = await res.json();
 
                 if (data) {
-                    setUser(data);
+                    // --- LÓGICA DE STATS INCORPORADA (Mínimo 60) ---
+                    const statsBase = data.stats ? 
+                        (typeof data.stats === 'string' ? JSON.parse(data.stats) : data.stats) : 
+                        { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 };
+                    
+                    const userDataWithStats = { ...data, stats: statsBase };
+                    setUser(userDataWithStats);
                     
                     setFormData({
                         name: data.name || '',
