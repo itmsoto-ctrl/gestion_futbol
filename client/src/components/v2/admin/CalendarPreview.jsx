@@ -170,6 +170,27 @@ const CalendarPreview = ({ config, onConfirm }) => {
     setEditingIdx(null);
   };
 
+  // 🛡️ NUEVA FUNCIÓN: Traduce los nombres a IDs temporales antes de enviarlos
+  const handleConfirmWithIds = () => {
+    const scheduleWithIds = schedule.map(item => {
+      // Buscamos el equipo original en config.teams por su nombre
+      const homeTeam = config.teams.find(t => t.name === item.match.home);
+      const awayTeam = config.teams.find(t => t.name === item.match.away);
+
+      // Retornamos el partido tal cual, pero enriqueciendo home y away
+      return {
+        ...item,
+        match: {
+          // Si lo encuentra, manda el temp_id. Si no (ej: "Finalista A"), manda el nombre.
+          home: homeTeam ? homeTeam.id : item.match.home,
+          away: awayTeam ? awayTeam.id : item.match.away
+        }
+      };
+    });
+
+    onConfirm(scheduleWithIds);
+  };
+
   return (
     <div className="space-y-4">
       <div className="max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar space-y-8">
@@ -261,7 +282,10 @@ const CalendarPreview = ({ config, onConfirm }) => {
         })}
       </div>
 
-      <button onClick={() => onConfirm(schedule)} className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-3xl text-xl uppercase italic shadow-xl">
+      <button 
+        onClick={handleConfirmWithIds} 
+        className="w-full bg-lime-400 text-zinc-950 font-black py-5 rounded-3xl text-xl uppercase italic shadow-xl"
+      >
         Confirmar y Publicar Calendario
       </button>
     </div>
