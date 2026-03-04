@@ -55,25 +55,38 @@ router.post('/register-basic', async (req, res) => {
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
-        const [users] = await db.execute('SELECT * FROM users WHERE email = ? AND role = "admin"', [email]);
+        // 1. Buscamos al usuario solo por email (quitamos el filtro de admin)
+        const [users] = await db.execute('SELECT * FROM users WHERE email = ?', [email]);
 
         if (users.length === 0) {
-            return res.status(401).json({ message: "Credenciales inválidas o no eres Admin" });
+            return res.status(401).json({ message: "Usuario no encontrado" });
         }
 
         const user = users[0];
-        const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) return res.status(401).json({ message: "Contraseña incorrecta" });
 
+        // 2. Comprobamos la contraseña
+        const validPassword = await bcrypt.compare(password, user.password);
+        if (!validPassword) {
+            return res.status(401).json({ message: "Contraseña incorrecta" });
+        }
+
+        // 3. Generamos el Token
         const secret = process.env.JWT_SECRET || 'secretofutnex2026';
         const token = jwt.sign({ id: user.id, role: user.role }, secret, { expiresIn: '24h' });
 
+        // 4. Enviamos la respuesta (Añadimos 'role' para que el Front redirija bien)
         res.json({
             message: "Login exitoso",
             token,
-            user: { id: user.id, name: user.name, email: user.email }
+            user: { 
+                id: user.id, 
+                name: user.name, 
+                email: user.email,
+                role: user.role // 👈 Esto es vital para tu nuevo AdminLogin.jsx
+            }
         });
     } catch (error) {
+        console.error("Error en login:", error);
         res.status(500).json({ message: "Error en el servidor", error_detail: error.message });
     }
 });
