@@ -217,20 +217,23 @@ const PlayerHome = () => {
                 <button onClick={() => handleAction('open', () => setShowTutorial(true))} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={24} /></button>
             </aside>
 
-            <main className="flex-1 flex flex-col items-center justify-start relative px-4 overflow-y-auto pt-6 pb-6">
-               
+            <main className="flex-1 flex flex-col items-center justify-start relative px-4 sm:px-6 overflow-y-auto pt-6 sm:pt-10 pb-6"> 
+            {/* CROMO JUNTADO AL SLIDER */} 
+            <div 
+            onClick={() => { playClick(); setView('SELFIE'); }} 
+            className="cursor-pointer transform scale-[0.6] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-110px] sm:mt-[-90px]" 
+            > 
+            <FutCard player={user} size="large" /> 
+            <div className="absolute -bottom-10 left-0 w-full text-center"> 
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 animate-pulse">Toca para editar tu ficha</p> 
+            </div> 
+            </div> 
 
-                <FutCard player={user} size="large" /> 
-                <div className="absolute -bottom-10 left-0 w-full text-center"> 
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 animate-pulse">Toca para editar tu ficha</p> 
-                </div> 
-                
-
-                <div onTouchStart={() => handleAction('swipe')} className="w-full flex justify-center mt-6">
-                    <MatchSlider matches={matches} />
-                </div>
-                <canvas ref={canvasRef} className="hidden" />
-            </main>
+            {/* SLIDER DE PARTIDOS CON EVENTO DE SONIDO */} 
+            <div onClick={onSlideChange} className="w-full flex justify-center"> 
+            <MatchSlider matches={matches} /> 
+            </div> 
+            </main> 
         </div>
     );
 };
