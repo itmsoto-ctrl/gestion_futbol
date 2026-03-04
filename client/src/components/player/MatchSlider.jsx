@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { X, MapPin, Clock, Calendar as CalIcon } from 'lucide-react';
 
 const MatchSlider = ({ matches }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [showModal, setShowModal] = useState(false);
 
     useEffect(() => {
-        if (matches && matches.length > 0) {
+        if (matches?.length > 0) {
             const today = new Date();
             const closestIndex = matches.findIndex(m => new Date(m.match_date) >= today);
             setCurrentIndex(closestIndex !== -1 ? closestIndex : 0);
@@ -14,14 +16,10 @@ const MatchSlider = ({ matches }) => {
 
     if (!matches || matches.length === 0) return null;
 
-    // Lógica para el arrastre (Swipe)
-    const handleDragEnd = (event, info) => {
+    const handleDragEnd = (e, info) => {
         const threshold = 50;
-        if (info.offset.x < -threshold && currentIndex < matches.length - 1) {
-            setCurrentIndex(prev => prev + 1);
-        } else if (info.offset.x > threshold && currentIndex > 0) {
-            setCurrentIndex(prev => prev - 1);
-        }
+        if (info.offset.x < -threshold && currentIndex < matches.length - 1) setCurrentIndex(prev => prev + 1);
+        else if (info.offset.x > threshold && currentIndex > 0) setCurrentIndex(prev => prev - 1);
     };
 
     const currentMatch = matches[currentIndex];
@@ -30,85 +28,98 @@ const MatchSlider = ({ matches }) => {
     const month = matchDate.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase().replace('.', '');
 
     return (
-        <div className="w-full max-w-md px-2 mt-[-20px] select-none relative z-10">
-            {/* BADGE DE JORNADA MEJORADO */}
-            <div className="flex justify-center mb-4">
-                <div className="px-6 py-1.5 bg-gradient-to-r from-amber-500 to-amber-300 text-black text-[12px] font-black uppercase italic rounded-full tracking-[0.2em] shadow-[0_0_20px_rgba(251,191,36,0.5)]">
+        <div className="w-full max-w-md px-4 mt-[-45px] select-none relative z-10"> {/* Subido "medio dedo" */}
+            
+            {/* JORNADA FLOTANTE */}
+            <div className="flex justify-center mb-6">
+                <span className="text-[14px] font-black uppercase italic text-amber-400 tracking-[0.3em] drop-shadow-md">
                     {currentMatch.type || `JORNADA ${currentMatch.round || '?'}`}
-                </div>
+                </span>
             </div>
 
-            {/* CONTENEDOR TÁCTIL (Drag) */}
-            <div className="relative h-72 touch-none">
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={currentIndex}
-                        drag="x"
-                        dragConstraints={{ left: 0, right: 0 }}
-                        onDragEnd={handleDragEnd}
-                        initial={{ opacity: 0, scale: 0.9, x: 100 }}
-                        animate={{ opacity: 1, scale: 1, x: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, x: -100 }}
-                        className="w-full h-full bg-gradient-to-b from-zinc-900/90 to-black/95 backdrop-blur-2xl border-2 border-white/10 rounded-[3rem] p-8 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8)] flex flex-col justify-between overflow-hidden"
-                    >
-                        {/* EFECTO DE LUZ DE FONDO */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-1 bg-amber-400/50 blur-xl"></div>
-
-                        <div className="flex justify-between items-center pt-2">
-                            {/* LOCAL */}
-                            <div className="flex flex-col items-center gap-3 flex-1">
-                                <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center p-3 border border-white/10 shadow-inner">
-                                    <img src={currentMatch.home_logo || '/default-team.png'} className="w-full h-full object-contain" alt="L" />
-                                </div>
-                                <span className="text-[14px] font-black uppercase italic text-white text-center leading-tight tracking-tighter">
-                                    {currentMatch.home_team}
-                                </span>
-                            </div>
-
-                            {/* VS Y FECHA TIPO CALENDARIO */}
-                            <div className="flex flex-col items-center gap-4 px-2">
-                                <span className="text-amber-400 font-black italic text-3xl drop-shadow-[0_0_15px_rgba(251,191,36,0.6)]">VS</span>
-                                
-                                {/* 📅 CALENDARIO VISUAL */}
-                                <div className="flex flex-col items-center bg-white rounded-xl overflow-hidden shadow-lg w-14">
-                                    <span className="text-black font-black text-xl py-1 leading-none">{day}</span>
-                                    <span className="bg-red-600 text-white text-[10px] font-black w-full text-center py-0.5">{month}</span>
-                                </div>
-                            </div>
-
-                            {/* VISITANTE */}
-                            <div className="flex flex-col items-center gap-3 flex-1">
-                                <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center p-3 border border-white/10 shadow-inner">
-                                    <img src={currentMatch.away_logo || '/default-team.png'} className="w-full h-full object-contain" alt="V" />
-                                </div>
-                                <span className="text-[14px] font-black uppercase italic text-white text-center leading-tight tracking-tighter">
-                                    {currentMatch.away_team}
-                                </span>
-                            </div>
+            {/* CONTENEDOR TRANSPARENTE CON SOMBRA */}
+            <motion.div
+                onClick={() => setShowModal(true)}
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                onDragEnd={handleDragEnd}
+                className="relative h-64 w-full flex flex-col items-center justify-center drop-shadow-[0_20px_30px_rgba(0,0,0,0.7)]"
+            >
+                <div className="flex w-full items-center justify-between px-4">
+                    {/* LOCAL */}
+                    <div className="flex flex-col items-center gap-4 flex-1">
+                        <div className="w-24 h-24 flex items-center justify-center transform hover:scale-110 transition-transform">
+                            <img src={currentMatch.home_logo || '/default-team.png'} className="w-full h-full object-contain filter drop-shadow-2xl" alt="L" />
                         </div>
+                        <span className="text-lg font-black uppercase italic text-white tracking-tighter text-center leading-none">
+                            {currentMatch.home_team}
+                        </span>
+                    </div>
 
-                        {/* INFO SEDE Y HORA - MÁS GRANDE */}
-                        <div className="border-t border-white/10 mt-6 pt-4 text-center">
-                            <div className="flex justify-center items-center gap-2 mb-1">
-                                <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
-                                <p className="text-lg font-black text-white uppercase tracking-[0.1em]">
-                                    {currentMatch.match_time?.slice(0, 5)}H
-                                </p>
+                    {/* VS + CALENDARIO CENTRADO */}
+                    <div className="flex flex-col items-center gap-3 px-6">
+                        <span className="text-amber-400 font-black italic text-4xl drop-shadow-glow">VS</span>
+                        
+                        {/* 📅 ICONO CALENDARIO */}
+                        <div className="flex flex-col items-center bg-white rounded-lg overflow-hidden w-16 shadow-2xl transform rotate-2">
+                            <span className="text-black font-black text-2xl py-1">{day}</span>
+                            <span className="bg-red-600 text-white text-[11px] font-black w-full text-center py-0.5">{month}</span>
+                        </div>
+                    </div>
+
+                    {/* VISITANTE */}
+                    <div className="flex flex-col items-center gap-4 flex-1">
+                        <div className="w-24 h-24 flex items-center justify-center transform hover:scale-110 transition-transform">
+                            <img src={currentMatch.away_logo || '/default-team.png'} className="w-full h-full object-contain filter drop-shadow-2xl" alt="V" />
+                        </div>
+                        <span className="text-lg font-black uppercase italic text-white tracking-tighter text-center leading-none">
+                            {currentMatch.away_team}
+                        </span>
+                    </div>
+                </div>
+
+                {/* INFO RÁPIDA INFERIOR */}
+                <div className="mt-8 flex items-center gap-3">
+                    <span className="text-2xl font-black text-white italic tracking-widest">{currentMatch.match_time?.slice(0, 5)}H</span>
+                    <div className="h-4 w-[2px] bg-amber-400/50 rotate-12"></div>
+                    <span className="text-[12px] font-bold text-amber-400 uppercase tracking-[0.2em]">{currentMatch.venue_name || 'VORA ARENA'}</span>
+                </div>
+            </motion.div>
+
+            {/* MODAL DE DETALLES */}
+            <AnimatePresence>
+                {showModal && (
+                    <motion.div 
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6"
+                    >
+                        <div className="w-full max-w-sm bg-zinc-900 border border-white/10 rounded-[3rem] p-8 relative overflow-hidden">
+                            <button onClick={() => setShowModal(false)} className="absolute top-6 right-6 text-white/40"><X /></button>
+                            
+                            <h3 className="text-amber-400 font-black italic text-2xl mb-8 uppercase tracking-tighter">Detalles del Encuentro</h3>
+                            
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-white/5 p-3 rounded-2xl text-amber-400"><CalIcon size={24}/></div>
+                                    <div>
+                                        <p className="text-[10px] uppercase font-black text-white/30 tracking-widest">Fecha y Hora</p>
+                                        <p className="text-lg font-bold text-white uppercase">{new Date(currentMatch.match_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })} — {currentMatch.match_time?.slice(0,5)}H</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-white/5 p-3 rounded-2xl text-amber-400"><MapPin size={24}/></div>
+                                    <div>
+                                        <p className="text-[10px] uppercase font-black text-white/30 tracking-widest">Sede y Campo</p>
+                                        <p className="text-lg font-bold text-white uppercase">{currentMatch.venue_name || 'ESTADIO VORA'}</p>
+                                        <p className="text-sm font-bold text-amber-400/60 uppercase italic">{currentMatch.pitch_name || 'Campo por definir'}</p>
+                                    </div>
+                                </div>
                             </div>
-                            <p className="text-[11px] font-bold text-amber-400/80 uppercase tracking-[0.2em]">
-                                {currentMatch.venue_name || 'ESTADIO VORA'}
-                            </p>
                         </div>
                     </motion.div>
-                </AnimatePresence>
-            </div>
-
-            {/* INDICADORES (PUNTITOS) */}
-            <div className="flex justify-center gap-2 mt-6">
-                {matches.map((_, i) => (
-                    <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i === currentIndex ? 'w-10 bg-amber-400' : 'w-2 bg-white/10'}`} />
-                ))}
-            </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
