@@ -195,26 +195,14 @@ router.post('/complete-tutorial', async (req, res) => {
 router.get('/user-profile', async (req, res) => {
     const { email } = req.query;
     try {
+        // 🔥 AÑADIDO: tutorial_seen y los JOINs para team_name, league_name y logo
         const query = `
-            SELECT 
-                u.id, 
-                u.email, 
-                u.name, 
-                u.photo_url, 
-                u.dni, 
-                u.position, 
-                u.country_code, 
-                u.tutorial_seen,
-                lp.team_id,
-                t.name AS team_name, 
-                t.logo AS team_logo, 
-                l.name AS league_name
+            SELECT u.id, u.email, u.name, u.photo_url, u.dni, u.position, u.country_code, u.tutorial_seen,
+                   t.name AS team_name, t.logo AS team_logo, l.name AS league_name
             FROM users u
-            LEFT JOIN league_players lp ON u.id = lp.user_id
-            LEFT JOIN league_teams t ON lp.team_id = t.id
+            LEFT JOIN league_teams t ON u.team_id = t.id
             LEFT JOIN leagues l ON t.league_id = l.id
             WHERE u.email = ?
-            LIMIT 1
         `;
         const [rows] = await db.execute(query, [email]);
 
@@ -223,7 +211,6 @@ router.get('/user-profile', async (req, res) => {
         console.log("Datos enviados al cliente:", rows[0]); 
         res.json(rows[0]);
     } catch (error) {
-        console.error("Error SQL Profile:", error);
         res.status(500).json({ error: error.message });
     }
 });

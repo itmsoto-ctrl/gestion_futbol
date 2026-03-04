@@ -79,7 +79,7 @@ router.get('/team-portal/:token', async (req, res) => {
 
 // 4. CREAR LIGA
 router.post('/create', verifyToken, async (req, res) => {
-    const { name, teamsCount, duration, startDate, selectedVenues, registrationConfig, teams } = req.body;
+    const { name, teamsCount, duration, startDate, selectedVenues, registrationConfig, teams, schedule } = req.body;
     const adminId = req.user.id || req.user.adminId || req.user.userId;
     const connection = await pool.getConnection();
     
@@ -88,6 +88,7 @@ router.post('/create', verifyToken, async (req, res) => {
         const inviteToken = crypto.randomBytes(5).toString('hex');
         const fieldsConfig = JSON.stringify(registrationConfig || {});
 
+        // 1. Insertar la Liga
         const [leagueResult] = await connection.execute(
             `INSERT INTO leagues (admin_id, name, teams_count, match_minutes, start_date, playing_days, invite_token, player_fields_config) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -95,18 +96,46 @@ router.post('/create', verifyToken, async (req, res) => {
         );
         const leagueId = leagueResult.insertId;
 
+        // 2. Insertar los Equipos y crear el Mapa de IDs
+        // teamIdMap vinculará el temp_id del frontend (0, 1, 2...) con el id real de la base de datos
+        const teamIdMap = {}; 
+
         for (const team of teams) {
             const teamToken = crypto.randomBytes(3).toString('hex').toUpperCase(); 
-            await connection.execute(
+            
+            const [teamResult] = await connection.execute(
                 `INSERT INTO league_teams (league_id, name, team_token, captain_phone) VALUES (?, ?, ?, ?)`,
                 [leagueId, team.name.trim(), teamToken, team.phone || null]
             );
+            
+            // Mapeamos el ID temporal al ID real autogenerado
+            teamIdMap[team.temp_id] = teamResult.insertId; 
+        }
+
+        // 3. Traducir e Insertar el Calendario
+        if (schedule && schedule.length > 0) {
+            for (const match of schedule) {
+                // Traducimos los IDs temporales del frontend usando nuestro diccionario
+                const realHomeId = teamIdMap[match.home];
+                const realAwayId = teamIdMap[match.away];
+                
+                // Extraemos datos adicionales del match (con valores por defecto por si acaso)
+                const matchDate = match.date || startDate;
+                const matchVenue = match.venue || 'Por definir';
+
+                await connection.execute(
+                    `INSERT INTO league_matches (league_id, home_team_id, away_team_id, match_date, venue_name) 
+                     VALUES (?, ?, ?, ?, ?)`,
+                    [leagueId, realHomeId, realAwayId, matchDate, matchVenue]
+                );
+            }
         }
 
         await connection.commit();
         res.status(201).json({ message: "Liga creada", leagueId });
     } catch (error) {
         await connection.rollback();
+        console.error("Error al crear la liga:", error);
         res.status(500).json({ error: error.message });
     } finally {
         connection.release();
@@ -185,6 +214,35 @@ router.post('/register-player-full', async (req, res) => {
         await connection.rollback();
         console.error("🚨 Error en Fichaje Maestro:", error.message);
         res.status(400).json({ error: error.message });
+    } finally {
+        connection.release();
+    }
+});
+
+// 🚨 RUTA DE TEST: BOTÓN DEL PÁNICO (Borrar todo)
+router.delete('/nuke-database', verifyToken, async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // 1. Desactivamos las restricciones de foreign keys para poder vaciar a lo bestia
+        await connection.execute('SET FOREIGN_KEY_CHECKS = 0');
+
+        // 2. Vaciamos todas las tablas relacionadas con ligas y reseteamos los IDs a 1
+        await connection.execute('TRUNCATE TABLE league_matches');
+        await connection.execute('TRUNCATE TABLE league_players');
+        await connection.execute('TRUNCATE TABLE league_teams');
+        await connection.execute('TRUNCATE TABLE leagues');
+
+        // 3. Volvemos a activar la seguridad de la base de datos
+        await connection.execute('SET FOREIGN_KEY_CHECKS = 1');
+
+        await connection.commit();
+        res.json({ message: "¡BOMBA NUCLEAR! Todas las ligas y equipos han sido eliminados. IDs reseteados a 1." });
+    } catch (error) {
+        await connection.rollback();
+        console.error("Error al resetear la base de datos:", error);
+        res.status(500).json({ error: error.message });
     } finally {
         connection.release();
     }

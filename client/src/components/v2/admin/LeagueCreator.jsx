@@ -102,17 +102,17 @@ const LeagueCreator = () => {
     try {
       const token = localStorage.getItem('token');
 
-      // 1. Limpiamos los equipos: enviamos solo el nombre.
-      // La base de datos generará sus propios IDs automáticamente.
-      const sanitizedTeams = config.teams.map(t => ({ name: t.name }));
+      // 1. Enviamos el ID temporal y el nombre para que el backend mapee correctamente
+      const sanitizedTeams = config.teams.map(t => ({ 
+          temp_id: t.id, // Enviamos el 0, 1, 2... para mapear en el servidor
+          name: t.name 
+      }));
 
       // 2. Aplanamos el objeto (Payload)
-      // Usamos el operador spread (...) para sacar todo de config al nivel principal
       const payload = {
-        ...config,               // Esto saca name, startDate, hasPlayoffs, etc.
-        teams: sanitizedTeams,   // Sobrescribimos con los equipos limpios
+        ...config,               
+        teams: sanitizedTeams,   
         schedule: generatedSchedule,
-        // Aseguramos que los valores sean booleanos puros si el servidor los requiere
         hasReturnMatch: Boolean(config.hasReturnMatch),
         hasPlayoffs: Boolean(config.hasPlayoffs)
       };
@@ -123,7 +123,7 @@ const LeagueCreator = () => {
           'Content-Type': 'application/json', 
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify(payload) // Enviamos el objeto aplanado
+        body: JSON.stringify(payload)
       });
 
       if (response.ok) {

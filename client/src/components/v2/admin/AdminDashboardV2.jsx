@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import LeagueCreator from './LeagueCreator';
 import API_BASE_URL from '../../../apiConfig';
+import NukeButton from './NukeButton';
 
 const AdminDashboardV2 = () => {
   const [activeTab, setActiveTab] = useState('leagues');
@@ -161,6 +162,7 @@ const AdminDashboardV2 = () => {
         </button>
         <button className="text-2xl text-zinc-700">👤</button>
       </nav>
+      <NukeButton />
     </div>
   );
 };
