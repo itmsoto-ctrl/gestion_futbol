@@ -35,18 +35,30 @@ router.post('/register-basic', async (req, res) => {
     try {
         // 1. Doble check manual antes de insertar
         const [exists] = await db.execute('SELECT id FROM users WHERE email = ?', [email]);
+        
         if (exists.length > 0) {
-            // Si ya existe, simplemente devolvemos el ID sin error para que el flujo siga
-            return res.status(200).json({ success: true, userId: exists[0].id, message: "Usuario ya existente" });
+            // Mantenemos tu lógica: si ya existe, no damos error, seguimos el flujo
+            return res.status(200).json({ 
+                success: true, 
+                userId: exists[0].id, 
+                message: "Usuario ya existente" 
+            });
         }
 
-        // 2. Si no existe, insertamos
+        // 🛡️ SEGURIDAD: Ciframos la contraseña
+        // Generamos un 'salt' y el hash. El '10' es el estándar de seguridad.
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+        // 2. Si no existe, insertamos (Usamos hashedPassword en lugar de password)
         const [result] = await db.execute(
             'INSERT INTO users (email, password, name, role, active) VALUES (?, ?, ?, "user", 1)',
-            [email, password, name]
+            [email, hashedPassword, name]
         );
+
         res.status(201).json({ success: true, userId: result.insertId });
     } catch (error) {
+        console.error("🚨 Error en registro:", error.message);
         res.status(500).json({ error: "Error en el servidor de registro" });
     }
 });
@@ -71,7 +83,7 @@ router.post('/login', async (req, res) => {
         }
 
         // 3. Generamos el Token
-        const secret = process.env.JWT_SECRET || 'secretofutnex2026';
+        const secret = process.env.JWT_SECRET || 'frase-super-secreta-de-daniel-2026';
         const token = jwt.sign({ id: user.id, role: user.role }, secret, { expiresIn: '24h' });
 
         // 4. Enviamos la respuesta (Añadimos 'role' para que el Front redirija bien)
@@ -162,6 +174,26 @@ router.post('/update-photo', async (req, res) => {
     } catch (error) {
         console.error("Error SQL:", error);
         res.status(500).json({ success: false, message: "Error en base de datos" });
+    }
+});
+
+router.get('/user-profile', async (req, res) => {
+    const { email } = req.query;
+    try {
+        // Hacemos un JOIN para traer el logo del equipo de la tabla league_teams
+        const query = `
+            SELECT u.*, lt.logo_url as team_logo 
+            FROM users u
+            LEFT JOIN league_teams lt ON u.team_id = lt.id
+            WHERE u.email = ?
+        `;
+        const [users] = await db.execute(query, [email]);
+        
+        if (users.length === 0) return res.status(404).json({ message: "No encontrado" });
+        
+        res.json(users[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
