@@ -39,17 +39,14 @@ const PlayerHome = () => {
                 const savedEmail = localStorage.getItem('userEmail');
                 if (!savedEmail) { setLoading(false); return; }
                 
-                // 1. Cargar perfil (con el JOIN del equipo para el logo)
                 const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
                 const data = await res.json();
                 
-                // 👀 DEBUG: Mira en la consola del navegador si aquí llega el nombre "A"
                 console.log("Dato recibido del server:", data);
 
                 if (data) {
                     setUser(data);
                     
-                    // ✅ CORRECCIÓN: Sincronizar el formulario con los datos reales de la DB
                     setFormData({
                         name: data.name || '',
                         dni: data.dni || '',
@@ -58,7 +55,6 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
-                    // Flujo automático: Si no hay foto, mandamos a Selfie
                     if (!data.photo_url) {
                         setView('SELFIE');
                     }
@@ -98,7 +94,6 @@ const PlayerHome = () => {
             const canvas = canvasRef.current;
             const context = canvas.getContext('2d');
 
-            // ✅ CORRECCIÓN: Forzamos el canvas a tener la resolución real de la cámara para evitar estiramientos
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             
@@ -161,9 +156,24 @@ const PlayerHome = () => {
                 </div>
 
                 {!tempPhoto ? (
-                    <div className="text-center mt-8 space-y-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-lime-400 animate-pulse">Toca el cromo para tu foto oficial</p>
-                        <h2 className="text-3xl font-black uppercase italic tracking-tighter leading-none text-white/20">FICHA VORA</h2>
+                    <div className="flex flex-col w-full gap-4 mt-8">
+                        <div className="text-center space-y-2">
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-lime-400 animate-pulse">Toca el cromo para cambiar foto</p>
+                        </div>
+                        
+                        <button 
+                            onClick={() => setView('FORM')} 
+                            className="w-full bg-white/5 border border-white/10 text-white font-black py-4 rounded-2xl uppercase italic text-sm flex items-center justify-center gap-3 active:scale-95 transition-all"
+                        >
+                            <User size={18} className="text-lime-400"/> GESTIONAR DATOS
+                        </button>
+
+                        <button 
+                            onClick={() => setView('HOME')} 
+                            className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center"
+                        >
+                            Volver al inicio
+                        </button>
                     </div>
                 ) : (
                     <div className="fixed bottom-10 left-0 right-0 z-[100] px-6 flex flex-col gap-3">
