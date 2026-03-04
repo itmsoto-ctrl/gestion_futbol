@@ -79,9 +79,8 @@ router.get('/team-portal/:token', async (req, res) => {
     }
 });
 
-// 4. CREAR LIGA (Versión Adaptada a Estructura de Base de Datos)
+// 4. CREAR LIGA (Versión Diccionario Universal y Lectura Anidada)
 router.post('/create', verifyToken, async (req, res) => {
-    // 🛡️ 1. Valores por defecto para evitar undefined
     const name = req.body.name || 'Liga Sin Nombre';
     const teamsCount = req.body.teamsCount || 0;
     const duration = req.body.duration || 60;
@@ -91,7 +90,6 @@ router.post('/create', verifyToken, async (req, res) => {
     const teams = req.body.teams || [];
     const schedule = req.body.schedule || [];
     
-    // 🛡️ 2. Protección del ID de administrador
     const adminId = req.user?.id || req.user?.adminId || req.user?.userId || null; 
 
     const connection = await pool.getConnection();
@@ -101,7 +99,7 @@ router.post('/create', verifyToken, async (req, res) => {
         const inviteToken = crypto.randomBytes(5).toString('hex');
         const fieldsConfig = JSON.stringify(registrationConfig);
 
-        // 🛡️ 3. Insertar Liga (Asegurando que no hay undefined en el JSON)
+        // 1. Insertamos Liga
         const [leagueResult] = await connection.execute(
             `INSERT INTO leagues (admin_id, name, teams_count, match_minutes, start_date, playing_days, invite_token, player_fields_config) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -109,40 +107,46 @@ router.post('/create', verifyToken, async (req, res) => {
         );
         const leagueId = leagueResult.insertId;
 
+        // 2. Insertamos Equipos y creamos el DICCIONARIO UNIVERSAL 🛡️
         const teamIdMap = {}; 
 
-        for (const team of teams) {
+        for (let i = 0; i < teams.length; i++) {
+            const team = teams[i];
             const teamToken = crypto.randomBytes(3).toString('hex').toUpperCase(); 
-            const teamName = team.name ? team.name.trim() : 'Equipo Desconocido';
-            const teamPhone = team.phone || null; // Forzamos null explícito
+            const teamName = team.name ? team.name.trim() : `Equipo ${i+1}`;
             
             const [teamResult] = await connection.execute(
                 `INSERT INTO league_teams (league_id, name, team_token, captain_phone) VALUES (?, ?, ?, ?)`,
-                [leagueId, teamName, teamToken, teamPhone]
+                [leagueId, teamName, teamToken, team.phone || null]
             );
             
-            // Atrapamos el ID temporal ya venga como temp_id o como id
-            const mappedId = team.temp_id !== undefined ? team.temp_id : team.id;
-            teamIdMap[mappedId] = teamResult.insertId; 
+            const newTeamId = teamResult.insertId;
+            
+            // Guardamos todas las formas posibles en las que el frontend nos pueda llamar al equipo
+            teamIdMap[i] = newTeamId;                                        // Por índice (0, 1, 2...)
+            if (team.temp_id !== undefined) teamIdMap[team.temp_id] = newTeamId; // Por temp_id
+            if (team.id !== undefined) teamIdMap[team.id] = newTeamId;           // Por id normal
+            teamIdMap[teamName] = newTeamId;                                 // Por nombre ("Equipo 1", "Rayo", etc)
         }
 
-        // ⚽ 4. Insertar Calendario (Ajustado a date, time y venue_id)
+        // 3. Insertamos el Calendario leyendo correctamente de match.match
         if (schedule && schedule.length > 0) {
-            for (const match of schedule) {
-                // Traducción de IDs de los equipos
-                const homeTempId = typeof match.home === 'object' ? match.home?.id : match.home;
-                const awayTempId = typeof match.away === 'object' ? match.away?.id : match.away;
+            for (const item of schedule) {
+                // ¡CORRECCIÓN! Los equipos vienen anidados dentro de item.match
+                const matchData = item.match || {};
+                
+                // Extraemos las keys (0, 1... o los nombres)
+                const homeKey = typeof matchData.home === 'object' ? (matchData.home?.id ?? matchData.home?.name) : matchData.home;
+                const awayKey = typeof matchData.away === 'object' ? (matchData.away?.id ?? matchData.away?.name) : matchData.away;
 
-                // Si no encuentra el mapeo, forzamos null (?? null) en vez de undefined
-                const realHomeId = teamIdMap[homeTempId] ?? null; 
-                const realAwayId = teamIdMap[awayTempId] ?? null;
+                // Buscamos en el diccionario
+                const realHomeId = teamIdMap[homeKey] ?? null; 
+                const realAwayId = teamIdMap[awayKey] ?? null;
                 
-                // Adaptación exacta a tu tabla
-                const mDate = match.date || startDate;     // Ej: '2026-03-04'
-                const mTime = match.time || '00:00:00';    // Ej: '19:00:00'
-                
-                // Extraemos el ID de la sede o forzamos 1 para que no falle el NOT NULL
-                const vId = parseInt(match.venue_id || match.venueId || match.venue) || 1;
+                // ¡CORRECCIÓN! Leemos la fecha de item.dateStr, la hora de item.time
+                const mDate = item.dateStr || startDate;     
+                const mTime = item.time || '00:00:00';    
+                const vId = parseInt(item.venue_id) || 1;
 
                 await connection.execute(
                     `INSERT INTO league_matches (league_id, home_team_id, away_team_id, venue_id, match_date, match_time) 
