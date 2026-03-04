@@ -1,10 +1,10 @@
 import { useMemo, useCallback } from 'react';
 
 const SOUND_URLS = {
-  click: 'https://cdn.pixabay.com/audio/2022/03/15/audio_730248383f.mp3', // Click seco
-  swipe: 'https://cdn.pixabay.com/audio/2022/03/10/audio_c363943340.mp3', // Swoosh rápido
-  open: 'https://cdn.pixabay.com/audio/2022/03/15/audio_8233345842.mp3', // Apertura
-  score: 'https://cdn.pixabay.com/audio/2022/03/24/audio_1e3706c478.mp3' // Redoble/Puntos
+  click: 'https://cdn.pixabay.com/audio/2022/03/15/audio_730248383f.mp3', 
+  swipe: 'https://cdn.pixabay.com/audio/2022/03/10/audio_c363943340.mp3', 
+  open: 'https://cdn.pixabay.com/audio/2022/03/15/audio_8233345842.mp3',
+  score: 'https://cdn.pixabay.com/audio/2024/02/12/audio_f5f6b2e1b1.mp3' // Redoble electrónico
 };
 
 const useInteractionSounds = () => {
@@ -15,7 +15,7 @@ const useInteractionSounds = () => {
       score: new Audio(SOUND_URLS.score),
   }), []);
 
-  const playSound = useCallback((key, volume = 0.5) => {
+  const playSound = useCallback((key, volume = 0.4) => {
     const audio = audioElements[key];
     if (audio) {
       audio.currentTime = 0;
