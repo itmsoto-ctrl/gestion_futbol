@@ -4,7 +4,7 @@ import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2,
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
-import WelcomeTutorial from './WelcomeTutorial'; // 👈 Importamos el nuevo componente
+import WelcomeTutorial from '../WelcomeTutorial'; // 👈 Importamos el nuevo componente
 
 const PlayerHome = () => {
     const navigate = useNavigate();
