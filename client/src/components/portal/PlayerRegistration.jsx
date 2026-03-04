@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom'; // 👈 Añadimos useNavigate
 import { Mail, Loader2, CheckCircle } from 'lucide-react';
 import API_BASE_URL from '../../apiConfig';
 import LeagueDataForm from './LeagueDataForm'; 
 
 const PlayerRegistration = () => {
     const { token } = useParams();
+    const navigate = useNavigate(); // 👈 Inicializamos el navegador
     const [step, setStep] = useState(1); 
     const [loading, setLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false); 
     const [teamInfo, setTeamInfo] = useState(null);
     const [fieldsConfig, setFieldsConfig] = useState({});
     
-    // ESTADO NUEVO: "Congela" los campos que realmente faltan
     const [requiredFields, setRequiredFields] = useState({
         dorsal: false, dni: false, phone: false, age: false
     });
@@ -26,6 +26,17 @@ const PlayerRegistration = () => {
     const [age, setAge] = useState('');
 
     const logoUrl = "/logo-shine.webp";
+
+    // 🔄 EFECTO DE REDIRECCIÓN AUTOMÁTICA
+    // Si llegamos al paso 4 (Éxito), esperamos 2 segundos y vamos al Home
+    useEffect(() => {
+        if (step === 4) {
+            const timer = setTimeout(() => {
+                navigate('/player-home');
+            }, 2500);
+            return () => clearTimeout(timer);
+        }
+    }, [step, navigate]);
 
     useEffect(() => {
         const fetchTeam = async () => {
@@ -44,14 +55,12 @@ const PlayerRegistration = () => {
     const determineNextStep = (userData = null) => {
         if (step === 3) return; 
 
-        // Calculamos qué falta exactamente
         const needsDorsal = !!fieldsConfig.number;
         const needsDni = !!(fieldsConfig.dni && !(userData?.dni || dni));
         const needsPhone = !!(fieldsConfig.phone && !(userData?.phone || phone));
         const needsAge = !!(fieldsConfig.age && !(userData?.age || age));
 
         if (needsDorsal || needsDni || needsPhone || needsAge) {
-            // Guardamos en estado fijo lo que vamos a pedirle en el formulario
             setRequiredFields({
                 dorsal: needsDorsal,
                 dni: needsDni,
@@ -60,13 +69,15 @@ const PlayerRegistration = () => {
             });
             setStep(3);
         } else {
+            // 🚀 CAMBIO CLAVE: Si no falta nada, "Unión Silenciosa"
             handleJoinLeague(
                 email, 
                 userData?.name || name, 
                 userData?.dni || dni, 
                 null, 
                 userData?.phone || phone, 
-                userData?.age || age
+                userData?.age || age,
+                true // Enviamos un flag de 'silent'
             );
         }
     };
@@ -118,7 +129,7 @@ const PlayerRegistration = () => {
         }
     };
 
-    const handleJoinLeague = async (uEmail, uName, uDni, uDorsal, uPhone, uAge) => {
+    const handleJoinLeague = async (uEmail, uName, uDni, uDorsal, uPhone, uAge, isSilent = false) => {
         setLoading(true);
         try {
             const res = await fetch(`${API_BASE_URL}/api/leagues/register-player-full`, {
@@ -136,7 +147,15 @@ const PlayerRegistration = () => {
             });
             if (res.ok) {
                 localStorage.setItem('userEmail', uEmail);
-                setStep(4);
+                
+                // 🚀 LÓGICA DE DESTINO
+                if (isSilent) {
+                    // Si no tuvo que rellenar nada, al Home directo
+                    navigate('/player-home');
+                } else {
+                    // Si rellenó el paso 3, mostramos el éxito antes de ir al Home
+                    setStep(4);
+                }
             } else {
                 alert("Error al procesar la ficha del equipo");
             }
@@ -148,13 +167,13 @@ const PlayerRegistration = () => {
         <div className="min-h-screen bg-[#665C5A] flex flex-col items-center justify-center p-6 text-center text-white italic animate-in zoom-in">
             <CheckCircle size={80} className="text-lime-400 mb-6 drop-shadow-xl" />
             <h1 className="text-3xl font-black uppercase tracking-tighter leading-none italic">¡REGISTRO <br/> EXITOSO!</h1>
-            <p className="mt-4 opacity-70 uppercase text-xs font-bold tracking-widest">Ya estás dentro de {teamInfo?.teamName}</p>
+            <p className="mt-4 opacity-70 uppercase text-xs font-bold tracking-widest">Entrando en el vestuario de {teamInfo?.teamName}...</p>
         </div>
     );
 
     return (
         <div className="min-h-screen bg-[#665C5A] text-white p-6 flex flex-col items-center font-sans overflow-x-hidden">
-            
+            {/* El resto del render se mantiene igual */}
             {step < 3 ? (
                 <div className="mt-8 mb-6 relative logo-container-shine">
                     <div className="logo-shine-overlay" style={{ "--logo-url": `url(${logoUrl})` }} />
@@ -167,7 +186,6 @@ const PlayerRegistration = () => {
             )}
 
             <div className="w-full max-w-sm">
-                
                 {step === 1 && (
                     <form onSubmit={handleCheckEmail} className="space-y-6 animate-in fade-in">
                         <div className="text-center mb-6">
@@ -204,7 +222,7 @@ const PlayerRegistration = () => {
                         handleJoinLeague(email, name, dni, dorsal, phone, age); 
                     }}>
                         <LeagueDataForm 
-                            requiredFields={requiredFields} // Usamos el nuevo estado blindado
+                            requiredFields={requiredFields}
                             dorsal={dorsal} setDorsal={setDorsal}
                             dni={dni} setDni={setDni}
                             phone={phone} setPhone={setPhone}
