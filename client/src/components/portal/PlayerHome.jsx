@@ -290,7 +290,7 @@ const PlayerHome = () => {
                 <div onClick={onSlideChange} className="w-full flex justify-center">
                     <MatchSlider matches={matches} />
                 </div>
-                
+                <canvas ref={canvasRef} className="hidden" />
             </main>
         </div>
     );
