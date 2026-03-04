@@ -192,40 +192,82 @@ router.post('/complete-tutorial', async (req, res) => {
 });
 
 // Ruta: GET /api/auth/user-profile (ACTUALIZADA CON JOIN PARA ESCUDO Y TUTORIAL)
+// Ruta: GET /api/auth/user-profile
 router.get('/user-profile', async (req, res) => {
     const { email } = req.query;
+    
     try {
-        // 🔥 AÑADIDO: tutorial_seen y los JOINs para team_name, league_name y logo
-        const query = `
-            SELECT u.id, u.email, u.name, u.photo_url, u.dni, u.position, u.country_code, u.tutorial_seen,
-                   t.name AS team_name, t.logo AS team_logo, l.name AS league_name
-            FROM users u
-            LEFT JOIN league_teams t ON u.team_id = t.id
-            LEFT JOIN leagues l ON t.league_id = l.id
-            WHERE u.email = ?
+        // 1. Obtenemos los datos base del usuario
+        const [users] = await db.execute('SELECT * FROM users WHERE email = ?', [email]);
+        
+        if (users.length === 0) {
+            return res.status(404).json({ message: "Usuario no encontrado" });
+        }
+        
+        const userBase = users[0];
+
+        // 2. Obtenemos TODOS los equipos en los que juega usando league_players
+        const queryTeams = `
+            SELECT 
+                lp.team_id, 
+                t.name AS team_name, 
+                t.logo AS team_logo, /* 🚨 CORREGIDO: antes ponía logo_url y petaba */
+                l.name AS league_name
+            FROM league_players lp
+            JOIN league_teams t ON lp.team_id = t.id
+            JOIN leagues l ON t.league_id = l.id
+            WHERE lp.user_id = ?
         `;
-        const [rows] = await db.execute(query, [email]);
+        const [teams] = await db.execute(queryTeams, [userBase.id]);
 
-        if (rows.length === 0) return res.status(404).json({ message: "No existe" });
+        // 3. Montamos la respuesta (Si acaba de registrarse, teams.length será 0)
+        const activeTeam = teams.length > 0 ? teams[0] : {};
 
-        console.log("Datos enviados al cliente:", rows[0]); 
-        res.json(rows[0]);
+        const responseData = {
+            ...userBase,           
+            ...activeTeam,         
+            all_teams: teams       
+        };
+
+        res.json(responseData);
+
     } catch (error) {
+        // 🚨 SI FALLA, ESTO LO PINTARÁ EN LOS LOGS DE RAILWAY
+        console.error("🚨 Error en user-profile:", error);
         res.status(500).json({ error: error.message });
     }
 });
 
+// RUTA: POST /api/auth/update-player-full
 router.post('/update-player-full', async (req, res) => {
-    const { email, photo_url, name, position, country_code } = req.body;
+    // 1. Extraemos TODO lo que manda el PlayerHome.jsx
+    const { email, photo_url, name, dni, position, country_code } = req.body;
+    
     try {
+        // 2. Blindamos contra undefined usando || null
         const sql = `
             UPDATE users 
-            SET photo_url = ?, name = ?, position = ?, country_code = ? 
+            SET photo_url = ?, 
+                name = ?, 
+                dni = ?, 
+                position = ?, 
+                country_code = ? 
             WHERE email = ?
         `;
-        await db.execute(sql, [photo_url, name, position, country_code, email]);
+        
+        await db.execute(sql, [
+            photo_url || null, 
+            name || null, 
+            dni || null, 
+            position || 'DEL', 
+            country_code || 'es', 
+            email
+        ]);
+
         res.json({ success: true, message: "Ficha actualizada correctamente" });
     } catch (error) {
+        // 🚨 SI FALLA, MIRA EL LOG DE RAILWAY, AQUÍ ESTARÁ EL CULPABLE 🚨
+        console.error("🚨 Error crítico en update-player-full:", error.message);
         res.status(500).json({ error: error.message });
     }
 });
