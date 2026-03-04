@@ -149,10 +149,19 @@ router.post('/create', verifyToken, async (req, res) => {
                 const mTime = item.time || '00:00:00';    
                 const vId = parseInt(item.venue_id) || 1;
 
+                // Dentro del loop del schedule en POST /create
                 await connection.execute(
-                    `INSERT INTO league_matches (league_id, home_team_id, away_team_id, venue_id, match_date, match_time) 
-                     VALUES (?, ?, ?, ?, ?, ?)`,
-                    [leagueId, realHomeId, realAwayId, vId, mDate, mTime]
+                    `INSERT INTO league_matches (league_id, home_team_id, away_team_id, venue_id, pitch_name, match_date, match_time) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        leagueId, 
+                        realHomeId, 
+                        realAwayId, 
+                        vId, 
+                        item.pitch || item.field || null, // Captura el nombre del campo (ej. "Pista 1")
+                        mDate, 
+                        mTime
+                    ]
                 );
             }
         }
