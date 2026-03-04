@@ -205,37 +205,44 @@ const PlayerHome = () => {
         );
     }
 
-    return (
-        <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
-            <aside className="w-16 sm:w-20 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 z-50">
-                <button onClick={() => handleAction('click')} className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg"><Home size={24} /></button>
-                <button onClick={() => handleAction('click')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Calendar size={24} /></button>
-                <button onClick={() => handleAction('click')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Trophy size={24} /></button>
-                {showInstallBtn && (
-                    <button onClick={() => handleAction('click', handleInstallClick)} className="w-12 h-12 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse"><UploadCloud size={24} /></button>
-                )}
-                <button onClick={() => handleAction('open', () => setShowTutorial(true))} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={24} /></button>
-            </aside>
+    return ( 
+<div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}> 
+{/* SIDEBAR CON SOMBRA BLANCA DIFUMINADA */} 
+<aside className="w-16 sm:w-20 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 sm:space-y-8 z-50"> 
+<button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-[0_0_15px_rgba(255,255,255,0.15)]"><Home size={24} /></button> 
+<button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Calendar size={24} /></button> 
+<button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Trophy size={24} /></button> 
+{showInstallBtn ? ( 
+<button onClick={() => { playClick(); handleInstallClick(); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse"> 
+<UploadCloud size={24} /> 
+</button> 
+) : ( 
+<button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><BarChart2 size={24} /></button> 
+)} 
+<button onClick={() => { playClick(); setShowTutorial(true); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Settings size={24} /></button> 
+</aside> 
 
-            <main className="flex-1 flex flex-col items-center justify-start relative px-4 sm:px-6 overflow-y-auto pt-6 sm:pt-10 pb-6"> 
-            {/* CROMO JUNTADO AL SLIDER */} 
-            <div 
-            onClick={() => { playClick(); setView('SELFIE'); }} 
-            className="cursor-pointer transform scale-[0.6] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-110px] sm:mt-[-90px]" 
-            > 
-            <FutCard player={user} size="large" /> 
-            <div className="absolute -bottom-10 left-0 w-full text-center"> 
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 animate-pulse">Toca para editar tu ficha</p> 
-            </div> 
-            </div> 
+{showTutorial && <WelcomeTutorial user={user} onFinish={() => { playClick(); setShowTutorial(false); }} />} 
 
-            {/* SLIDER DE PARTIDOS CON EVENTO DE SONIDO */} 
-            <div onClick={onSlideChange} className="w-full flex justify-center"> 
-            <MatchSlider matches={matches} /> 
-            </div> 
-            </main> 
-        </div>
-    );
-};
+<main className="flex-1 flex flex-col items-center justify-start relative px-4 sm:px-6 overflow-y-auto pt-6 sm:pt-10 pb-6"> 
+{/* CROMO JUNTADO AL SLIDER */} 
+<div 
+onClick={() => { playClick(); setView('SELFIE'); }} 
+className="cursor-pointer transform scale-[0.6] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-110px] sm:mt-[-90px]" 
+> 
+<FutCard player={user} size="large" /> 
+<div className="absolute -bottom-10 left-0 w-full text-center"> 
+<p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 animate-pulse">Toca para editar tu ficha</p> 
+</div> 
+</div> 
+
+{/* SLIDER DE PARTIDOS CON EVENTO DE SONIDO */} 
+<div onClick={onSlideChange} className="w-full flex justify-center"> 
+<MatchSlider matches={matches} /> 
+</div> 
+</main> 
+</div> 
+); 
+}; 
 
 export default PlayerHome;
