@@ -74,34 +74,59 @@ const PlayerHome = () => {
         setUploading(true);
     
         try {
-            // 1️⃣ Subida a Cloudinary
+            console.log("Iniciando subida a Cloudinary...");
+            
+            // 1️⃣ SUBIDA A CLOUDINARY
             const formData = new FormData();
             formData.append('file', tempPhoto);
-            formData.append('upload_preset', 'vora_players');
+            // ⚠️ IMPORTANTE: Asegúrate de que este es el nombre exacto en tu Cloudinary
+            formData.append('upload_preset', 'vora_players'); 
     
             const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', {
                 method: 'POST',
                 body: formData
             });
-            const cloudData = await cloudRes.json();
-            if (!cloudData.secure_url) throw new Error("Error en Cloudinary");
     
-            // 2️⃣ Guardar URL en Base de Datos
+            const cloudData = await cloudRes.json();
+            
+            if (!cloudData.secure_url) {
+                console.error("Error Cloudinary:", cloudData);
+                throw new Error(`Cloudinary dice: ${cloudData.error?.message || 'Error desconocido'}`);
+            }
+    
+            console.log("Imagen subida con éxito:", cloudData.secure_url);
+    
+            // 2️⃣ ACTUALIZAR BASE DE DATOS
+            const savedEmail = localStorage.getItem('userEmail');
+            const token = localStorage.getItem('token'); // Recuperamos el token por si acaso
+    
             const response = await fetch(`${API_BASE_URL}/api/auth/update-photo`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    // Añadimos el token por si tu servidor lo requiere
+                    'Authorization': token ? `Bearer ${token}` : '' 
+                },
                 body: JSON.stringify({
-                    email: user.email,
+                    email: savedEmail,
                     photo_url: cloudData.secure_url
                 })
             });
     
+            const dbData = await response.json();
+    
             if (response.ok) {
+                console.log("Base de datos actualizada");
                 setUser(prev => ({ ...prev, photo_url: cloudData.secure_url }));
                 setTempPhoto(null);
+                alert("¡Cromo guardado con éxito! 🚀");
+            } else {
+                throw new Error(`Servidor dice: ${dbData.message || 'Error al guardar en DB'}`);
             }
+    
         } catch (err) {
-            alert("Error al guardar la foto profesional.");
+            console.error("ERROR DETECTADO:", err);
+            alert(`🚨 Error: ${err.message}`);
         } finally {
             setUploading(false);
         }
