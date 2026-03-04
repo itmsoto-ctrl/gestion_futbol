@@ -196,15 +196,16 @@ router.get('/user-profile', async (req, res) => {
     const { email } = req.query;
     try {
         const query = `
-            SELECT u.id, u.email, u.name, u.photo_url, u.dni, u.position, u.country_code, u.tutorial_seen,
-                   t.name AS team_name, l.name AS league_name
-            FROM users u
-            LEFT JOIN league_teams t ON u.team_id = t.id
-            LEFT JOIN leagues l ON t.league_id = l.id
-            WHERE u.email = ?
+            SELECT id, email, name, photo_url, dni, position, country_code 
+            FROM users 
+            WHERE email = ?
         `;
         const [rows] = await db.execute(query, [email]);
+
         if (rows.length === 0) return res.status(404).json({ message: "No existe" });
+
+        // IMPORTANTE: Devolvemos rows[0] para que sea un objeto {name: 'A', ...}
+        console.log("Datos enviados al cliente:", rows[0]); 
         res.json(rows[0]);
     } catch (error) {
         res.status(500).json({ error: error.message });
