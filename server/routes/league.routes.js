@@ -1,3 +1,5 @@
+// routes/league_routes.js
+
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
@@ -77,7 +79,7 @@ router.get('/team-portal/:token', async (req, res) => {
     }
 });
 
-// 4. CREAR LIGA (Versión Blindada)
+// 4. CREAR LIGA (Versión Adaptada a Estructura de Base de Datos)
 router.post('/create', verifyToken, async (req, res) => {
     // 🛡️ 1. Valores por defecto para evitar undefined
     const name = req.body.name || 'Liga Sin Nombre';
@@ -124,9 +126,10 @@ router.post('/create', verifyToken, async (req, res) => {
             teamIdMap[mappedId] = teamResult.insertId; 
         }
 
+        // ⚽ 4. Insertar Calendario (Ajustado a date, time y venue_id)
         if (schedule && schedule.length > 0) {
             for (const match of schedule) {
-                // 🛡️ 4. Protección al leer el calendario (por si home/away son objetos o enteros)
+                // Traducción de IDs de los equipos
                 const homeTempId = typeof match.home === 'object' ? match.home?.id : match.home;
                 const awayTempId = typeof match.away === 'object' ? match.away?.id : match.away;
 
@@ -134,13 +137,17 @@ router.post('/create', verifyToken, async (req, res) => {
                 const realHomeId = teamIdMap[homeTempId] ?? null; 
                 const realAwayId = teamIdMap[awayTempId] ?? null;
                 
-                const matchDate = match.date || startDate;
-                const matchVenue = match.venue || 'Por definir';
+                // Adaptación exacta a tu tabla
+                const mDate = match.date || startDate;     // Ej: '2026-03-04'
+                const mTime = match.time || '00:00:00';    // Ej: '19:00:00'
+                
+                // Extraemos el ID de la sede o forzamos 1 para que no falle el NOT NULL
+                const vId = parseInt(match.venue_id || match.venueId || match.venue) || 1;
 
                 await connection.execute(
-                    `INSERT INTO league_matches (league_id, home_team_id, away_team_id, match_date, venue_name) 
-                     VALUES (?, ?, ?, ?, ?)`,
-                    [leagueId, realHomeId, realAwayId, matchDate, matchVenue]
+                    `INSERT INTO league_matches (league_id, home_team_id, away_team_id, venue_id, match_date, match_time) 
+                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    [leagueId, realHomeId, realAwayId, vId, mDate, mTime]
                 );
             }
         }
