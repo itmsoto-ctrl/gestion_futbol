@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { verifyToken } = require('../middleware/auth.middleware');
 
+
 // ==========================================
 // 1. AUTENTICACIÓN Y REGISTRO
 // ==========================================
@@ -130,6 +131,31 @@ router.post('/update-profile', verifyToken, async (req, res) => {
         res.json({ message: "Perfil actualizado" });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// NUEVA RUTA: Guardar la foto del selfie
+router.post('/update-photo', async (req, res) => {
+    const { email, photo_url } = req.body;
+
+    if (!email || !photo_url) {
+        return res.status(400).json({ message: "Faltan datos" });
+    }
+
+    try {
+        const [result] = await db.execute(
+            'UPDATE users SET photo_url = ? WHERE email = ?',
+            [photo_url, email]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Usuario no encontrado" });
+        }
+
+        res.json({ success: true, message: "Foto actualizada correctamente" });
+    } catch (error) {
+        console.error("Error al guardar la foto:", error);
+        res.status(500).json({ message: "Error interno del servidor" });
     }
 });
 

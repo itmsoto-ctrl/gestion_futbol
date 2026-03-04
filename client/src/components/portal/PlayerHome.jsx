@@ -59,9 +59,33 @@ const PlayerHome = () => {
         }
     };
 
-    const handleAccept = () => {
-        setUser(prev => ({ ...prev, photo_url: tempPhoto }));
-        setTempPhoto(null);
+    const handleAccept = async () => {
+        try {
+            const savedEmail = localStorage.getItem('userEmail');
+            
+            // Enviamos la foto al servidor
+            const response = await fetch(`${API_BASE_URL}/api/auth/update-photo`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: savedEmail,
+                    photo_url: tempPhoto // El base64 de la captura
+                })
+            });
+    
+            const data = await response.json();
+    
+            if (data.success) {
+                setUser(prev => ({ ...prev, photo_url: tempPhoto }));
+                setTempPhoto(null);
+                alert("¡Cromo guardado en tu perfil! 🔥");
+            } else {
+                alert("Error al guardar: " + data.message);
+            }
+        } catch (err) {
+            console.error("Error en la petición:", err);
+            alert("No se pudo conectar con el servidor.");
+        }
     };
 
     if (loading) return <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center text-lime-400 font-black italic">Preparando terreno...</div>;
