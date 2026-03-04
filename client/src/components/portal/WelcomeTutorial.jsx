@@ -110,6 +110,6 @@ const WelcomeTutorial = ({ user, onFinish }) => {
             </div>
         </div>
     );
-};
+    
 
 export default WelcomeTutorial;
