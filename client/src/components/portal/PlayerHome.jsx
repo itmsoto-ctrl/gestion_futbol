@@ -1,56 +1,178 @@
-import React, { useState, useEffect } from 'react';
-import { Home, Calendar, Trophy, BarChart2, Settings, UploadCloud } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2, UploadCloud, User } from 'lucide-react';
+import { motion } from 'framer-motion';
+import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
+import { usePWAInstall } from '../../hooks/usePWAInstall';
+import WelcomeTutorial from './WelcomeTutorial';
 import MatchSlider from '../player/MatchSlider';
 import useInteractionSounds from '../../hooks/useInteractionSounds';
 
 const PlayerHome = () => {
+    // 🔊 Hooks de sonido y navegación
     const { playClick, playSwipe, playOpen } = useInteractionSounds();
-    const [user, setUser] = useState(null); // ... lógica de fetch aquí ...
+    const navigate = useNavigate();
+    const { showInstallBtn, handleInstallClick } = usePWAInstall();
+    
+    // 📊 Estados de la App
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [view, setView] = useState('HOME'); // ✅ Aquí estaba el error, ahora está definido
+    const [showTutorial, setShowTutorial] = useState(false);
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [tempPhoto, setTempPhoto] = useState(null);
+    const [uploading, setUploading] = useState(false);
+    const [formData, setFormData] = useState({ name: '', dni: '', dorsal: '', position: 'DEL', country_code: 'es' });
+    const [matches, setMatches] = useState([]);
+    
+    const videoRef = useRef(null);
+    const canvasRef = useRef(null);
+    const streamRef = useRef(null);
 
-    // 🔊 ACTIVADOR DE AUDIO Y VIBRACIÓN
+    // 📳 Función maestra para Sonido + Vibración + Acción
     const handleAction = (type, fn) => {
-        // Vibración háptica (20ms)
         if (window.navigator.vibrate) window.navigator.vibrate(20);
-        
-        // Sonidos
         if (type === 'click') playClick();
         if (type === 'swipe') playSwipe();
         if (type === 'open') playOpen();
-        
         if (fn) fn();
     };
 
+    useEffect(() => {
+        const fetchUserData = async () => {
+            try {
+                const savedEmail = localStorage.getItem('userEmail');
+                if (!savedEmail) { setLoading(false); return; }
+                const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
+                const data = await res.json();
+                if (data) {
+                    const statsBase = data.stats ? (typeof data.stats === 'string' ? JSON.parse(data.stats) : data.stats) : { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 };
+                    setUser({ ...data, stats: statsBase });
+                    setFormData({ name: data.name || '', dni: data.dni || '', dorsal: data.dorsal || '', position: data.position || 'DEL', country_code: data.country_code || 'es' });
+                    
+                    if (data.tutorial_seen === 0) { setShowTutorial(true); setView('SELFIE'); }
+                    else if (!data.photo_url) { setView('SELFIE'); }
+                    else { setView('HOME'); }
+
+                    if (data.team_id) {
+                        const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`);
+                        const mData = await mRes.json();
+                        setMatches(mData);
+                    }
+                }
+            } catch (err) { console.error(err); } finally { setLoading(false); }
+        };
+        fetchUserData();
+        return () => stopCamera();
+    }, []);
+
+    const stopCamera = () => {
+        if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+        setIsCameraOpen(false);
+    };
+
+    const handleFinalUpdate = async () => {
+        setUploading(true);
+        handleAction('open');
+        try {
+            let finalPhotoUrl = user.photo_url;
+            if (tempPhoto) {
+                const cloudFormData = new FormData();
+                cloudFormData.append('file', tempPhoto);
+                cloudFormData.append('upload_preset', 'vora_players'); 
+                const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', { method: 'POST', body: cloudFormData });
+                const cloudData = await cloudRes.json();
+                finalPhotoUrl = cloudData.secure_url;
+            }
+            const response = await fetch(`${API_BASE_URL}/api/auth/update-player-full`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email, photo_url: finalPhotoUrl, ...formData, stats: user.stats })
+            });
+            if (response.ok) { 
+                setUser(prev => ({ ...prev, photo_url: finalPhotoUrl, ...formData })); 
+                setTempPhoto(null);
+                setView('HOME'); 
+            }
+        } catch (err) { alert(err.message); } finally { setUploading(false); }
+    };
+
+    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-amber-400 font-black italic tracking-widest uppercase">Accediendo...</div>;
+
+    // --- VISTA A: SELFIE / CÁMARA ---
+    if (view === 'SELFIE') {
+        return (
+            <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-10 px-6 relative overflow-hidden">
+                <div onClick={() => handleAction('click')} className="cursor-pointer active:scale-95 transition-transform drop-shadow-2xl transform scale-90">
+                    <FutCard player={{ ...user, name: formData.name || 'JUGADOR', photo_url: tempPhoto || user?.photo_url }} />
+                </div>
+                <div className="flex flex-col w-full gap-4 mt-8">
+                    <button onClick={() => handleAction('click', () => setView('FORM'))} className="w-full bg-white/5 border border-white/10 text-white font-black py-4 rounded-2xl uppercase italic flex items-center justify-center gap-3">
+                        <User size={18} className="text-amber-400"/> GESTIONAR DATOS
+                    </button>
+                    <button onClick={() => handleAction('click', () => setView('HOME'))} className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Omitir por ahora</button>
+                </div>
+            </div>
+        );
+    }
+
+    // --- VISTA B: FORMULARIO ---
+    if (view === 'FORM') {
+        return (
+            <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-8 px-6 pb-6">
+                <div className="w-full max-w-md space-y-6">
+                    <h2 className="text-2xl font-black uppercase italic text-amber-400 text-center">Ficha Técnica</h2>
+                    <input type="text" placeholder="NOMBRE" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-4 px-4 font-bold uppercase outline-none focus:border-amber-400" />
+                    <button onClick={handleFinalUpdate} disabled={uploading} className="w-full bg-amber-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl active:scale-95 transition-all">
+                        {uploading ? <Loader2 className="animate-spin m-auto" /> : "CONFIRMAR FICHA"}
+                    </button>
+                    <button onClick={() => handleAction('click', () => setView('SELFIE'))} className="w-full py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center text-center">Volver</button>
+                </div>
+            </div>
+        );
+    }
+
+    // --- VISTA C: HOME (CON BALANCEO 3D) ---
     return (
-        <div className="min-h-screen bg-cover bg-center flex overflow-hidden" 
-             style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
+        <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
             
             {/* SIDEBAR CON SOMBRA BLANCA DIFUMINADA */}
-            <aside className="w-16 sm:w-20 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 space-y-6 z-50">
+            <aside className="w-16 sm:w-20 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 z-50">
                 <button onClick={() => handleAction('click')} className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-[0_0_15px_rgba(255,255,255,0.15)]"><Home size={24} /></button>
                 <button onClick={() => handleAction('click')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Calendar size={24} /></button>
                 <button onClick={() => handleAction('click')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Trophy size={24} /></button>
-                <button onClick={() => handleAction('open')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={24} /></button>
+                
+                {showInstallBtn && (
+                    <button onClick={() => handleAction('click', handleInstallClick)} className="w-12 h-12 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse">
+                        <UploadCloud size={24} />
+                    </button>
+                )}
+                
+                <button onClick={() => handleAction('open', () => setShowTutorial(true))} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Settings size={24} /></button>
             </aside>
 
-            <main className="flex-1 flex flex-col items-center justify-start relative px-4 pt-6 pb-6 overflow-y-auto">
+            {showTutorial && <WelcomeTutorial user={user} onFinish={() => handleAction('click', () => setShowTutorial(false))} />}
+
+            <main className="flex-1 flex flex-col items-center justify-start relative px-4 overflow-y-auto pt-6 pb-6">
                 
-                {/* 🃏 CROMO: Escala ajustada y Balanceo Axial */}
-                <div 
+                {/* 🃏 CROMO CON BALANCEO AXIAL (Giro Y) */}
+                <motion.div 
                     onClick={() => handleAction('open', () => setView('SELFIE'))} 
-                    className="cursor-pointer transform scale-[0.68] sm:scale-80 transition-all drop-shadow-[0_30px_45px_rgba(0,0,0,0.8)] mt-[-75px]"
+                    className="cursor-pointer transform scale-[0.68] sm:scale-80 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-85px]"
                 >
                     <FutCard player={user} />
                     <div className="absolute -bottom-10 left-0 w-full text-center">
                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 animate-pulse italic">Toca para gestionar ficha</p>
                     </div>
-                </div>
+                </motion.div>
 
-                {/* ⚽ SLIDER: Con sonido al deslizar */}
+                {/* ⚽ SLIDER DE PARTIDOS */}
                 <div onTouchStart={() => handleAction('swipe')} className="w-full flex justify-center mt-4">
-                    <MatchSlider matches={[]} />
+                    <MatchSlider matches={matches} />
                 </div>
                 
+                <canvas ref={canvasRef} className="hidden" />
             </main>
         </div>
     );
