@@ -6,9 +6,25 @@ import FutCard from '../FutCard';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import WelcomeTutorial from './WelcomeTutorial';
 import MatchSlider from '../player/MatchSlider';
+import useInteractionSounds from '../../hooks/useInteractionSounds';
 
 
 const PlayerHome = () => {
+    const { playClick, playSwipe } = useInteractionSounds();
+
+    // 🔊 Función para manejar el slide con sonido y vibración
+    const onSlideChange = () => {
+        playSwipe(); // Sonido swoosh
+        if (window.navigator.vibrate) window.navigator.vibrate(15); // Vibración hática sutil
+    };
+
+    // 🔊 Al confirmar la ficha
+    const handleConfirm = () => {
+        playClick();
+        if (window.navigator.vibrate) window.navigator.vibrate([30, 50, 30]); // Vibración doble de éxito
+        handleFinalUpdate();
+    };
+
     const navigate = useNavigate();
     const { showInstallBtn, handleInstallClick } = usePWAInstall();
     
