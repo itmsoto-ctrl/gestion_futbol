@@ -105,7 +105,7 @@ const PlayerHome = () => {
     if (view === 'SELFIE') {
         return (
             <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-10 px-6 relative overflow-hidden">
-                <div onClick={() => handleAction('click')} className="cursor-pointer active:scale-95 transition-transform drop-shadow-2xl transform scale-[0.85]">
+                <div onClick={() => handleAction('click')} className="cursor-pointer active:scale-95 transition-transform drop-shadow-2xl transform scale-[0.80]">
                     <FutCard player={{ ...user, name: formData.name || 'JUGADOR', photo_url: tempPhoto || user?.photo_url }} />
                 </div>
                 <div className="flex flex-col w-full gap-4 mt-8">
@@ -144,6 +144,7 @@ const PlayerHome = () => {
                                 <option value="es">ESPAÑA 🇪🇸</option>
                                 <option value="ar">ARGENTINA 🇦🇷</option>
                                 <option value="br">BRASIL 🇧🇷</option>
+                                <option value="fr">FRANCIA 🇫🇷</option>
                                 <option value="pt">PORTUGAL 🇵🇹</option>
                             </select>
                         </div>
@@ -160,7 +161,7 @@ const PlayerHome = () => {
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
             <aside className="w-16 sm:w-20 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 z-50">
-                <button onClick={() => handleAction('click')} className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-[0_0_15px_rgba(255,255,255,0.15)]"><Home size={24} /></button>
+                <button onClick={() => handleAction('click')} className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg">🏠</button>
                 <button onClick={() => handleAction('click')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 transition-all"><Calendar size={24} /></button>
                 <button onClick={() => handleAction('click')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 transition-all"><Trophy size={24} /></button>
                 {showInstallBtn && (
@@ -169,22 +170,26 @@ const PlayerHome = () => {
                 <button onClick={() => handleAction('open', () => setShowTutorial(true))} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto transition-all"><Settings size={24} /></button>
             </aside>
 
-            <main className="flex-1 flex flex-col items-center justify-start relative px-4 overflow-y-auto pt-6 pb-6">
-                <motion.div 
-                    onClick={() => handleAction('open', () => setView('SELFIE'))} 
-                    animate={{ rotateY: [-10, 10, -10], rotateX: [2, -2, 2] }}
-                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-                    style={{ transformStyle: "preserve-3d" }}
-                    // ✅ ESCALA FIJADA EN 0.5 Y MARGEN AJUSTADO PARA PROPORCIÓN
-                    className="cursor-pointer transform scale-[0.5] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_45px_50px_rgba(0,0,0,0.8)] mt-[-120px]"
-                >
-                    <FutCard player={user} />
-                    <div className="absolute -bottom-10 left-0 w-full text-center">
-                        <p className="text-[12px] font-black uppercase tracking-[0.4em] text-white/30 animate-pulse italic">Panel VORA</p>
-                    </div>
-                </motion.div>
+            {showTutorial && <WelcomeTutorial user={user} onFinish={() => handleAction('click', () => setShowTutorial(false))} />}
 
-                <div onTouchStart={() => handleAction('swipe')} className="w-full flex justify-center mt-6">
+            <main className="flex-1 flex flex-col items-center justify-start relative px-4 overflow-y-auto pt-4 pb-6">
+                {/* 🃏 ESCALA FIJADA EN 0.48 PARA PROPORCIÓN PERFECTA */}
+                <div className="h-[280px] w-full flex items-center justify-center mt-[-80px]">
+                    <motion.div 
+                        onClick={() => handleAction('open', () => setView('SELFIE'))} 
+                        animate={{ rotateY: [-8, 8, -8], rotateX: [2, -2, 2] }}
+                        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+                        style={{ transformStyle: "preserve-3d" }}
+                        className="cursor-pointer transform scale-[0.48] active:scale-95 transition-all drop-shadow-[0_45px_50px_rgba(0,0,0,0.8)]"
+                    >
+                        <FutCard player={user} />
+                        <div className="absolute -bottom-10 left-0 w-full text-center">
+                            <p className="text-[12px] font-black uppercase tracking-[0.4em] text-white/30 animate-pulse italic">Panel VORA</p>
+                        </div>
+                    </motion.div>
+                </div>
+
+                <div onTouchStart={() => handleAction('swipe')} className="w-full flex justify-center mt-2">
                     <MatchSlider matches={matches} />
                 </div>
             </main>

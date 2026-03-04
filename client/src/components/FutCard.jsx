@@ -3,29 +3,30 @@ import { motion, animate } from 'framer-motion';
 import useInteractionSounds from '../hooks/useInteractionSounds';
 
 const RatingCounter = memo(({ targetValue, onComplete }) => {
-  // 🛡️ Inicialización inteligente: si ya animó, empieza directamente en el valor final
+  // 🛡️ Inicializamos con el valor final si ya se completó la animación en esta sesión
   const [displayValue, setDisplayValue] = useState(() => {
-    return sessionStorage.getItem('vora_rating_done') === 'true' ? targetValue : 0;
+    const isDone = sessionStorage.getItem('vora_rating_done');
+    return isDone === 'true' ? targetValue : 0;
   });
   
   const { playScore } = useInteractionSounds();
-  const animatedRef = useRef(false);
+  const hasStarted = useRef(false);
 
   useEffect(() => {
     const isDone = sessionStorage.getItem('vora_rating_done');
     
-    // Si ya se hizo o el valor no es válido, no hacemos nada
-    if (isDone === 'true' || targetValue === 0 || animatedRef.current) {
-      setDisplayValue(targetValue);
-      if (onComplete) onComplete();
+    // Si ya terminó, si el valor es 0 (carga inicial) o si ya arrancó la animación, no hacemos nada
+    if (isDone === 'true' || targetValue === 0 || hasStarted.current) {
+      if (isDone === 'true' || targetValue > 0) setDisplayValue(targetValue);
+      if (onComplete && (isDone === 'true' || targetValue > 0)) onComplete();
       return;
     }
 
-    animatedRef.current = true;
+    hasStarted.current = true;
     playScore(0.3); 
 
     const controls = animate(0, targetValue, {
-      duration: 2,
+      duration: 1.5, // Un pelín más rápido para asegurar que termine antes de que el usuario navegue
       ease: [0.33, 1, 0.68, 1],
       onUpdate: (v) => setDisplayValue(Math.floor(v)),
       onComplete: () => {
@@ -33,6 +34,7 @@ const RatingCounter = memo(({ targetValue, onComplete }) => {
         if (onComplete) onComplete();
       }
     });
+    
     return () => controls.stop();
   }, [targetValue, onComplete, playScore]);
 
@@ -56,14 +58,14 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
     <div className="relative select-none" style={{ width: '350px', height: '504px', perspective: "2000px" }}>
       <motion.div
         animate={{ 
-          rotateY: isFlipped ? 180 : [-7, 7, -7], 
+          rotateY: isFlipped ? 180 : [-6, 6, -6], 
           rotateX: [2, -2, 2],
           y: [0, -5, 0] 
         }}
         transition={{ 
-          rotateY: isFlipped ? { duration: 0.8 } : { duration: 8, repeat: Infinity, ease: "easeInOut" },
-          rotateX: { duration: 6, repeat: Infinity, ease: "easeInOut" },
-          y: { duration: 4, repeat: Infinity, ease: "easeInOut" }
+          rotateY: isFlipped ? { duration: 0.8 } : { duration: 10, repeat: Infinity, ease: "easeInOut" },
+          rotateX: { duration: 8, repeat: Infinity, ease: "easeInOut" },
+          y: { duration: 5, repeat: Infinity, ease: "easeInOut" }
         }}
         style={{ width: '100%', height: '100%', transformStyle: "preserve-3d" }}
         onClick={onFlip}
@@ -84,7 +86,7 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
 
           <div className="absolute top-[60px] left-[45px] z-20 flex flex-col items-center text-[#3a2d0f] font-bold font-oswald text-center">
             <motion.div 
-              animate={isRatingDone ? { scale: [1, 1.2, 1], filter: ["brightness(1)", "brightness(2.2)", "brightness(1)"] } : {}}
+              animate={isRatingDone ? { scale: [1, 1.15, 1], filter: ["brightness(1)", "brightness(2)", "brightness(1)"] } : {}}
               className="text-[85px] leading-[0.7] font-black tracking-tighter"
             >
               <RatingCounter targetValue={rating} onComplete={() => setIsRatingDone(true)} />
