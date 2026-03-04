@@ -6,6 +6,7 @@ const pool = require('../config/db');
 const { verifyToken } = require('../middleware/auth.middleware');
 const crypto = require('crypto');
 
+
 // 1. OBTENER LIGAS DEL ADMIN
 router.get('/my-leagues', verifyToken, async (req, res) => {
     try {
@@ -270,6 +271,30 @@ router.delete('/nuke-database', verifyToken, async (req, res) => {
         res.status(500).json({ error: error.message });
     } finally {
         connection.release();
+    }
+});
+
+//⚽ RUTA PARA EL CALENDARIO DEL EQUIPO
+router.get('/my-calendar/:teamId', async (req, res) => {
+    const { teamId } = req.params;
+    try {
+        // Usamos league_matches como indicaste y league_teams para los logos
+        const [rows] = await pool.execute(
+            `SELECT m.*, 
+            t1.name as home_team, t1.logo as home_logo, 
+            t2.name as away_team, t2.logo as away_logo 
+            FROM league_matches m
+            JOIN league_teams t1 ON m.home_team_id = t1.id
+            JOIN league_teams t2 ON m.away_team_id = t2.id
+            WHERE m.home_team_id = ? OR m.away_team_id = ?
+            ORDER BY m.match_date ASC`, 
+            [teamId, teamId]
+        );
+        
+        res.json(rows);
+    } catch (err) {
+        console.error("Error en my-calendar:", err);
+        res.status(500).json({ error: "Error al obtener el calendario" });
     }
 });
 
