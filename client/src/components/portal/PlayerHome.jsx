@@ -2,8 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Camera, X, RefreshCw, Check, ShieldCheck } from 'lucide-react';
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
+import { usePWAInstall } from '../../hooks/usePWAInstall';
+
 
 const PlayerHome = () => {
+    const { showInstallBtn, handleInstallClick } = usePWAInstall(); // ¡Y listo!
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -109,7 +112,7 @@ const PlayerHome = () => {
 
     return (
         <div className="min-h-screen bg-[#665C5A] text-white flex flex-col items-center pt-10 relative overflow-hidden">
-            <div className="fixed top-0 left-0 z-[9999] bg-red-600 text-white text-[10px] px-2 py-1 font-mono">V-LAYOUT-FINAL-10</div>
+            
 
             <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform">
                 <FutCard 

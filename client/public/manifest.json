@@ -1,20 +1,22 @@
 {
-  "short_name": "FutbolApp",
-  "name": "Gestión de Fútbol - Daniel",
+  "short_name": "VORA",
+  "name": "VORA Football League",
   "icons": [
     {
-      "src": "logo192.png",
-      "type": "image/png",
-      "sizes": "192x192"
+      "src": "logo-shine.webp",
+      "sizes": "192x192",
+      "type": "image/webp",
+      "purpose": "any maskable"
     },
     {
-      "src": "logo512.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "src": "logo-shine.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#a3e635",
+  "background_color": "#09090b"
 }
