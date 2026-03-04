@@ -5,7 +5,7 @@ import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import WelcomeTutorial from './WelcomeTutorial';
-import MatchSlider from '../player/MatchSlider';
+import MatchSlider from '../player/MatchSlider'; // Asumimos que están en la misma carpeta
 
 const PlayerHome = () => {
     const navigate = useNavigate();
@@ -124,8 +124,7 @@ const PlayerHome = () => {
                 cloudFormData.append('file', tempPhoto);
                 cloudFormData.append('upload_preset', 'vora_players'); 
                 const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', {
-                    method: 'POST',
-                    body: cloudFormData
+                    method: 'POST', body: cloudFormData
                 });
                 const cloudData = await cloudRes.json();
                 finalPhotoUrl = cloudData.secure_url;
@@ -138,7 +137,7 @@ const PlayerHome = () => {
                     email: user.email,
                     photo_url: finalPhotoUrl,
                     ...formData,
-                    stats: user.stats // ✅ CORREGIDO: Enviamos los stats para no perderlos
+                    stats: user.stats // ✅ Stats guardados en el búnker
                 })
             });
 
@@ -150,9 +149,8 @@ const PlayerHome = () => {
         } catch (err) { alert(`🚨 Error: ${err.message}`); } finally { setUploading(false); }
     };
 
-    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic tracking-widest">PREPARANDO VESTUARIO...</div>;
+    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic tracking-widest uppercase">Accediendo al vestuario...</div>;
 
-    // --- VISTA A: SELFIE ---
     if (view === 'SELFIE') {
         return (
             <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-10 px-6 relative overflow-hidden">
@@ -173,7 +171,6 @@ const PlayerHome = () => {
                         <button onClick={startCamera} className="w-full bg-white/5 backdrop-blur-md text-white/40 font-black py-4 rounded-2xl uppercase italic text-[10px] tracking-widest">REPETIR FOTO</button>
                     </div>
                 )}
-                {/* ... (Cámara igual) ... */}
                 {isCameraOpen && (
                     <div className="fixed inset-0 z-[120] bg-black flex flex-col">
                         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
@@ -192,11 +189,10 @@ const PlayerHome = () => {
         );
     }
 
-    // --- VISTA B: FORMULARIO ---
     if (view === 'FORM') {
         return (
             <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-8 px-6 pb-6">
-                <div className="w-full max-md space-y-6">
+                <div className="w-full max-w-md space-y-6">
                     <h2 className="text-2xl font-black uppercase italic text-lime-400 text-center">Datos de Ficha</h2>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2 space-y-1">
@@ -216,40 +212,69 @@ const PlayerHome = () => {
                         <div className="space-y-1">
                             <label className="text-[10px] font-black uppercase text-white/40 ml-2">Nacionalidad</label>
                             <select value={formData.country_code} onChange={(e) => setFormData({...formData, country_code: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white">
-                                <option value="es">ESPAÑA 🇪🇸</option><option value="ar">ARGENTINA 🇦🇷</option><option value="br">BRASIL 🇧🇷</option><option value="fr">FRANCIA 🇫🇷</option>
+                                <option value="es">ESPAÑA 🇪🇸</option>
+                                <option value="ar">ARGENTINA 🇦🇷</option>
+                                <option value="br">BRASIL 🇧🇷</option>
+                                <option value="fr">FRANCIA 🇫🇷</option>
+                                <option value="gb">INGLATERRA 🏴󠁧󠁢󠁥󠁮󠁧󠁿</option>
+                                <option value="de">ALEMANIA 🇩🇪</option>
+                                <option value="pt">PORTUGAL 🇵🇹</option>
+                                <option value="it">ITALIA 🇮🇹</option>
+                                <option value="mx">MÉXICO 🇲🇽</option>
+                                <option value="co">COLOMBIA 🇨🇴</option>
                             </select>
                         </div>
                     </div>
-                    <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl active:scale-95 transition-all">
+                    <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl active:scale-95 transition-all disabled:opacity-30">
                         {uploading ? <Loader2 className="animate-spin m-auto" /> : "CONFIRMAR FICHA"}
                     </button>
+                    <button onClick={() => setView('SELFIE')} className="w-full mt-2 py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Volver a la foto</button>
                 </div>
             </div>
         );
     }
 
-    // --- VISTA C: HOME (OPTIMIZADA) ---
+    // --- VISTA C: HOME PREMIUM (OPTIMIZADA MÓVIL) ---
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
-            <aside className="w-16 sm:w-20 bg-red-950/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 z-50">
-                <button className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg"><Home size={24} /></button>
-                <button className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Calendar size={24} /></button>
-                <button className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Trophy size={24} /></button>
+            
+            {/* SIDEBAR CON PWA INTEGRADO */}
+            <aside className="w-16 sm:w-20 bg-red-950/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 sm:space-y-8 z-50">
+                <button className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg"><Home size={24} /></button>
+                <button className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Calendar size={24} /></button>
+                <button className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Trophy size={24} /></button>
+                
+                {/* 📲 REEMPLAZO DINÁMICO: Si se puede instalar, sale la nube; si no, el icono de estadísticas */}
                 {showInstallBtn ? (
-                    <button onClick={handleInstallClick} className="w-12 h-12 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_15px_rgba(163,230,53,0.3)] animate-pulse"><UploadCloud size={24} /></button>
+                    <button onClick={handleInstallClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_15px_rgba(163,230,53,0.3)] animate-pulse">
+                        <UploadCloud size={24} />
+                    </button>
                 ) : (
-                    <button className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><BarChart2 size={24} /></button>
+                    <button className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><BarChart2 size={24} /></button>
                 )}
-                <button onClick={() => setShowTutorial(true)} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={24} /></button>
+                
+                <button onClick={() => setShowTutorial(true)} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={24} /></button>
             </aside>
 
             {showTutorial && <WelcomeTutorial user={user} onFinish={() => setShowTutorial(false)} />}
 
-            <main className="flex-1 flex flex-col items-center justify-start relative px-4 overflow-y-auto pt-0 pb-6"> {/* ✅ pt-0 para subirlo */}
-                <div onClick={() => setView('SELFIE')} className="cursor-pointer transform scale-[0.65] sm:scale-85 active:scale-95 transition-all mt-[-95px] sm:mt-[-40px]"> {/* ✅ mt-[-95px] para subirlo */}
+            <main className="flex-1 flex flex-col items-center justify-start relative px-4 sm:px-6 overflow-y-auto pt-6 sm:pt-10 pb-6">
+                
+                {/* 🃏 CROMO EMPUJADO HACIA ARRIBA (AJUSTADO PELÍN ABAJO) */}
+                <div 
+                    onClick={() => setView('SELFIE')} 
+                    className="cursor-pointer transform scale-[0.65] sm:scale-85 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-10px] sm:mt-[-5px]" // ✅ CORREGIDO: Bajado pelín (antes mt-[-40px])
+                >
                     <FutCard player={user} size="large" />
+                    <div className="absolute -bottom-8 left-0 w-full text-center">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 animate-pulse">Toca para editar tu ficha</p>
+                    </div>
                 </div>
+
+                {/* ⚽ SLIDER DE PARTIDOS (MODULAR) */}
+                {/* ✅ CORREGIDO: Borrado el bloque estático antiguo y estático, dejando solo el Slider */}
                 <MatchSlider matches={matches} />
+                
             </main>
         </div>
     );
