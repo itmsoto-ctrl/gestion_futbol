@@ -5,7 +5,6 @@ import { Camera, Check, ArrowRight, ArrowLeft, Smartphone, Zap, Star } from 'luc
 const WelcomeTutorial = ({ user, onFinish }) => {
     const [currentStep, setCurrentStep] = useState(1);
 
-    // Datos dinámicos del usuario
     const playerName = user?.name?.split(' ')[0].toUpperCase() || 'JUGADOR';
     const leagueName = user?.league_name || 'tu liga oficial';
     const teamName = user?.team_name || 'tu equipo';
@@ -13,7 +12,7 @@ const WelcomeTutorial = ({ user, onFinish }) => {
     const steps = [
         {
             title: `¡BIENVENIDO,\n${playerName}!`,
-            content: `Has sido formalmente convocado para disputar la liga ${leagueName}.\n\nDefenderás los colores de ${teamName}.\n\nPrepárate para demostrar tu talento y liderar a tu equipo hacia la victoria.`,
+            content: `Has sido oficialmente convocado para participar en la liga ${leagueName}.\n\nDefenderás los colores de ${teamName}.\n\nPrepárate para demostrar tu talento y liderar a tu equipo hacia la victoria.`,
             icon: <Star className="text-lime-400" size={50} />
         },
         {
@@ -40,7 +39,6 @@ const WelcomeTutorial = ({ user, onFinish }) => {
     return (
         <div className="fixed inset-0 z-[200] bg-zinc-950 text-white flex flex-col items-center justify-start pt-16 px-6 font-sans italic overflow-hidden">
             
-            {/* Barra de Progreso Superior */}
             <div className="absolute top-0 left-0 w-full h-1.5 bg-white/5">
                 <motion.div 
                     className="h-full bg-lime-400 shadow-[0_0_15px_rgba(163,230,53,0.5)]"
@@ -61,7 +59,6 @@ const WelcomeTutorial = ({ user, onFinish }) => {
                         {steps[currentStep-1].icon}
                     </div>
 
-                    {/* Area de contenido con scrollable para evitar solapamientos */}
                     <div className="flex-1 w-full overflow-y-auto space-y-6 px-2 pb-10 scrollbar-hide">
                         <div className="space-y-4 pt-1">
                             <h2 className="text-4xl font-black uppercase italic tracking-tighter leading-[0.9] whitespace-pre-line">
@@ -70,7 +67,6 @@ const WelcomeTutorial = ({ user, onFinish }) => {
                             <div className="w-12 h-1 bg-lime-400 mx-auto rounded-full" />
                         </div>
 
-                        {/* Imagen dinámica para el paso 2 */}
                         {steps[currentStep-1].image && (
                             <motion.img 
                                 initial={{ scale: 0.8, opacity: 0 }}
@@ -88,7 +84,6 @@ const WelcomeTutorial = ({ user, onFinish }) => {
                 </motion.div>
             </AnimatePresence>
 
-            {/* Botones de Navegación Fijos */}
             <div className="fixed bottom-10 left-0 right-0 px-8 flex items-center justify-between max-w-md mx-auto w-full z-10">
                 <button 
                     onClick={prev}

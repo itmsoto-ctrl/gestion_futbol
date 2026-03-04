@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2, UploadCloud, User, IdCard, Hash, Target, MapPin } from 'lucide-react';
+import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2, UploadCloud, User, IdCard, Hash, Target, MapPin, ChevronRight } from 'lucide-react';
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
@@ -13,8 +13,9 @@ const PlayerHome = () => {
     // ESTADOS
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState('HOME'); 
+    const [view, setView] = useState('HOME'); // 'HOME', 'CARD_MENU', 'CALENDAR', 'FORM'
     const [showTutorial, setShowTutorial] = useState(false);
+    
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
@@ -47,19 +48,16 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
-                    // 🛠 LÓGICA DE ENTRADA CORREGIDA
-                    // Si no tiene foto guardada...
+                    // 🛠 LÓGICA DE NAVEGACIÓN "12:15H" RECUPERADA
                     if (!data.photo_url || data.photo_url === "" || data.photo_url === "null") {
                         const hasSeen = localStorage.getItem('tutorialSeen');
-                        if (!hasSeen) {
-                            setShowTutorial(true); // Ver tutorial primero
-                        } else {
-                            setView('CARD_MENU'); // Ir al menú de gestión directamente
-                        }
+                        if (!hasSeen) setShowTutorial(true);
+                        setView('CARD_MENU'); // Bloqueamos el Home si no hay foto
                     } else {
-                        setView('HOME'); // Usuario con foto va al Home
+                        setView('HOME');
                     }
 
+                    // CARGA DE CALENDARIO DEL EQUIPO
                     if (data.team_id) {
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`);
                         const mData = await mRes.json();
@@ -78,7 +76,7 @@ const PlayerHome = () => {
         if (!user?.photo_url) setView('CARD_MENU');
     };
 
-    // --- FUNCIONES CÁMARA ---
+    // --- FUNCIONES CÁMARA (Recuperadas de tu versión estable) ---
     const startCamera = async () => {
         setTempPhoto(null);
         setIsCameraOpen(true);
@@ -131,7 +129,7 @@ const PlayerHome = () => {
                 setTempPhoto(null);
                 setView('HOME');
             }
-        } catch (err) { alert(`🚨 Error: ${err.message}`); } finally { setUploading(false); }
+        } catch (err) { alert(`Error: ${err.message}`); } finally { setUploading(false); }
     };
 
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic tracking-widest uppercase">Preparando Vestuario...</div>;
@@ -142,19 +140,17 @@ const PlayerHome = () => {
             {/* SIDEBAR */}
             <aside className="w-20 bg-red-950/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-12 space-y-8 z-50">
                 <button onClick={() => setView('HOME')} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${view === 'HOME' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30'}`}><Home size={28} /></button>
-                <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Calendar size={28} /></button>
+                <button onClick={() => setView('CALENDAR')} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${view === 'CALENDAR' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30'}`}><Calendar size={28} /></button>
                 <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Trophy size={28} /></button>
                 <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><BarChart2 size={28} /></button>
-                {/* Botón Settings lanza el Tutorial siempre */}
-                <button onClick={() => setShowTutorial(true)} className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto active:scale-95 transition-all"><Settings size={28} /></button>
+                <button onClick={() => setShowTutorial(true)} className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto active:scale-95"><Settings size={28} /></button>
             </aside>
 
-            {/* TUTORIAL OVERLAY */}
             {showTutorial && <WelcomeTutorial user={user} onFinish={finishTutorial} />}
 
             <main className="flex-1 flex flex-col items-center justify-center relative px-6 overflow-y-auto pt-10 pb-10">
                 
-                {/* VISTA 1: HOME */}
+                {/* VISTA 1: HOME (PRÓXIMO PARTIDO) */}
                 {view === 'HOME' && (
                     <div className="flex flex-col items-center justify-center w-full animate-in fade-in duration-700">
                         {showInstallBtn && (
@@ -168,28 +164,57 @@ const PlayerHome = () => {
                                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 animate-pulse">Toca para gestionar ficha</p>
                             </div>
                         </div>
-                        <div className="mt-20 text-center space-y-4 text-white font-black italic">
-                            <div className="inline-block px-5 py-1.5 bg-amber-400 text-black text-[10px] uppercase rounded-full tracking-[0.2em]">Siguiente Encuentro</div>
-                            <h2 className="text-4xl uppercase italic tracking-tighter">
-                                {matches[0]?.home_team || 'POR DEFINIR'} <span className="text-amber-400 text-2xl font-black">VS</span> {matches[0]?.away_team || 'POR DEFINIR'}
-                            </h2>
+
+                        {/* INFO PRÓXIMO PARTIDO (RECUPERADO 12:15H) */}
+                        <div className="mt-20 text-center space-y-4 text-white">
+                            <div className="inline-block px-5 py-1.5 bg-amber-400 text-black text-[10px] font-black uppercase rounded-full tracking-[0.2em]">Siguiente Encuentro</div>
+                            <div className="space-y-2">
+                                <h2 className="text-4xl font-black uppercase italic tracking-tighter leading-none">
+                                    {matches[0]?.home_team || 'POR DEFINIR'} <span className="text-amber-400 text-2xl font-black">VS</span> {matches[0]?.away_team || 'POR DEFINIR'}
+                                </h2>
+                                <div className="flex flex-col gap-1">
+                                    <p className="text-xl font-bold text-white/90">
+                                       {matches[0] ? new Date(matches[0].match_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Próximamente'}
+                                    </p>
+                                    <p className="text-xs uppercase tracking-[0.3em] font-black text-amber-400">
+                                       {matches[0]?.venue_name || 'ESTADIO VORA'} — {matches[0] ? new Date(matches[0].match_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '00:00H'}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* VISTA 2: MENÚ DEL CROMO (CARD_MENU) */}
+                {/* VISTA 2: CALENDARIO DE EQUIPO (OBJETIVO DE HOY) */}
+                {view === 'CALENDAR' && (
+                    <div className="w-full max-w-md animate-in slide-in-from-right duration-500 space-y-6">
+                        <div className="text-center">
+                            <h2 className="text-3xl font-black uppercase italic text-lime-400">Mi Calendario</h2>
+                            <p className="text-[10px] uppercase font-bold text-white/30 tracking-widest">{user?.team_name}</p>
+                        </div>
+                        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
+                            {matches.length > 0 ? matches.map((m, idx) => (
+                                <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+                                    <div className="flex flex-col">
+                                        <p className="text-[10px] font-black text-lime-400 uppercase tracking-tighter">{new Date(m.match_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(m.match_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</p>
+                                        <p className="text-lg font-black text-white leading-none mt-1 uppercase tracking-tighter">{m.home_team} VS {m.away_team}</p>
+                                        <p className="text-[10px] font-bold text-white/30 uppercase mt-1 flex items-center gap-1"><MapPin size={10}/> {m.venue_name}</p>
+                                    </div>
+                                    <ChevronRight className="text-white/20" />
+                                </div>
+                            )) : (
+                                <p className="text-center text-white/20 font-bold uppercase py-10">No hay partidos programados</p>
+                            )}
+                        </div>
+                        <button onClick={() => setView('HOME')} className="w-full py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Volver al inicio</button>
+                    </div>
+                )}
+
+                {/* VISTAS RESTANTES (CARD_MENU, FORM, ETC) SIN CAMBIOS PARA SEGURIDAD */}
                 {view === 'CARD_MENU' && (
                     <div className="w-full flex flex-col items-center animate-in zoom-in-95 duration-500">
-                         {/* Solo aquí se abre la cámara al pulsar el cromo */}
                          <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transform scale-[0.8]">
-                            <FutCard 
-                                player={{
-                                    ...user,
-                                    name: formData.name || 'JUGADOR',
-                                    photo_url: tempPhoto || user?.photo_url,
-                                    position: formData.position
-                                }} 
-                            />
+                            <FutCard player={{ ...user, name: formData.name, photo_url: tempPhoto || user?.photo_url, position: formData.position }} />
                         </div>
                         {!tempPhoto ? (
                             <div className="flex flex-col w-full gap-4 mt-8 max-w-xs">
@@ -201,13 +226,12 @@ const PlayerHome = () => {
                         ) : (
                             <div className="fixed bottom-10 left-0 right-0 z-[100] px-6 flex flex-col gap-3 max-w-md mx-auto">
                                 <button onClick={() => setView('FORM')} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3 active:scale-95">¡ESTÁ DE LOCOS! <Check/></button>
-                                <button onClick={startCamera} className="w-full bg-white/5 text-white/40 font-black py-4 rounded-2xl uppercase italic text-[10px] tracking-widest">REPETIR FOTO</button>
+                                <button onClick={startCamera} className="w-full bg-white/5 text-white/40 font-black py-4 rounded-2xl uppercase italic text-[10px]">REPETIR FOTO</button>
                             </div>
                         )}
                     </div>
                 )}
 
-                {/* VISTA 3: FORMULARIO */}
                 {view === 'FORM' && (
                     <div className="w-full max-w-md space-y-6 animate-in slide-in-from-bottom-10 duration-500">
                         <div className="text-center"><h2 className="text-2xl font-black uppercase italic text-lime-400 leading-none">Datos de Ficha</h2></div>
