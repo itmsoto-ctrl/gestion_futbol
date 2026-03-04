@@ -10,13 +10,11 @@ const PlayerHome = () => {
     const navigate = useNavigate();
     const { showInstallBtn, handleInstallClick } = usePWAInstall();
     
-    // ESTADOS DE NAVEGACIÓN
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState('HOME'); // 'HOME', 'CARD_MENU', 'CALENDAR', 'FORM'
+    const [view, setView] = useState('HOME'); 
     const [showTutorial, setShowTutorial] = useState(false);
     
-    // ESTADOS CÁMARA Y DATOS
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
@@ -36,34 +34,38 @@ const PlayerHome = () => {
                 const savedEmail = localStorage.getItem('userEmail');
                 if (!savedEmail) { setLoading(false); return; }
                 
-                // 1. CARGAMOS PERFIL (Asegúrate de que el SQL JOIN traiga league_name y team_name)
                 const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
                 const data = await res.json();
                 
                 if (data) {
                     setUser(data);
                     setFormData({
-                        name: data.name || '', dni: data.dni || '', dorsal: data.dorsal || '',
-                        position: data.position || 'DEL', country_code: data.country_code || 'es'
+                        name: data.name || '',
+                        dni: data.dni || '',
+                        dorsal: data.dorsal || '',
+                        position: data.position || 'DEL',
+                        country_code: data.country_code || 'es'
                     });
 
-                    // 🛠 LÓGICA DE NAVEGACIÓN RECUPERADA (12:15H)
-                    if (!data.photo_url || data.photo_url === "" || data.photo_url === "null") {
-                        const hasSeen = localStorage.getItem('tutorialSeen');
-                        if (!hasSeen) setShowTutorial(true);
-                        setView('CARD_MENU'); // Obligamos a pasar por gestión si no hay foto
+                    // 1️⃣ LÓGICA DE NAVEGACIÓN (Prioridad Tutorial)
+                    const hasSeen = localStorage.getItem('tutorialSeen');
+                    if (!data.photo_url) {
+                        if (!hasSeen) {
+                            setShowTutorial(true);
+                        }
+                        setView('CARD_MENU'); // Obligamos a estar en gestión si no hay foto
                     } else {
                         setView('HOME');
                     }
 
-                    // 2. CARGAMOS CALENDARIO (OBJETIVO DE HOY)
+                    // 2️⃣ CARGA DE CALENDARIO (Objetivo de hoy)
                     if (data.team_id) {
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`);
                         const mData = await mRes.json();
                         setMatches(mData);
                     }
                 }
-            } catch (err) { console.error(err); } finally { setLoading(false); }
+            } catch (err) { console.error("Error carga:", err); } finally { setLoading(false); }
         };
         fetchUserData();
         return () => stopCamera();
@@ -72,10 +74,9 @@ const PlayerHome = () => {
     const finishTutorial = () => {
         localStorage.setItem('tutorialSeen', 'true');
         setShowTutorial(false);
-        if (!user?.photo_url) setView('CARD_MENU');
     };
 
-    // --- FUNCIONES CÁMARA (Recuperadas de tu versión estable) ---
+    // --- FUNCIONES CÁMARA (Recuperadas y estables) ---
     const startCamera = async () => {
         setTempPhoto(null);
         setIsCameraOpen(true);
@@ -131,7 +132,7 @@ const PlayerHome = () => {
         } catch (err) { alert(`Error: ${err.message}`); } finally { setUploading(false); }
     };
 
-    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic tracking-widest uppercase">Preparando Vestuario...</div>;
+    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic uppercase tracking-widest">Preparando Vestuario...</div>;
 
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans italic" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
@@ -145,15 +146,16 @@ const PlayerHome = () => {
                 <button onClick={() => setShowTutorial(true)} className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={28} /></button>
             </aside>
 
+            {/* TUTORIAL OVERLAY */}
             {showTutorial && <WelcomeTutorial user={user} onFinish={finishTutorial} />}
 
             <main className="flex-1 flex flex-col items-center justify-center relative px-6 overflow-y-auto pt-10 pb-10">
                 
-                {/* VISTA 1: HOME (PRÓXIMO PARTIDO) */}
+                {/* VISTA 1: HOME (Objetivo: Próximo Partido) */}
                 {view === 'HOME' && (
                     <div className="flex flex-col items-center justify-center w-full animate-in fade-in duration-700">
                         {showInstallBtn && (
-                            <button onClick={handleInstallClick} className="absolute top-6 right-6 bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-3xl text-white animate-pulse z-40">
+                            <button onClick={handleInstallClick} className="absolute top-6 right-6 bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-3xl text-white z-40">
                                 <UploadCloud size={24} />
                             </button>
                         )}
@@ -164,7 +166,7 @@ const PlayerHome = () => {
                             </div>
                         </div>
 
-                        {/* INFO PRÓXIMO PARTIDO */}
+                        {/* INFO PRÓXIMO PARTIDO (RECUPERADO) */}
                         <div className="mt-20 text-center space-y-4 text-white">
                             <div className="inline-block px-5 py-1.5 bg-amber-400 text-black text-[10px] font-black uppercase rounded-full tracking-[0.2em]">Siguiente Encuentro</div>
                             <div className="space-y-2">
@@ -184,11 +186,11 @@ const PlayerHome = () => {
                     </div>
                 )}
 
-                {/* VISTA 2: CALENDARIO COMPLETO (OBJETIVO DE HOY) */}
+                {/* VISTA 2: CALENDARIO (Objetivo de hoy) */}
                 {view === 'CALENDAR' && (
                     <div className="w-full max-w-md animate-in slide-in-from-right duration-500 space-y-6">
                         <div className="text-center">
-                            <h2 className="text-3xl font-black uppercase italic text-lime-400">Calendario Oficial</h2>
+                            <h2 className="text-3xl font-black uppercase italic text-lime-400">Calendario</h2>
                             <p className="text-[10px] uppercase font-bold text-white/30 tracking-widest">{user?.team_name}</p>
                         </div>
                         <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
@@ -202,14 +204,14 @@ const PlayerHome = () => {
                                     <ChevronRight className="text-white/20" />
                                 </div>
                             )) : (
-                                <p className="text-center text-white/20 font-bold uppercase py-10 tracking-widest">No hay partidos programados</p>
+                                <p className="text-center text-white/20 font-bold uppercase py-10 tracking-widest italic">No hay partidos programados</p>
                             )}
                         </div>
-                        <button onClick={() => setView('HOME')} className="w-full py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Volver al inicio</button>
+                        <button onClick={() => setView('HOME')} className="w-full py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Cerrar Calendario</button>
                     </div>
                 )}
 
-                {/* VISTA 3: MENÚ DEL CROMO (CARD_MENU) */}
+                {/* VISTA 3: MENÚ GESTIÓN (CARD_MENU) */}
                 {view === 'CARD_MENU' && (
                     <div className="w-full flex flex-col items-center animate-in zoom-in-95 duration-500">
                          <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transform scale-[0.8]">
@@ -223,9 +225,9 @@ const PlayerHome = () => {
                                 <button onClick={() => setView('HOME')} className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Volver al inicio</button>
                             </div>
                         ) : (
-                            <div className="fixed bottom-10 left-0 right-0 z-[100] px-6 flex flex-col gap-3 max-w-md mx-auto">
-                                <button onClick={() => setView('FORM')} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3 active:scale-95">¡ESTÁ DE LOCOS! <Check/></button>
-                                <button onClick={startCamera} className="w-full bg-white/5 text-white/40 font-black py-4 rounded-2xl uppercase italic text-[10px]">REPETIR FOTO</button>
+                            <div className="fixed bottom-10 left-0 right-0 z-[100] px-6 flex flex-col gap-3 max-w-md mx-auto font-sans italic">
+                                <button onClick={() => setView('FORM')} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase text-xl shadow-xl flex items-center justify-center gap-3 active:scale-95">¡ESTÁ DE LOCOS! <Check/></button>
+                                <button onClick={startCamera} className="w-full bg-white/5 text-white/40 font-black py-4 rounded-2xl uppercase text-[10px]">REPETIR FOTO</button>
                             </div>
                         )}
                     </div>
@@ -233,16 +235,16 @@ const PlayerHome = () => {
 
                 {/* VISTA 4: FORMULARIO */}
                 {view === 'FORM' && (
-                    <div className="w-full max-w-md space-y-6 animate-in slide-in-from-bottom-10 duration-500">
-                        <div className="text-center"><h2 className="text-2xl font-black uppercase italic text-lime-400 leading-none">Datos de Ficha</h2></div>
-                        <div className="grid grid-cols-2 gap-4">
+                    <div className="w-full max-w-md space-y-6 animate-in slide-in-from-bottom-10 duration-500 font-sans italic">
+                        <div className="text-center"><h2 className="text-2xl font-black uppercase text-lime-400 leading-none">Datos de Ficha</h2></div>
+                        <div className="grid grid-cols-2 gap-4 text-white">
                             <div className="col-span-2 space-y-1">
                                 <label className="text-[10px] font-black uppercase text-white/40 ml-2">Nombre en Carta</label>
-                                <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none text-white transition-all" />
+                                <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none transition-all" />
                             </div>
                             <div className="col-span-2 space-y-1">
                                 <label className="text-[10px] font-black uppercase text-white/40 ml-2">DNI / Documento</label>
-                                <input type="text" value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none text-white transition-all" />
+                                <input type="text" value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none transition-all" />
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[10px] font-black uppercase text-white/40 ml-2">Dorsal</label>
@@ -250,17 +252,14 @@ const PlayerHome = () => {
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[10px] font-black uppercase text-white/40 ml-2">Posición</label>
-                                <select value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white">
-                                    <option value="PO" className="bg-[#1a1a1a]">PO</option>
-                                    <option value="DFC" className="bg-[#1a1a1a]">DFC</option>
-                                    <option value="MC" className="bg-[#1a1a1a]">MC</option>
-                                    <option value="DEL" className="bg-[#1a1a1a]">DEL</option>
+                                <select value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none bg-zinc-900">
+                                    <option value="PO">PO</option><option value="DFC">DFC</option><option value="MC">MC</option><option value="DEL">DEL</option>
                                 </select>
                             </div>
                         </div>
                         <div className="pt-6">
-                            <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3">
-                                {uploading ? <Loader2 className="animate-spin" /> : "CONFIRMAR FICHA"}
+                            <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase text-xl shadow-xl flex items-center justify-center gap-3">
+                                {uploading ? <Loader2 className="animate-spin" /> : "CONFIRMAR DATOS"}
                             </button>
                             <button onClick={() => setView('CARD_MENU')} className="w-full mt-2 py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Volver</button>
                         </div>
