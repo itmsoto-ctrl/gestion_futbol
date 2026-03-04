@@ -5,7 +5,7 @@ import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import WelcomeTutorial from './WelcomeTutorial';
-import MatchSlider from './MatchSlider'; // ✅ Corregido: Importación local
+import MatchSlider from '../player/MatchSlider';
 
 const PlayerHome = () => {
     const navigate = useNavigate();
