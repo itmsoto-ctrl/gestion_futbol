@@ -11,24 +11,24 @@ const WelcomeTutorial = ({ user, onFinish }) => {
 
     const steps = [
         {
-            title: `¡BIENVENIDO,\n${playerName}!`,
+            title: `¡HOLA,\n${playerName}!`,
             content: `Has sido oficialmente convocado para disputar la liga ${leagueName}.\n\nDefenderás los colores de ${teamName}.\n\nPrepárate para demostrar tu talento y liderar a tu equipo hacia la victoria.`,
             icon: <Star className="text-lime-400" size={50} />
         },
         {
             title: "TU FICHA OFICIAL",
             image: "/tutorial-card.webp",
-            content: "Es hora de presentarte ante la liga como una estrella.\n\nBusca una iluminación clara y un fondo liso para tu selfie: así tu tarjeta lucirá impecable.\n\nPodrás repetir la captura hasta que el resultado sea perfecto.",
+            content: "Busca una iluminación clara y un fondo liso para tu selfie: así tu tarjeta lucirá impecable.\n\nPodrás repetir la captura hasta que el resultado sea perfecto.",
             icon: <Camera className="text-lime-400" size={50} />
         },
         {
             title: "ESTADÍSTICAS FUT",
-            content: "Tras cada jornada, los responsables registrarán el marcador oficial.\n\nRecibirás una notificación push: accede de inmediato para indicar tus goles y asistencias.\n\n¡Mira cómo mejora tu puntuación Fut y evoluciona tu carta tras cada partido!",
+            content: "Tras cada jornada, los responsables registrarán el marcador oficial.\n\nRecibirás una notificación: entra rápido para indicar tus goles y asistencias.",
             icon: <Zap className="text-lime-400" size={50} />
         },
         {
             title: "INSTALA VORA",
-            content: "Haz este paso una única vez para garantizar la mejor experiencia.\n\nInstala VORA como aplicación en tu pantalla de inicio para recibir alertas de tus próximos encuentros y visualizar tus resultados en tiempo real.\n\n¡Nos vemos en el campo!",
+            content: "Instala VORA en tu pantalla de inicio para recibir alertas de tus próximos encuentros y visualizar tus resultados en tiempo real.",
             icon: <Smartphone className="text-lime-400" size={50} />
         }
     ];
@@ -48,18 +48,18 @@ const WelcomeTutorial = ({ user, onFinish }) => {
                     <div className="flex-1 w-full overflow-y-auto space-y-6 px-2 pb-24 scrollbar-hide">
                         <h2 className="text-4xl font-black uppercase tracking-tighter leading-[0.9] whitespace-pre-line">{steps[currentStep-1].title}</h2>
                         <div className="w-12 h-1 bg-lime-400 mx-auto rounded-full" />
-                        {steps[currentStep-1].image && <motion.img src={steps[currentStep-1].image} className="h-44 mx-auto my-1 rounded-2xl shadow-2xl border border-white/5" alt="FUT Preview" />}
+                        {steps[currentStep-1].image && <motion.img src={steps[currentStep-1].image} className="h-44 mx-auto my-1 rounded-2xl border border-white/5" alt="FUT Preview" />}
                         <p className="text-xl text-white/70 font-medium leading-relaxed whitespace-pre-line">{steps[currentStep-1].content}</p>
                     </div>
                 </motion.div>
             </AnimatePresence>
 
-            <div className="fixed bottom-10 left-0 right-0 px-8 flex items-center justify-between max-w-md mx-auto w-full z-10">
+            <div className="fixed bottom-10 left-0 right-0 px-8 flex items-center justify-between max-w-md mx-auto w-full z-10 bg-zinc-950 pb-4">
                 <button onClick={prev} className={`p-4 rounded-full bg-white/5 ${currentStep === 1 ? 'opacity-0' : 'opacity-100'}`}><ArrowLeft size={24} /></button>
                 <div className="flex gap-2">
                     {[1, 2, 3, 4].map(s => <div key={s} className={`h-1.5 rounded-full transition-all duration-500 ${s === currentStep ? 'bg-lime-400 w-6' : 'bg-white/10 w-2'}`} />)}
                 </div>
-                <button onClick={next} className="bg-lime-400 text-black p-4 rounded-full shadow-[0_10px_25px_rgba(163,230,53,0.3)]">{currentStep === 4 ? <Check size={24} /> : <ArrowRight size={24} />}</button>
+                <button onClick={next} className="bg-lime-400 text-black p-4 rounded-full shadow-lg">{currentStep === 4 ? <Check size={24} /> : <ArrowRight size={24} />}</button>
             </div>
         </div>
     );
