@@ -283,7 +283,14 @@ const PlayerHome = () => {
                 <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Trophy size={28} /></button>
                 <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><BarChart2 size={28} /></button>
                 <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={28} /></button>
+                {/* 🆕 BOTÓN SETTINGS AHORA ABRE EL TUTORIAL */}
+                <button 
+                    onClick={() => setShowTutorial(true)} 
+                    className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto active:scale-95 transition-all"
+                ></button>
             </aside>
+
+            {showTutorial && <WelcomeTutorial user={user} onFinish={finishTutorial} />}
 
             <main className="flex-1 flex flex-col items-center justify-center relative px-6 overflow-y-auto pt-10 pb-10">
                 {showInstallBtn && (
