@@ -1,5 +1,3 @@
-// client/src/components/portal/PlayerHome.jsx
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2, UploadCloud, User, IdCard, Hash, Target, MapPin } from 'lucide-react';
@@ -12,21 +10,15 @@ const PlayerHome = () => {
     const navigate = useNavigate();
     const { showInstallBtn, handleInstallClick } = usePWAInstall();
     
-    // ESTADOS PRINCIPALES
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    // ✅ RENOMBRADO DANI: De 'SELFIE' a 'CARD_MENU' para que sea más claro
     const [view, setView] = useState('HOME'); // 'HOME', 'CARD_MENU', 'FORM'
-    
-    // --- ESTADO TUTORIAL ---
     const [showTutorial, setShowTutorial] = useState(false);
     
-    // ESTADOS CÁMARA Y SUBIDA
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
     
-    // ESTADO FORMULARIO: Aquí es donde corregimos el pre-llenado
     const [formData, setFormData] = useState({
         name: '', dni: '', dorsal: '', position: 'DEL', country_code: 'es'
     });
@@ -42,8 +34,6 @@ const PlayerHome = () => {
                 const savedEmail = localStorage.getItem('userEmail');
                 if (!savedEmail) { setLoading(false); return; }
                 
-                // 🚀 IMPORTANTE PARA DANI: Asegúrate de que el backend (/api/auth/user-profile)
-                // esté devolviendo 'league_name' y 'team_name' (necesitas un SQL JOIN).
                 const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
                 const data = await res.json();
                 
@@ -57,14 +47,13 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
-                    // --- LÓGICA DE ACTIVACIÓN DEL TUTORIAL ---
+                    // 🛠 LÓGICA DE NAVEGACIÓN CORREGIDA
                     if (!data.photo_url) {
                         const hasSeen = localStorage.getItem('tutorialSeen');
                         if (!hasSeen) {
                             setShowTutorial(true);
                         } else {
-                            // Si no hay foto, el "menu" del cromo para hacerse la foto
-                            setView('CARD_MENU');
+                            setView('CARD_MENU'); // Enviamos al menú, no al Home
                         }
                     }
 
@@ -80,15 +69,11 @@ const PlayerHome = () => {
         return () => stopCamera();
     }, []);
 
-    // Función para cerrar el tutorial
     const finishTutorial = () => {
         localStorage.setItem('tutorialSeen', 'true');
         setShowTutorial(false);
-        // Si venía del flujo inicial (sin foto), lo mandamos al menu del cromo
         if (!user?.photo_url) setView('CARD_MENU');
     };
-
-    // ... (Mantén tus funciones startCamera, stopCamera, capturePhoto y handleFinalUpdate exactamente igual)
 
     const startCamera = async () => {
         setTempPhoto(null);
@@ -147,19 +132,17 @@ const PlayerHome = () => {
         } catch (err) { alert(`Error: ${err.message}`); } finally { setUploading(false); }
     };
 
-    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic uppercase tracking-widest">PREPARANDO VESTUARIO...</div>;
+    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic tracking-widest uppercase">Preparando Vestuario...</div>;
 
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
             
-            {/* --- SIDEBAR IZQUIERDA --- */}
             <aside className="w-20 bg-red-950/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-12 space-y-8 z-50">
                 <button onClick={() => setView('HOME')} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${view === 'HOME' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30'}`}><Home size={28} /></button>
                 <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Calendar size={28} /></button>
                 <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Trophy size={28} /></button>
                 <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><BarChart2 size={28} /></button>
                 
-                {/* BOTÓN SETTINGS AHORA ABRE EL TUTORIAL */}
                 <button 
                     onClick={() => setShowTutorial(true)} 
                     className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto active:scale-95 transition-all"
@@ -168,11 +151,10 @@ const PlayerHome = () => {
                 </button>
             </aside>
 
-            {/* RENDERIZADO DEL TUTORIAL (Fuera del main para overlay total) */}
             {showTutorial && <WelcomeTutorial user={user} onFinish={finishTutorial} />}
 
             <main className="flex-1 flex flex-col items-center justify-center relative px-6 overflow-y-auto pt-10 pb-10">
-                {/* VISTA SEGÚN EL ESTADO 'view' */}
+                
                 {view === 'HOME' && (
                     <div className="flex flex-col items-center justify-center w-full animate-in fade-in duration-700">
                         {showInstallBtn && (
@@ -180,16 +162,15 @@ const PlayerHome = () => {
                                 <UploadCloud size={24} />
                             </button>
                         )}
-                        {/* ✅ CORRECCIÓN DANI: Cambiado de setView('SELFIE') a setView('CARD_MENU') */}
                         <div onClick={() => setView('CARD_MENU')} className="cursor-pointer transform scale-[0.7] sm:scale-85 active:scale-95 transition-all drop-shadow-[0_45px_45px_rgba(0,0,0,0.7)]">
                             <FutCard player={user} size="large" />
                             <div className="absolute -bottom-12 left-0 w-full text-center">
-                                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 animate-pulse">Toca para editar tu ficha</p>
+                                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 animate-pulse">Toca para gestionar tu ficha</p>
                             </div>
                         </div>
                         <div className="mt-20 text-center space-y-4 text-white">
                             <div className="inline-block px-5 py-1.5 bg-amber-400 text-black text-[10px] font-black uppercase italic rounded-full tracking-[0.2em]">Siguiente Encuentro</div>
-                            <h2 className="text-4xl font-black uppercase italic tracking-tighter leading-none whitespace-pre-line">
+                            <h2 className="text-4xl font-black uppercase italic tracking-tighter leading-none">
                                 {matches[0]?.home_team || 'POR DEFINIR'} <span className="text-amber-400 text-2xl">VS</span> {matches[0]?.away_team || 'POR DEFINIR'}
                             </h2>
                             <p className="text-xl font-bold opacity-90">{matches[0] ? new Date(matches[0].match_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Próximamente'}</p>
@@ -197,10 +178,8 @@ const PlayerHome = () => {
                     </div>
                 )}
 
-                {/* ✅ RENOMBRADO DE 'SELFIE' A 'CARD_MENU' */}
                 {view === 'CARD_MENU' && (
                     <div className="w-full flex flex-col items-center animate-in zoom-in-95 duration-500">
-                         {/* La tarjeta en el menu del cromo abre la camara */}
                          <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transform scale-[0.8]">
                             <FutCard 
                                 player={{
@@ -220,9 +199,7 @@ const PlayerHome = () => {
                             </div>
                         ) : (
                             <div className="fixed bottom-10 left-0 right-0 z-[100] px-6 flex flex-col gap-3">
-                                <button onClick={() => setView('FORM')} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
-                                    ¡ESTÁ DE LOCOS! <Check/>
-                                </button>
+                                <button onClick={() => setView('FORM')} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">¡ESTÁ DE LOCOS! <Check/></button>
                                 <button onClick={startCamera} className="w-full bg-white/5 backdrop-blur-md text-white/40 font-black py-4 rounded-2xl uppercase italic text-[10px] tracking-widest">REPETIR FOTO</button>
                             </div>
                         )}
@@ -259,12 +236,11 @@ const PlayerHome = () => {
                             <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3">
                                 {uploading ? <Loader2 className="animate-spin" /> : "CONFIRMAR FICHA"}
                             </button>
-                            <button onClick={() => setView('CARD_MENU')} className="w-full mt-2 py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Volver a la foto</button>
+                            <button onClick={() => setView('CARD_MENU')} className="w-full mt-2 py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Volver al inicio</button>
                         </div>
                     </div>
                 )}
 
-                {/* Overlay Cámara */}
                 {isCameraOpen && (
                     <div className="fixed inset-0 z-[120] bg-black flex flex-col animate-in fade-in duration-300">
                         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
