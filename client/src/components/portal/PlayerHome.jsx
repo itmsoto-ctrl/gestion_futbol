@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2, UploadCloud, User } from 'lucide-react';
-import { motion } from 'framer-motion';
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
