@@ -4,6 +4,7 @@ import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2,
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
+import ProfileWizard from './ProfileWizard'; // <--- Tu nuevo componente
 
 const PlayerHome = () => {
     const navigate = useNavigate();
@@ -15,6 +16,9 @@ const PlayerHome = () => {
     const [uploading, setUploading] = useState(false);
     const [matches, setMatches] = useState([]);
 
+    // --- NUEVA LÓGICA: ESTADO DE EDICIÓN ---
+    const [isEditing, setIsEditing] = useState(false);
+
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const streamRef = useRef(null);
@@ -25,12 +29,13 @@ const PlayerHome = () => {
                 const savedEmail = localStorage.getItem('userEmail');
                 if (!savedEmail) { setLoading(false); return; }
                 
-                // 1. Cargar perfil (con el JOIN del equipo para el logo)
                 const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
                 const data = await res.json();
                 if (data) {
                     setUser(data);
-                    // 2. Cargar calendario si tiene equipo
+                    // Si el usuario no tiene foto, activamos el modo edición/registro por defecto
+                    if (!data.photo_url) setIsEditing(true);
+
                     if (data.team_id) {
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`);
                         const mData = await mRes.json();
@@ -71,41 +76,51 @@ const PlayerHome = () => {
         }
     };
 
-    const handleAccept = async () => {
-        if (!tempPhoto) return;
+    // --- ACTUALIZADO: handleAccept ahora recibe los datos del Wizard ---
+    const handleAccept = async (editData = {}) => {
         setUploading(true);
-    
         try {
-            const formData = new FormData();
-            formData.append('file', tempPhoto);
-            formData.append('upload_preset', 'vora_players'); 
+            let finalPhotoUrl = user.photo_url;
+
+            // 1. Subida de foto si hay una nueva captura
+            if (tempPhoto) {
+                const formData = new FormData();
+                formData.append('file', tempPhoto);
+                formData.append('upload_preset', 'vora_players'); 
+                const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const cloudData = await cloudRes.json();
+                if (!cloudData.secure_url) throw new Error("Error Cloudinary");
+                finalPhotoUrl = cloudData.secure_url;
+            }
     
-            const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', {
-                method: 'POST',
-                body: formData
-            });
-            const cloudData = await cloudRes.json();
-            
-            if (!cloudData.secure_url) throw new Error("Error Cloudinary");
-    
+            // 2. Guardar en Base de Datos (Foto + Datos del reverso)
             const savedEmail = localStorage.getItem('userEmail');
-            const token = localStorage.getItem('token');
-    
-            const response = await fetch(`${API_BASE_URL}/api/auth/update-photo`, {
+            const response = await fetch(`${API_BASE_URL}/api/auth/update-player-full`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': token ? `Bearer ${token}` : '' 
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     email: savedEmail,
-                    photo_url: cloudData.secure_url
+                    photo_url: finalPhotoUrl,
+                    name: editData.name || user.name,
+                    position: editData.position || user.position,
+                    country_code: editData.country || user.country_code
                 })
             });
     
             if (response.ok) {
-                setUser(prev => ({ ...prev, photo_url: cloudData.secure_url }));
+                setUser(prev => ({ 
+                    ...prev, 
+                    photo_url: finalPhotoUrl,
+                    name: editData.name || prev.name,
+                    position: editData.position || prev.position,
+                    country_code: editData.country || prev.country_code
+                }));
                 setTempPhoto(null);
+                setIsEditing(false); // <--- Cerramos el modo edición tras guardar
+                alert("¡Ficha oficial guardada! 🚀");
             }
         } catch (err) {
             alert(`🚨 Error: ${err.message}`);
@@ -116,37 +131,21 @@ const PlayerHome = () => {
 
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic">PREPARANDO VESTUARIO...</div>;
 
-    // --- VISTA A: CAPTURA (Si no hay foto guardada) ---
-    if (!user?.photo_url) {
+    // --- VISTA A: REGISTRO / EDICIÓN (ProfileWizard) ---
+    // Se muestra si no hay foto o si el usuario pulsó para editar
+    if (isEditing) {
         return (
-            <div className="min-h-screen bg-[#665C5A] text-white flex flex-col items-center pt-10 px-6 relative overflow-hidden">
-                <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-                    <FutCard 
-                        player={{
-                            name: user?.name || 'JUGADOR',
-                            rating: 85,
-                            photo_url: tempPhoto || null,
-                            position: 'DEL',
-                            pac: 80, sho: 85, pas: 72, dri: 84, def: 35, phy: 70
-                        }} 
-                    />
-                </div>
+            <div className="min-h-screen bg-[#1a1a1a] flex flex-col items-center pt-10 px-6 relative overflow-hidden">
+                <ProfileWizard 
+                    user={user} 
+                    tempPhoto={tempPhoto} 
+                    onStartCamera={startCamera} 
+                    onSave={handleAccept} 
+                    uploading={uploading}
+                    onCancel={() => user?.photo_url && setIsEditing(false)}
+                />
 
-                {!tempPhoto ? (
-                    <div className="text-center mt-10 space-y-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-lime-400 animate-pulse">Toca el cromo para entrar en la liga</p>
-                        <h2 className="text-3xl font-black uppercase italic tracking-tighter leading-none text-white/20">TU FICHA <br/> OFICIAL</h2>
-                    </div>
-                ) : (
-                    <div className="fixed bottom-10 left-0 right-0 z-[100] px-6 flex flex-col gap-3">
-                        <button onClick={handleAccept} disabled={uploading} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3">
-                            {uploading ? <Loader2 className="animate-spin" /> : <>¡ESTÁ DE LOCOS! <Check/></>}
-                        </button>
-                        <button onClick={startCamera} className="w-full bg-white/10 backdrop-blur-md text-white font-black py-4 rounded-2xl uppercase italic border border-white/20">REPETIR FOTO</button>
-                    </div>
-                )}
-
-                {/* Cámara Overlay */}
+                {/* Cámara Overlay (se mantiene en PlayerHome para no duplicar lógica) */}
                 {isCameraOpen && (
                     <div className="fixed inset-0 z-[120] bg-black flex flex-col">
                         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
@@ -157,7 +156,7 @@ const PlayerHome = () => {
                             </div>
                             <button onClick={stopCamera} className="absolute top-6 right-6 text-white bg-black/50 p-3 rounded-full"><X /></button>
                         </div>
-                        <div className="h-40 flex items-center justify-center bg-[#1a1a1a] border-t border-white/10">
+                        <div className="h-40 flex items-center justify-center bg-zinc-950 border-t border-white/5">
                             <button onClick={capturePhoto} className="w-20 h-20 bg-lime-400 rounded-full flex items-center justify-center shadow-xl active:scale-90 transition-all">
                                 <Camera size={32} className="text-black" />
                             </button>
@@ -168,7 +167,7 @@ const PlayerHome = () => {
         );
     }
 
-    // --- VISTA B: HOME PREMIUM (Si ya tiene foto) ---
+    // --- VISTA B: HOME PREMIUM (Si ya tiene foto y no está editando) ---
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" 
              style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
@@ -188,15 +187,15 @@ const PlayerHome = () => {
                     </button>
                 )}
 
-                {/* ESCALADO 0.7 PARA QUE QUEPA TODO Y CLIC PARA REPETIR SELFIE */}
+                {/* ESCALADO 0.7 Y CLIC PARA EDITAR FICHA COMPLETA */}
                 <div 
-                    onClick={startCamera} 
+                    onClick={() => setIsEditing(true)} 
                     className="cursor-pointer transform scale-[0.7] sm:scale-85 active:scale-95 transition-all drop-shadow-[0_45px_45px_rgba(0,0,0,0.7)] animate-in slide-in-from-bottom-10 duration-700"
                 >
                     <FutCard player={user} size="large" />
                     <div className="absolute -bottom-12 left-0 w-full text-center">
                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 animate-pulse">
-                            Toca para repetir selfie
+                            Toca para editar tu ficha técnica
                         </p>
                     </div>
                 </div>
@@ -217,25 +216,6 @@ const PlayerHome = () => {
                         </div>
                     </div>
                 </div>
-
-                {/* Re-utilizamos el overlay de cámara aquí por si pulsa en el cromo para repetir */}
-                {isCameraOpen && (
-                    <div className="fixed inset-0 z-[120] bg-black flex flex-col">
-                        <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-                            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                            <canvas ref={canvasRef} className="hidden" />
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <div className="w-72 h-96 border-[3px] border-lime-400/50 border-dashed rounded-[50%_50%_45%_45%] shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]"></div>
-                            </div>
-                            <button onClick={stopCamera} className="absolute top-6 right-6 text-white bg-black/50 p-3 rounded-full"><X /></button>
-                        </div>
-                        <div className="h-40 flex items-center justify-center bg-[#1a1a1a] border-t border-white/10">
-                            <button onClick={capturePhoto} className="w-20 h-20 bg-lime-400 rounded-full flex items-center justify-center shadow-xl active:scale-90 transition-all">
-                                <Camera size={32} className="text-black" />
-                            </button>
-                        </div>
-                    </div>
-                )}
             </main>
         </div>
     );
