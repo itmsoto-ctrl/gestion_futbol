@@ -100,7 +100,7 @@ const MatchSlider = ({ matches }) => {
             <AnimatePresence>
                 {showModal && (
                     <motion.div 
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1 }} exit={{ opacity: 0, x: -50 }}
                         className="fixed inset-0 z-[250] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6"
                     >
                         <div className="w-full max-w-sm bg-zinc-900/50 border border-white/10 rounded-[3rem] p-8 relative overflow-hidden shadow-2xl">
