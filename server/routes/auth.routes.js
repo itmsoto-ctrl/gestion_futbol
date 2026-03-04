@@ -138,24 +138,17 @@ router.post('/update-profile', verifyToken, async (req, res) => {
 router.post('/update-photo', async (req, res) => {
     const { email, photo_url } = req.body;
 
-    if (!email || !photo_url) {
-        return res.status(400).json({ message: "Faltan datos" });
-    }
-
     try {
+        // Actualizamos la foto_url con el enlace de Cloudinary
         const [result] = await db.execute(
             'UPDATE users SET photo_url = ? WHERE email = ?',
             [photo_url, email]
         );
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "Usuario no encontrado" });
-        }
-
-        res.json({ success: true, message: "Foto actualizada correctamente" });
+        res.json({ success: true, message: "URL guardada con éxito" });
     } catch (error) {
-        console.error("Error al guardar la foto:", error);
-        res.status(500).json({ message: "Error interno del servidor" });
+        console.error("Error SQL:", error);
+        res.status(500).json({ success: false, message: "Error en base de datos" });
     }
 });
 

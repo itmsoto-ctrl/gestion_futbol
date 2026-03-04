@@ -60,31 +60,48 @@ const PlayerHome = () => {
     };
 
     const handleAccept = async () => {
+        if (!tempPhoto) return;
+        setLoading(true);
+    
         try {
-            const savedEmail = localStorage.getItem('userEmail');
+            // 1️⃣ SUBIR A CLOUDINARY (Directo desde el móvil)
+            const formData = new FormData();
+            formData.append('file', tempPhoto); // El base64 capturado
+            formData.append('upload_preset', 'vora_players'); // Tu preset de Cloudinary
+    
+            const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const cloudData = await cloudRes.json();
             
-            // Enviamos la foto al servidor
+            if (!cloudData.secure_url) throw new Error("Error en Cloudinary");
+    
+            const finalUrl = cloudData.secure_url;
+            const savedEmail = localStorage.getItem('userEmail');
+    
+            // 2️⃣ GUARDAR SOLO LA URL EN TU BASE DE DATOS
             const response = await fetch(`${API_BASE_URL}/api/auth/update-photo`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     email: savedEmail,
-                    photo_url: tempPhoto // El base64 de la captura
+                    photo_url: finalUrl // <-- Ahora es un enlace corto: https://res.cloudinary...
                 })
             });
     
             const data = await response.json();
     
             if (data.success) {
-                setUser(prev => ({ ...prev, photo_url: tempPhoto }));
+                setUser(prev => ({ ...prev, photo_url: finalUrl }));
                 setTempPhoto(null);
-                alert("¡Cromo guardado en tu perfil! 🔥");
-            } else {
-                alert("Error al guardar: " + data.message);
+                alert("¡Cromo guardado en la nube! 🚀");
             }
         } catch (err) {
-            console.error("Error en la petición:", err);
-            alert("No se pudo conectar con el servidor.");
+            console.error("Error en el proceso:", err);
+            alert("Fallo al guardar la foto profesional.");
+        } finally {
+            setLoading(false);
         }
     };
 
