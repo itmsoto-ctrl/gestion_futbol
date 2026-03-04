@@ -218,19 +218,13 @@ const PlayerHome = () => {
             </aside>
 
             <main className="flex-1 flex flex-col items-center justify-start relative px-4 overflow-y-auto pt-6 pb-6">
-                <motion.div 
-                    onClick={() => handleAction('open', () => setView('SELFIE'))} 
-                    animate={{ rotateY: [-8, 8, -8], rotateX: [2, -2, 2] }}
-                    transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-                    style={{ transformStyle: "preserve-3d" }}
-                    // ✅ ESCALA FIJADA EN 0.54 PARA PROPORCIÓN PERFECTA
-                    className="cursor-pointer transform scale-[0.45] sm:scale-55 active:scale-95 transition-all drop-shadow-[0_45px_50px_rgba(0,0,0,0.8)] mt-[-115px]"
-                >
-                    <FutCard player={user} />
-                    <div className="absolute -bottom-10 left-0 w-full text-center">
-                        <p className="text-[12px] font-black uppercase tracking-[0.4em] text-white/30 animate-pulse italic">Panel VORA</p>
-                    </div>
-                </motion.div>
+               
+
+                <FutCard player={user} size="large" /> 
+                <div className="absolute -bottom-10 left-0 w-full text-center"> 
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 animate-pulse">Toca para editar tu ficha</p> 
+                </div> 
+                
 
                 <div onTouchStart={() => handleAction('swipe')} className="w-full flex justify-center mt-6">
                     <MatchSlider matches={matches} />
