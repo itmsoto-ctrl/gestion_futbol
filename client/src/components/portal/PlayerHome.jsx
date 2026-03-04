@@ -5,7 +5,7 @@ import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import ProfileWizard from './ProfileWizard';
-
+import ProfileWizard from './ProfileWizard';
 
 const PlayerHome = () => {
     const navigate = useNavigate();
