@@ -3,26 +3,30 @@ import { motion, animate } from 'framer-motion';
 import useInteractionSounds from '../hooks/useInteractionSounds';
 
 const RatingCounter = ({ targetValue, onComplete }) => {
-  const [displayValue, setDisplayValue] = useState(0);
+  // 🛡️ Inicializamos el estado directamente desde sessionStorage para evitar el "salto" de 0 a X
+  const [displayValue, setDisplayValue] = useState(() => {
+    const alreadyAnimated = sessionStorage.getItem('vora_rating_animated');
+    return alreadyAnimated === 'true' ? targetValue : 0;
+  });
+  
   const { playScore } = useInteractionSounds();
-  const hasAnimated = useRef(sessionStorage.getItem('rating_done'));
 
   useEffect(() => {
-    // Si ya animó antes, mostrar el valor final directamente
-    if (hasAnimated.current === 'true') {
-      setDisplayValue(targetValue);
+    const alreadyAnimated = sessionStorage.getItem('vora_rating_animated');
+
+    if (alreadyAnimated === 'true') {
       if (onComplete) onComplete();
       return;
     }
 
-    // Animación de subida única
-    playScore(0.3);
+    // Solo ejecutamos la animación y el sonido si es la primera vez en la sesión
+    playScore(0.3); 
     const controls = animate(0, targetValue, {
-      duration: 1.8,
+      duration: 2,
       ease: [0.33, 1, 0.68, 1],
       onUpdate: (v) => setDisplayValue(Math.floor(v)),
       onComplete: () => {
-        sessionStorage.setItem('rating_done', 'true');
+        sessionStorage.setItem('vora_rating_animated', 'true');
         if (onComplete) onComplete();
       }
     });
@@ -34,17 +38,27 @@ const RatingCounter = ({ targetValue, onComplete }) => {
 
 const FutCard = ({ player, isFlipped, onFlip, children }) => {
   const videoRef = useRef(null);
-  const [isRatingDone, setIsRatingDone] = useState(false);
+  const [isRatingDone, setIsRatingDone] = useState(() => {
+    // Si ya animó antes, el estado de "completado" (brillo) debe estar activo
+    return sessionStorage.getItem('vora_rating_animated') === 'true';
+  });
+
   const stats = player?.stats || { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 };
   const rating = player?.rating || 60;
+
+  useEffect(() => { 
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  }, [player?.photo_url]);
 
   return (
     <div className="relative select-none" style={{ width: '350px', height: '504px', perspective: "2000px" }}>
       <motion.div
         animate={{ 
-          rotateY: isFlipped ? 180 : [-6, 6, -6], // Giro más suave
-          rotateX: [2, -2, 2],
-          y: [0, -5, 0] 
+          rotateY: isFlipped ? 180 : [-8, 8, -8], // Balanceo axial elegante
+          rotateX: [3, -3, 3],
+          y: [0, -8, 0] // Efecto flotante 3D
         }}
         transition={{ 
           rotateY: isFlipped ? { duration: 0.8 } : { duration: 8, repeat: Infinity, ease: "easeInOut" },
@@ -68,10 +82,14 @@ const FutCard = ({ player, isFlipped, onFlip, children }) => {
             />
           )}
 
-          <div className="absolute top-[60px] left-[45px] z-20 flex flex-col items-center text-[#3a2d0f] font-bold font-oswald">
+          <div className="absolute top-[60px] left-[45px] z-20 flex flex-col items-center text-[#3a2d0f] font-bold font-oswald text-center">
             <motion.div 
-              animate={isRatingDone ? { scale: [1, 1.2, 1], filter: ["brightness(1)", "brightness(2.2)", "brightness(1)"] } : {}}
-              className="text-[85px] font-black leading-[0.7] tracking-tighter"
+              animate={isRatingDone ? { 
+                scale: [1, 1.2, 1], 
+                filter: ["brightness(1)", "brightness(2.2)", "brightness(1)"] 
+              } : {}}
+              transition={{ duration: 0.8 }}
+              className="text-[85px] leading-[0.7] font-black tracking-tighter"
             >
               <RatingCounter targetValue={rating} onComplete={() => setIsRatingDone(true)} />
             </motion.div>
@@ -83,7 +101,7 @@ const FutCard = ({ player, isFlipped, onFlip, children }) => {
           </div>
 
           <div className="absolute top-[285px] left-0 w-full text-center z-30 text-[#3a2d0f] font-oswald text-[36px] font-black uppercase italic tracking-tighter border-b border-[#3a2d0f]/10 pb-1 mx-auto w-[80%]">
-            {player?.name || 'URIEL BOTAS'}
+            {player?.name || 'JUGADOR'}
           </div>
 
           <div className="absolute top-[345px] left-1/2 -translate-x-1/2 w-[80%] z-30 flex justify-center items-center py-2">

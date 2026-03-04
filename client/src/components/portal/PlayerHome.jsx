@@ -24,7 +24,7 @@ const PlayerHome = () => {
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
     
-    // 📝 Campos de formulario restaurados
+    // 📝 Formulario con todos los campos necesarios
     const [formData, setFormData] = useState({ 
         name: '', 
         dni: '', 
@@ -118,11 +118,11 @@ const PlayerHome = () => {
     if (view === 'SELFIE') {
         return (
             <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-10 px-6 relative overflow-hidden">
-                <div onClick={() => handleAction('click')} className="cursor-pointer active:scale-95 transition-transform drop-shadow-2xl transform scale-[0.85]">
+                <div onClick={() => handleAction('click')} className="cursor-pointer active:scale-95 transition-transform drop-shadow-2xl transform scale-[0.80]">
                     <FutCard player={{ ...user, name: formData.name || 'JUGADOR', photo_url: tempPhoto || user?.photo_url }} />
                 </div>
                 <div className="flex flex-col w-full gap-4 mt-8">
-                    <button onClick={() => handleAction('click', () => setView('FORM'))} className="w-full bg-white/5 border border-white/10 text-white font-black py-4 rounded-2xl uppercase italic flex items-center justify-center gap-3">
+                    <button onClick={() => handleAction('click', () => setView('FORM'))} className="w-full bg-white/5 border border-white/10 text-white font-black py-4 rounded-2xl uppercase italic flex items-center justify-center gap-3 active:bg-white/10 transition-all">
                         <User size={18} className="text-amber-400"/> GESTIONAR DATOS
                     </button>
                     <button onClick={() => handleAction('click', () => setView('HOME'))} className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Omitir por ahora</button>
@@ -131,43 +131,41 @@ const PlayerHome = () => {
         );
     }
 
-    // --- VISTA B: FORMULARIO (Restaurado con todos los campos) ---
+    // --- VISTA B: FORMULARIO ---
     if (view === 'FORM') {
         return (
             <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-8 px-6 pb-6">
                 <div className="w-full max-w-md space-y-6">
-                    <h2 className="text-2xl font-black uppercase italic text-amber-400 text-center">Ficha Técnica</h2>
+                    <h2 className="text-2xl font-black uppercase italic text-amber-400 text-center tracking-tighter">Ficha Técnica</h2>
                     
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2 space-y-1">
                             <label className="text-[10px] font-black uppercase text-white/40 ml-2">Nombre en Carta</label>
-                            <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-amber-400 outline-none text-white" />
+                            <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-zinc-900 border border-white/10 rounded-xl py-3 px-4 font-bold uppercase focus:border-amber-400 outline-none text-white transition-colors" />
                         </div>
                         <div className="col-span-2 space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">DNI / Documento</label>
-                            <input type="text" value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-amber-400 outline-none text-white" />
+                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">DNI / Pasaporte</label>
+                            <input type="text" value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value})} className="w-full bg-zinc-900 border border-white/10 rounded-xl py-3 px-4 font-bold uppercase focus:border-amber-400 outline-none text-white transition-colors" />
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-black uppercase text-white/40 ml-2">Posición</label>
-                            <select value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white uppercase">
-                                {['POR', 'LD', 'DFC', 'LI', 'MCD', 'MC', 'MCO', 'MD', 'MI', 'ED', 'EI', 'DC'].map(pos => <option key={pos} value={pos} className="bg-[#1a1a1a]">{pos}</option>)}
+                            <select value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full bg-zinc-900 border border-white/10 rounded-xl py-3 px-4 font-bold outline-none text-white uppercase transition-colors">
+                                {['POR', 'LD', 'DFC', 'LI', 'MCD', 'MC', 'MCO', 'MD', 'MI', 'ED', 'EI', 'DC'].map(pos => <option key={pos} value={pos} className="bg-zinc-900">{pos}</option>)}
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">Nacionalidad</label>
-                            <select value={formData.country_code} onChange={(e) => setFormData({...formData, country_code: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white">
-                                <option value="es" className="bg-[#1a1a1a]">ESPAÑA 🇪🇸</option>
-                                <option value="ar" className="bg-[#1a1a1a]">ARGENTINA 🇦🇷</option>
-                                <option value="br" className="bg-[#1a1a1a]">BRASIL 🇧🇷</option>
-                                <option value="fr" className="bg-[#1a1a1a]">FRANCIA 🇫🇷</option>
-                                <option value="gb" className="bg-[#1a1a1a]">INGLATERRA 🏴󠁧󠁢󠁥󠁮󠁧󠁿</option>
-                                <option value="de" className="bg-[#1a1a1a]">ALEMANIA 🇩🇪</option>
-                                <option value="pt" className="bg-[#1a1a1a]">PORTUGAL 🇵🇹</option>
+                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">País</label>
+                            <select value={formData.country_code} onChange={(e) => setFormData({...formData, country_code: e.target.value})} className="w-full bg-zinc-900 border border-white/10 rounded-xl py-3 px-4 font-bold outline-none text-white transition-colors">
+                                <option value="es">ESPAÑA 🇪🇸</option>
+                                <option value="ar">ARGENTINA 🇦🇷</option>
+                                <option value="br">BRASIL 🇧🇷</option>
+                                <option value="fr">FRANCIA 🇫🇷</option>
+                                <option value="pt">PORTUGAL 🇵🇹</option>
                             </select>
                         </div>
                     </div>
 
-                    <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-amber-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl active:scale-95 transition-all">
+                    <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-amber-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl active:scale-95 transition-all disabled:opacity-30">
                         {uploading ? <Loader2 className="animate-spin m-auto" /> : "CONFIRMAR FICHA"}
                     </button>
                     <button onClick={() => handleAction('click', () => setView('SELFIE'))} className="w-full py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Volver a la foto</button>
@@ -180,11 +178,10 @@ const PlayerHome = () => {
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
             
-            {/* SIDEBAR */}
             <aside className="w-16 sm:w-20 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 z-50">
                 <button onClick={() => handleAction('click')} className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-[0_0_15px_rgba(255,255,255,0.15)]"><Home size={24} /></button>
-                <button onClick={() => handleAction('click')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Calendar size={24} /></button>
-                <button onClick={() => handleAction('click')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Trophy size={24} /></button>
+                <button onClick={() => handleAction('click')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 transition-all"><Calendar size={24} /></button>
+                <button onClick={() => handleAction('click')} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 transition-all"><Trophy size={24} /></button>
                 
                 {showInstallBtn && (
                     <button onClick={() => handleAction('click', handleInstallClick)} className="w-12 h-12 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse">
@@ -192,32 +189,32 @@ const PlayerHome = () => {
                     </button>
                 )}
                 
-                <button onClick={() => handleAction('open', () => setShowTutorial(true))} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Settings size={24} /></button>
+                <button onClick={() => handleAction('open', () => setShowTutorial(true))} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto transition-all"><Settings size={24} /></button>
             </aside>
 
             {showTutorial && <WelcomeTutorial user={user} onFinish={() => handleAction('click', () => setShowTutorial(false))} />}
 
             <main className="flex-1 flex flex-col items-center justify-start relative px-4 overflow-y-auto pt-6 pb-6">
                 
-                {/* 🃏 CROMO REDUCIDO Y BALANCEADO */}
+                {/* 🃏 CROMO REDUCIDO (Escala 0.54) Y BALANCEADO */}
                 <motion.div 
                     onClick={() => handleAction('open', () => setView('SELFIE'))} 
                     animate={{ 
-                        rotateY: [-12, 12, -12], 
+                        rotateY: [-10, 10, -10], 
                         rotateX: [2, -2, 2] 
                     }}
                     transition={{ 
-                        duration: 7, 
+                        duration: 8, 
                         repeat: Infinity, 
                         ease: "easeInOut" 
                     }}
                     style={{ transformStyle: "preserve-3d" }}
-                    // Ajuste de escala a 0.54 para mejor proporción
-                    className="cursor-pointer transform scale-[0.54] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-110px]"
+                    // ✅ CORRECCIÓN: Escala ajustada y margen superior suavizado para mejor proporción
+                    className="cursor-pointer transform scale-[0.54] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_45px_50px_rgba(0,0,0,0.8)] mt-[-90px]"
                 >
                     <FutCard player={user} />
                     <div className="absolute -bottom-10 left-0 w-full text-center">
-                        <p className="text-[12px] font-black uppercase tracking-[0.3em] text-white/20 animate-pulse italic">Gestión de Ficha</p>
+                        <p className="text-[12px] font-black uppercase tracking-[0.4em] text-white/30 animate-pulse italic">Panel VORA</p>
                     </div>
                 </motion.div>
 
