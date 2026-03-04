@@ -197,4 +197,19 @@ router.get('/user-profile', async (req, res) => {
     }
 });
 
+router.post('/update-player-full', async (req, res) => {
+    const { email, photo_url, name, position, country_code } = req.body;
+    try {
+        const sql = `
+            UPDATE users 
+            SET photo_url = ?, name = ?, position = ?, country_code = ? 
+            WHERE email = ?
+        `;
+        await db.execute(sql, [photo_url, name, position, country_code, email]);
+        res.json({ success: true, message: "Ficha actualizada correctamente" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;
