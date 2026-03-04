@@ -1,6 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
 
 /* -----------------------------------------------------------
    1. CONFIGURACIÓN GLOBAL Y COLORES (VORA Gray)
@@ -116,11 +117,14 @@ html, body {
   transform: rotate(45deg);
   animation: shine 4s infinite;
 }
+
+
 @keyframes shine {
   0% { transform: translateX(-150%) rotate(45deg); }
-  20% { transform: translateX(150%) rotate(45deg); }
+  40% { transform: translateX(150%) rotate(45deg); }
   100% { transform: translateX(150%) rotate(45deg); }
 }
+
 .font-oswald {
   font-family: 'Oswald', sans-serif;
 }
