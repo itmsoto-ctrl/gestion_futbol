@@ -18,7 +18,7 @@ const PlayerHome = () => {
     // 📊 Estados de la App
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState('HOME'); // ✅ Aquí estaba el error, ahora está definido
+    const [view, setView] = useState('HOME'); 
     const [showTutorial, setShowTutorial] = useState(false);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [tempPhoto, setTempPhoto] = useState(null);
@@ -31,6 +31,7 @@ const PlayerHome = () => {
     const streamRef = useRef(null);
 
     // 📳 Función maestra para Sonido + Vibración + Acción
+    // El primer clic en cualquier sitio activará el contexto de audio del navegador
     const handleAction = (type, fn) => {
         if (window.navigator.vibrate) window.navigator.vibrate(20);
         if (type === 'click') playClick();
@@ -159,7 +160,18 @@ const PlayerHome = () => {
                 {/* 🃏 CROMO CON BALANCEO AXIAL (Giro Y) */}
                 <motion.div 
                     onClick={() => handleAction('open', () => setView('SELFIE'))} 
-                    className="cursor-pointer transform scale-[0.68] sm:scale-80 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-85px]"
+                    // ✅ AÑADIDO: Animación de balanceo 3D en el eje Y (axial)
+                    animate={{ 
+                        rotateY: [-15, 15, -15], // Gira izquierda y derecha
+                        rotateX: [3, -3, 3]     // Cabeceo suave arriba y abajo
+                    }}
+                    transition={{ 
+                        duration: 7,            // Movimiento muy fluido y lento
+                        repeat: Infinity, 
+                        ease: "easeInOut" 
+                    }}
+                    style={{ transformStyle: "preserve-3d" }}
+                    className="cursor-pointer transform scale-[0.68] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_45px_60px_rgba(0,0,0,0.8)] mt-[-70px] sm:mt-[-50px]"
                 >
                     <FutCard player={user} />
                     <div className="absolute -bottom-10 left-0 w-full text-center">
@@ -168,7 +180,7 @@ const PlayerHome = () => {
                 </motion.div>
 
                 {/* ⚽ SLIDER DE PARTIDOS */}
-                <div onTouchStart={() => handleAction('swipe')} className="w-full flex justify-center mt-4">
+                <div onTouchStart={() => handleAction('swipe')} className="w-full flex justify-center mt-6">
                     <MatchSlider matches={matches} />
                 </div>
                 
