@@ -9,10 +9,12 @@ const PlayerHome = () => {
     const navigate = useNavigate();
     const { showInstallBtn, handleInstallClick } = usePWAInstall();
     
+    // ESTADOS PRINCIPALES
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('HOME'); // 'HOME', 'SELFIE', 'FORM'
     
+    // ESTADOS CÁMARA Y SUBIDA
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
@@ -37,14 +39,17 @@ const PlayerHome = () => {
                 const savedEmail = localStorage.getItem('userEmail');
                 if (!savedEmail) { setLoading(false); return; }
                 
+                // 1. Cargar perfil (con el JOIN del equipo para el logo)
                 const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
                 const data = await res.json();
                 
+                // 👀 DEBUG: Mira en la consola del navegador si aquí llega el nombre "A"
+                console.log("Dato recibido del server:", data);
+
                 if (data) {
                     setUser(data);
                     
-                    // ✅ CORRECCIÓN PRE-LLENADO: Sincronizamos los datos de la DB con el Formulario
-                    // Si en la DB el nombre es "A", aquí se asignará "A" automáticamente.
+                    // ✅ CORRECCIÓN: Sincronizar el formulario con los datos reales de la DB
                     setFormData({
                         name: data.name || '',
                         dni: data.dni || '',
@@ -89,12 +94,16 @@ const PlayerHome = () => {
 
     const capturePhoto = () => {
         if (videoRef.current && canvasRef.current) {
-            const context = canvasRef.current.getContext('2d');
-            // Mantenemos la proporción real del video para evitar estiramientos
-            canvasRef.current.width = videoRef.current.videoWidth;
-            canvasRef.current.height = videoRef.current.videoHeight;
-            context.drawImage(videoRef.current, 0, 0);
-            setTempPhoto(canvasRef.current.toDataURL('image/jpeg', 0.8));
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
+            const context = canvas.getContext('2d');
+
+            // ✅ CORRECCIÓN: Forzamos el canvas a tener la resolución real de la cámara para evitar estiramientos
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            setTempPhoto(canvas.toDataURL('image/jpeg', 0.8));
             stopCamera();
         }
     };
@@ -171,8 +180,7 @@ const PlayerHome = () => {
                             <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
                             <canvas ref={canvasRef} className="hidden" />
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                {/* Guía visual para encuadrar la cara */}
-                                <div className="w-64 h-80 border-[3px] border-lime-400/30 border-dashed rounded-[50%_50%_40%_40%] shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]"></div>
+                                <div className="w-72 h-96 border-[3px] border-lime-400/50 border-dashed rounded-[50%_50%_45%_45%] shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]"></div>
                             </div>
                             <button onClick={stopCamera} className="absolute top-6 right-6 text-white bg-black/50 p-3 rounded-full"><X /></button>
                         </div>
@@ -276,13 +284,32 @@ const PlayerHome = () => {
             </aside>
 
             <main className="flex-1 flex flex-col items-center justify-center relative px-6 overflow-y-auto pt-10 pb-10">
-                <div onClick={() => setView('SELFIE')} className="cursor-pointer transform scale-[0.7] sm:scale-85 active:scale-95 transition-all drop-shadow-[0_45px_45px_rgba(0,0,0,0.7)]">
+                {showInstallBtn && (
+                    <button onClick={handleInstallClick} className="absolute top-6 right-6 bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-3xl text-white animate-pulse z-40">
+                        <UploadCloud size={24} />
+                    </button>
+                )}
+
+                <div 
+                    onClick={() => setView('SELFIE')} 
+                    className="cursor-pointer transform scale-[0.7] sm:scale-85 active:scale-95 transition-all drop-shadow-[0_45px_45px_rgba(0,0,0,0.7)]"
+                >
                     <FutCard player={user} size="large" />
                     <div className="absolute -bottom-12 left-0 w-full text-center">
                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 animate-pulse">Toca para editar tu ficha</p>
                     </div>
                 </div>
-                {/* ... resto del contenido (Siguiente Encuentro) ... */}
+
+                <div className="mt-20 text-center space-y-4">
+                    <div className="inline-block px-5 py-1.5 bg-amber-400 text-black text-[10px] font-black uppercase italic rounded-full tracking-[0.2em]">Siguiente Encuentro</div>
+                    <div className="space-y-2 text-white">
+                        <h2 className="text-4xl font-black uppercase italic tracking-tighter">
+                            {matches[0]?.home_team || 'POR DEFINIR'} <span className="text-amber-400 text-2xl">VS</span> {matches[0]?.away_team || 'POR DEFINIR'}
+                        </h2>
+                        <p className="text-xl font-bold opacity-90">{matches[0] ? new Date(matches[0].match_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Próximamente'}</p>
+                        <p className="text-xs uppercase tracking-[0.3em] font-black text-amber-400">{matches[0]?.venue_name || 'ESTADIO VORA'}</p>
+                    </div>
+                </div>
             </main>
         </div>
     );
