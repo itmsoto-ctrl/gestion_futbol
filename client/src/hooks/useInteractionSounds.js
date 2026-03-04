@@ -4,7 +4,7 @@ const SOUND_URLS = {
   click: 'https://cdn.pixabay.com/audio/2022/03/15/audio_730248383f.mp3', 
   swipe: 'https://cdn.pixabay.com/audio/2022/03/10/audio_c363943340.mp3', 
   open: 'https://cdn.pixabay.com/audio/2022/03/15/audio_8233345842.mp3',
-  score: 'https://cdn.pixabay.com/audio/2024/02/12/audio_f5f6b2e1b1.mp3' // Redoble electrónico
+  score: 'https://cdn.pixabay.com/audio/2024/02/12/audio_f5f6b2e1b1.mp3' 
 };
 
 const useInteractionSounds = () => {
