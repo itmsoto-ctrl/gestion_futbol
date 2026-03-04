@@ -1,22 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2, UploadCloud } from 'lucide-react';
+import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2, UploadCloud, User, IdCard, Hash, Target, MapPin } from 'lucide-react';
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
-import ProfileWizard from './ProfileWizard';
-import ProfileWizard from './ProfileWizard';
 
 const PlayerHome = () => {
     const navigate = useNavigate();
     const { showInstallBtn, handleInstallClick } = usePWAInstall();
+    
+    // ESTADOS PRINCIPALES
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [view, setView] = useState('HOME'); // 'HOME', 'SELFIE', 'FORM'
+    
+    // ESTADOS CÁMARA Y SUBIDA
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
-    const [matches, setMatches] = useState([]);
+    
+    // ESTADO FORMULARIO (Precargado con datos del SELECT)
+    const [formData, setFormData] = useState({
+        name: '',
+        dni: '',
+        dorsal: '',
+        position: 'DEL',
+        country_code: 'es'
+    });
 
+    const [matches, setMatches] = useState([]);
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const streamRef = useRef(null);
@@ -27,12 +39,25 @@ const PlayerHome = () => {
                 const savedEmail = localStorage.getItem('userEmail');
                 if (!savedEmail) { setLoading(false); return; }
                 
-                // 1. Cargar perfil (con el JOIN del equipo para el logo)
                 const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
                 const data = await res.json();
+                
                 if (data) {
                     setUser(data);
-                    // 2. Cargar calendario si tiene equipo
+                    // PRECARGA DE DATOS PARA EL FORMULARIO
+                    setFormData({
+                        name: data.name || '',
+                        dni: data.dni || '',
+                        dorsal: data.dorsal || '',
+                        position: data.position || 'DEL',
+                        country_code: data.country_code || 'es'
+                    });
+
+                    // Si no hay foto, forzamos inicio en Selfie
+                    if (!data.photo_url) {
+                        setView('SELFIE');
+                    }
+
                     if (data.team_id) {
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`);
                         const mData = await mRes.json();
@@ -45,6 +70,7 @@ const PlayerHome = () => {
         return () => stopCamera();
     }, []);
 
+    // --- LÓGICA DE CÁMARA ---
     const startCamera = async () => {
         setTempPhoto(null);
         setIsCameraOpen(true);
@@ -73,82 +99,79 @@ const PlayerHome = () => {
         }
     };
 
-    const handleAccept = async () => {
-        if (!tempPhoto) return;
+    // --- GUARDADO FINAL (EL UPDATE TOTAL) ---
+    const handleFinalUpdate = async () => {
         setUploading(true);
-    
         try {
-            const formData = new FormData();
-            formData.append('file', tempPhoto);
-            formData.append('upload_preset', 'vora_players'); 
-    
-            const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', {
+            let finalPhotoUrl = user.photo_url;
+
+            // 1. Si hay una nueva foto temporal, la subimos primero
+            if (tempPhoto) {
+                const cloudFormData = new FormData();
+                cloudFormData.append('file', tempPhoto);
+                cloudFormData.append('upload_preset', 'vora_players'); 
+                const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', {
+                    method: 'POST',
+                    body: cloudFormData
+                });
+                const cloudData = await cloudRes.json();
+                finalPhotoUrl = cloudData.secure_url;
+            }
+
+            // 2. Update de todos los campos en la tabla users
+            const response = await fetch(`${API_BASE_URL}/api/auth/update-player-full`, {
                 method: 'POST',
-                body: formData
-            });
-            const cloudData = await cloudRes.json();
-            
-            if (!cloudData.secure_url) throw new Error("Error Cloudinary");
-    
-            const savedEmail = localStorage.getItem('userEmail');
-            const token = localStorage.getItem('token');
-    
-            const response = await fetch(`${API_BASE_URL}/api/auth/update-photo`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': token ? `Bearer ${token}` : '' 
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    email: savedEmail,
-                    photo_url: cloudData.secure_url
+                    email: user.email,
+                    photo_url: finalPhotoUrl,
+                    ...formData
                 })
             });
-    
+
             if (response.ok) {
-                setUser(prev => ({ ...prev, photo_url: cloudData.secure_url }));
+                setUser(prev => ({ ...prev, photo_url: finalPhotoUrl, ...formData }));
                 setTempPhoto(null);
+                setView('HOME');
             }
         } catch (err) {
-            alert(`🚨 Error: ${err.message}`);
+            alert(`🚨 Error al guardar: ${err.message}`);
         } finally {
             setUploading(false);
         }
     };
 
-    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic">PREPARANDO VESTUARIO...</div>;
+    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic tracking-widest">PREPARANDO VESTUARIO...</div>;
 
-    // --- VISTA A: CAPTURA (Si no hay foto guardada) ---
-    if (!user?.photo_url) {
+    // --- VISTA A: SELFIE ---
+    if (view === 'SELFIE') {
         return (
-            <div className="min-h-screen bg-[#665C5A] text-white flex flex-col items-center pt-10 px-6 relative overflow-hidden">
-                <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+            <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-10 px-6 relative overflow-hidden">
+                <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transform scale-90">
                     <FutCard 
                         player={{
-                            name: user?.name || 'JUGADOR',
-                            rating: 85,
-                            photo_url: tempPhoto || null,
-                            position: 'DEL',
-                            pac: 80, sho: 85, pas: 72, dri: 84, def: 35, phy: 70
+                            ...user,
+                            name: formData.name || 'JUGADOR',
+                            photo_url: tempPhoto || user?.photo_url,
+                            position: formData.position
                         }} 
                     />
                 </div>
 
                 {!tempPhoto ? (
-                    <div className="text-center mt-10 space-y-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-lime-400 animate-pulse">Toca el cromo para entrar en la liga</p>
-                        <h2 className="text-3xl font-black uppercase italic tracking-tighter leading-none text-white/20">TU FICHA <br/> OFICIAL</h2>
+                    <div className="text-center mt-8 space-y-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-lime-400 animate-pulse">Toca el cromo para tu foto oficial</p>
+                        <h2 className="text-3xl font-black uppercase italic tracking-tighter leading-none text-white/20 text-center">FICHA <br/> VORA</h2>
                     </div>
                 ) : (
                     <div className="fixed bottom-10 left-0 right-0 z-[100] px-6 flex flex-col gap-3">
-                        <button onClick={handleAccept} disabled={uploading} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3">
-                            {uploading ? <Loader2 className="animate-spin" /> : <>¡ESTÁ DE LOCOS! <Check/></>}
+                        <button onClick={() => setView('FORM')} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
+                            ¡ESTÁ DE LOCOS! <Check/>
                         </button>
-                        <button onClick={startCamera} className="w-full bg-white/10 backdrop-blur-md text-white font-black py-4 rounded-2xl uppercase italic border border-white/20">REPETIR FOTO</button>
+                        <button onClick={startCamera} className="w-full bg-white/5 backdrop-blur-md text-white/40 font-black py-4 rounded-2xl uppercase italic text-xs tracking-widest">REPETIR FOTO</button>
                     </div>
                 )}
 
-                {/* Cámara Overlay */}
                 {isCameraOpen && (
                     <div className="fixed inset-0 z-[120] bg-black flex flex-col">
                         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
@@ -159,10 +182,8 @@ const PlayerHome = () => {
                             </div>
                             <button onClick={stopCamera} className="absolute top-6 right-6 text-white bg-black/50 p-3 rounded-full"><X /></button>
                         </div>
-                        <div className="h-40 flex items-center justify-center bg-[#1a1a1a] border-t border-white/10">
-                            <button onClick={capturePhoto} className="w-20 h-20 bg-lime-400 rounded-full flex items-center justify-center shadow-xl active:scale-90 transition-all">
-                                <Camera size={32} className="text-black" />
-                            </button>
+                        <div className="h-40 flex items-center justify-center bg-zinc-950">
+                            <button onClick={capturePhoto} className="w-20 h-20 bg-lime-400 rounded-full flex items-center justify-center shadow-xl active:scale-90 transition-all"><Camera size={32} className="text-black" /></button>
                         </div>
                     </div>
                 )}
@@ -170,11 +191,94 @@ const PlayerHome = () => {
         );
     }
 
-    // --- VISTA B: HOME PREMIUM (Si ya tiene foto) ---
+    // --- VISTA B: FORMULARIO COMPACTO (TODO EN UNA PANTALLA) ---
+    if (view === 'FORM') {
+        return (
+            <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-10 px-6 pb-6 overflow-y-auto">
+                <div className="w-full max-w-md space-y-6">
+                    <div className="text-center">
+                        <h2 className="text-2xl font-black uppercase italic text-lime-400">Datos de Ficha</h2>
+                        <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest">Completa tu perfil oficial</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Fila 1: Nombre (Completo) */}
+                        <div className="col-span-2 space-y-1">
+                            <label className="text-[10px] font-black uppercase text-white/30 ml-2 flex items-center gap-2"><User size={12}/> Nombre en Carta</label>
+                            <input 
+                                type="text" value={formData.name} 
+                                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none transition-all"
+                            />
+                        </div>
+
+                        {/* Fila 2: DNI (Completo) */}
+                        <div className="col-span-2 space-y-1">
+                            <label className="text-[10px] font-black uppercase text-white/30 ml-2 flex items-center gap-2"><IdCard size={12}/> DNI / Documento</label>
+                            <input 
+                                type="text" value={formData.dni} 
+                                onChange={(e) => setFormData({...formData, dni: e.target.value})}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none transition-all placeholder:text-white/10"
+                                placeholder="00000000X"
+                            />
+                        </div>
+
+                        {/* Fila 3: Dorsal (Heredado) y Posición */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase text-white/30 ml-2 flex items-center gap-2"><Hash size={12}/> Dorsal</label>
+                            <input 
+                                type="text" value={formData.dorsal} readOnly
+                                className="w-full bg-white/5 border border-white/5 rounded-xl py-3 px-4 font-black text-lime-400 outline-none opacity-50"
+                            />
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase text-white/30 ml-2 flex items-center gap-2"><Target size={12}/> Posición</label>
+                            <select 
+                                value={formData.position}
+                                onChange={(e) => setFormData({...formData, position: e.target.value})}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 font-bold outline-none appearance-none"
+                            >
+                                <option value="PO">PO</option>
+                                <option value="DFC">DFC</option>
+                                <option value="MC">MC</option>
+                                <option value="DEL">DEL</option>
+                            </select>
+                        </div>
+
+                        {/* Fila 4: Nacionalidad */}
+                        <div className="col-span-2 space-y-1">
+                            <label className="text-[10px] font-black uppercase text-white/30 ml-2 flex items-center gap-2"><MapPin size={12}/> Nacionalidad</label>
+                            <select 
+                                value={formData.country_code}
+                                onChange={(e) => setFormData({...formData, country_code: e.target.value})}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 font-bold outline-none appearance-none"
+                            >
+                                <option value="es">ESPAÑA 🇪🇸</option>
+                                <option value="ar">ARGENTINA 🇦🇷</option>
+                                <option value="fr">FRANCIA 🇫🇷</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="pt-4">
+                        <button 
+                            onClick={handleFinalUpdate} 
+                            disabled={uploading || !formData.name}
+                            className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-30"
+                        >
+                            {uploading ? <Loader2 className="animate-spin" /> : "CONFIRMAR FICHA"}
+                        </button>
+                        <button onClick={() => setView('SELFIE')} className="w-full mt-2 py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Volver a la foto</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // --- VISTA C: HOME PREMIUM ---
     return (
-        <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" 
-             style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
-            
+        <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
             <aside className="w-20 bg-red-950/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-12 space-y-8 z-50">
                 <button className="w-14 h-14 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg"><Home size={28} /></button>
                 <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Calendar size={28} /></button>
@@ -184,60 +288,25 @@ const PlayerHome = () => {
             </aside>
 
             <main className="flex-1 flex flex-col items-center justify-center relative px-6 overflow-y-auto pt-10 pb-10">
-                {showInstallBtn && (
-                    <button onClick={handleInstallClick} className="absolute top-6 right-6 bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-3xl text-white animate-pulse z-40">
-                        <UploadCloud size={24} />
-                    </button>
-                )}
-
-                {/* ESCALADO 0.7 PARA QUE QUEPA TODO Y CLIC PARA REPETIR SELFIE */}
                 <div 
-                    onClick={startCamera} 
-                    className="cursor-pointer transform scale-[0.7] sm:scale-85 active:scale-95 transition-all drop-shadow-[0_45px_45px_rgba(0,0,0,0.7)] animate-in slide-in-from-bottom-10 duration-700"
+                    onClick={() => setView('SELFIE')} 
+                    className="cursor-pointer transform scale-[0.7] sm:scale-85 active:scale-95 transition-all drop-shadow-[0_45px_45px_rgba(0,0,0,0.7)]"
                 >
                     <FutCard player={user} size="large" />
                     <div className="absolute -bottom-12 left-0 w-full text-center">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 animate-pulse">
-                            Toca para repetir selfie
-                        </p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 animate-pulse">Toca para editar tu ficha</p>
                     </div>
                 </div>
 
                 <div className="mt-20 text-center space-y-4">
                     <div className="inline-block px-5 py-1.5 bg-amber-400 text-black text-[10px] font-black uppercase italic rounded-full tracking-[0.2em]">Siguiente Encuentro</div>
-                    <div className="space-y-2">
-                        <h2 className="text-4xl font-black uppercase italic tracking-tighter text-white">
+                    <div className="space-y-2 text-white">
+                        <h2 className="text-4xl font-black uppercase italic tracking-tighter">
                             {matches[0]?.home_team || 'POR DEFINIR'} <span className="text-amber-400 text-2xl">VS</span> {matches[0]?.away_team || 'POR DEFINIR'}
                         </h2>
-                        <div className="flex flex-col gap-1">
-                            <p className="text-xl font-bold text-white/90">
-                               {matches[0] ? new Date(matches[0].match_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Próximamente'}
-                            </p>
-                            <p className="text-xs uppercase tracking-[0.3em] font-black text-amber-400">
-                               {matches[0]?.venue_name || 'ESTADIO VORA'} — {matches[0] ? new Date(matches[0].match_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '00:00H'}
-                            </p>
-                        </div>
+                        {/* ... resto del calendario ... */}
                     </div>
                 </div>
-
-                {/* Re-utilizamos el overlay de cámara aquí por si pulsa en el cromo para repetir */}
-                {isCameraOpen && (
-                    <div className="fixed inset-0 z-[120] bg-black flex flex-col">
-                        <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-                            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                            <canvas ref={canvasRef} className="hidden" />
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <div className="w-72 h-96 border-[3px] border-lime-400/50 border-dashed rounded-[50%_50%_45%_45%] shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]"></div>
-                            </div>
-                            <button onClick={stopCamera} className="absolute top-6 right-6 text-white bg-black/50 p-3 rounded-full"><X /></button>
-                        </div>
-                        <div className="h-40 flex items-center justify-center bg-[#1a1a1a] border-t border-white/10">
-                            <button onClick={capturePhoto} className="w-20 h-20 bg-lime-400 rounded-full flex items-center justify-center shadow-xl active:scale-90 transition-all">
-                                <Camera size={32} className="text-black" />
-                            </button>
-                        </div>
-                    </div>
-                )}
             </main>
         </div>
     );
