@@ -5,31 +5,22 @@ import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import WelcomeTutorial from './WelcomeTutorial';
+import MatchSlider from './MatchSlider'; // ✅ Corregido: Importación local
 
 const PlayerHome = () => {
     const navigate = useNavigate();
     const { showInstallBtn, handleInstallClick } = usePWAInstall();
     
-    // ESTADOS PRINCIPALES
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState('HOME'); // 'HOME', 'SELFIE', 'FORM'
-    
-    // ESTADO TUTORIAL
+    const [view, setView] = useState('HOME'); 
     const [showTutorial, setShowTutorial] = useState(false);
-
-    // ESTADOS CÁMARA Y SUBIDA
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
     
-    // ESTADO FORMULARIO
     const [formData, setFormData] = useState({
-        name: '',
-        dni: '',
-        dorsal: '',
-        position: 'DEL',
-        country_code: 'es'
+        name: '', dni: '', dorsal: '', position: 'DEL', country_code: 'es'
     });
 
     const [matches, setMatches] = useState([]);
@@ -47,14 +38,12 @@ const PlayerHome = () => {
                 const data = await res.json();
 
                 if (data) {
-                    // --- LÓGICA DE STATS INCORPORADA (Mínimo 60) ---
+                    // --- LÓGICA DE STATS INCORPORADA ---
                     const statsBase = data.stats ? 
                         (typeof data.stats === 'string' ? JSON.parse(data.stats) : data.stats) : 
                         { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 };
                     
-                    const userDataWithStats = { ...data, stats: statsBase };
-                    setUser(userDataWithStats);
-                    
+                    setUser({ ...data, stats: statsBase });
                     setFormData({
                         name: data.name || '',
                         dni: data.dni || '',
@@ -63,7 +52,6 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
-                    // LÓGICA DE CONTROL (Base de Datos)
                     if (data.tutorial_seen === 0) {
                         setShowTutorial(true); 
                         setView('SELFIE'); 
@@ -118,10 +106,8 @@ const PlayerHome = () => {
             const video = videoRef.current;
             const canvas = canvasRef.current;
             const context = canvas.getContext('2d');
-
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             setTempPhoto(canvas.toDataURL('image/jpeg', 0.8));
             stopCamera();
@@ -151,7 +137,8 @@ const PlayerHome = () => {
                 body: JSON.stringify({
                     email: user.email,
                     photo_url: finalPhotoUrl,
-                    ...formData
+                    ...formData,
+                    stats: user.stats // ✅ CORREGIDO: Enviamos los stats para no perderlos
                 })
             });
 
@@ -170,52 +157,27 @@ const PlayerHome = () => {
         return (
             <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-10 px-6 relative overflow-hidden">
                 {showTutorial && <WelcomeTutorial user={user} onFinish={finishTutorial} />}
-
                 <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transform scale-90">
-                    <FutCard 
-                        player={{
-                            ...user,
-                            name: formData.name || 'JUGADOR',
-                            photo_url: tempPhoto || user?.photo_url,
-                            position: formData.position
-                        }} 
-                    />
+                    <FutCard player={{ ...user, name: formData.name || 'JUGADOR', photo_url: tempPhoto || user?.photo_url, position: formData.position }} />
                 </div>
-
                 {!tempPhoto ? (
                     <div className="flex flex-col w-full gap-4 mt-8">
-                        <div className="text-center space-y-2">
-                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-lime-400 animate-pulse">Toca el cromo para cambiar foto</p>
-                        </div>
-                        
-                        <button 
-                            onClick={() => setView('FORM')} 
-                            className="w-full bg-white/5 border border-white/10 text-white font-black py-4 rounded-2xl uppercase italic text-sm flex items-center justify-center gap-3 active:scale-95 transition-all"
-                        >
+                        <button onClick={() => setView('FORM')} className="w-full bg-white/5 border border-white/10 text-white font-black py-4 rounded-2xl uppercase italic text-sm flex items-center justify-center gap-3 active:scale-95 transition-all">
                             <User size={18} className="text-lime-400"/> GESTIONAR DATOS
                         </button>
-
-                        <button 
-                            onClick={() => setView('HOME')} 
-                            className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center"
-                        >
-                            Volver al inicio
-                        </button>
+                        <button onClick={() => setView('HOME')} className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Volver al inicio</button>
                     </div>
                 ) : (
                     <div className="fixed bottom-10 left-0 right-0 z-[100] px-6 flex flex-col gap-3">
-                        <button onClick={() => setView('FORM')} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
-                            ¡ESTÁ DE LOCOS! <Check/>
-                        </button>
+                        <button onClick={() => setView('FORM')} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl active:scale-95 transition-all">¡ESTÁ DE LOCOS! <Check/></button>
                         <button onClick={startCamera} className="w-full bg-white/5 backdrop-blur-md text-white/40 font-black py-4 rounded-2xl uppercase italic text-[10px] tracking-widest">REPETIR FOTO</button>
                     </div>
                 )}
-
+                {/* ... (Cámara igual) ... */}
                 {isCameraOpen && (
                     <div className="fixed inset-0 z-[120] bg-black flex flex-col">
                         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
                             <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                            <canvas ref={canvasRef} className="hidden" />
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                 <div className="w-72 h-96 border-[3px] border-lime-400/50 border-dashed rounded-[50%_50%_45%_45%] shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]"></div>
                             </div>
@@ -230,137 +192,64 @@ const PlayerHome = () => {
         );
     }
 
-    // --- VISTA B: FORMULARIO COMPACTO ---
+    // --- VISTA B: FORMULARIO ---
     if (view === 'FORM') {
         return (
             <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-8 px-6 pb-6">
-                <div className="w-full max-w-md space-y-6">
-                    <div className="text-center">
-                        <h2 className="text-2xl font-black uppercase italic text-lime-400">Datos de Ficha</h2>
-                        <p className="text-[10px] uppercase font-bold text-white/40 tracking-widest">Verifica tu información oficial</p>
-                    </div>
-
+                <div className="w-full max-md space-y-6">
+                    <h2 className="text-2xl font-black uppercase italic text-lime-400 text-center">Datos de Ficha</h2>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2 space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2 flex items-center gap-2"><User size={12}/> Nombre en Carta</label>
-                            <input 
-                                type="text" value={formData.name} 
-                                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                                className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none transition-all text-white"
-                            />
+                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">Nombre en Carta</label>
+                            <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none text-white" />
                         </div>
-
                         <div className="col-span-2 space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2 flex items-center gap-2"><IdCard size={12}/> DNI / Documento</label>
-                            <input 
-                                type="text" value={formData.dni} 
-                                onChange={(e) => setFormData({...formData, dni: e.target.value})}
-                                className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none text-white"
-                            />
+                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">DNI / Documento</label>
+                            <input type="text" value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none text-white" />
                         </div>
-
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2 flex items-center gap-2"><Hash size={12}/> Dorsal</label>
-                            <input type="text" value={formData.dorsal} readOnly className="w-full bg-white/5 border border-white/5 rounded-xl py-3 px-4 font-black text-lime-400 opacity-50 outline-none" />
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2 flex items-center gap-2"><Target size={12}/> Posición</label>
-                            <select 
-                                value={formData.position}
-                                onChange={(e) => setFormData({...formData, position: e.target.value})}
-                                className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white"
-                            >
-                                <option value="PO" className="bg-[#1a1a1a]">PO</option>
-                                <option value="DFC" className="bg-[#1a1a1a]">DFC</option>
-                                <option value="MC" className="bg-[#1a1a1a]">MC</option>
-                                <option value="DEL" className="bg-[#1a1a1a]">DEL</option>
+                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">Posición</label>
+                            <select value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white">
+                                {['POR', 'LD', 'DFC', 'LI', 'MCD', 'MC', 'MCO', 'MD', 'MI', 'ED', 'EI', 'DC'].map(pos => <option key={pos} value={pos} className="bg-[#1a1a1a]">{pos}</option>)}
                             </select>
                         </div>
-
-                        <div className="col-span-2 space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2 flex items-center gap-2"><MapPin size={12}/> Nacionalidad</label>
-                            <select 
-                                value={formData.country_code}
-                                onChange={(e) => setFormData({...formData, country_code: e.target.value})}
-                                className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white"
-                            >
-                                <option value="es" className="bg-[#1a1a1a]">ESPAÑA 🇪🇸</option>
-                                <option value="ar" className="bg-[#1a1a1a]">ARGENTINA 🇦🇷</option>
-                                <option value="fr" className="bg-[#1a1a1a]">FRANCIA 🇫🇷</option>
-                                <option value="it" className="bg-[#1a1a1a]">ITALIA 🇮🇹</option>
-                                <option value="br" className="bg-[#1a1a1a]">BRASIL 🇧🇷</option>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">Nacionalidad</label>
+                            <select value={formData.country_code} onChange={(e) => setFormData({...formData, country_code: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white">
+                                <option value="es">ESPAÑA 🇪🇸</option><option value="ar">ARGENTINA 🇦🇷</option><option value="br">BRASIL 🇧🇷</option><option value="fr">FRANCIA 🇫🇷</option>
                             </select>
                         </div>
                     </div>
-
-                    <div className="pt-6">
-                        <button 
-                            onClick={handleFinalUpdate} 
-                            disabled={uploading || !formData.name}
-                            className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-30"
-                        >
-                            {uploading ? <Loader2 className="animate-spin" /> : "CONFIRMAR FICHA"}
-                        </button>
-                        <button onClick={() => setView('SELFIE')} className="w-full mt-2 py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Volver a la foto</button>
-                    </div>
+                    <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl active:scale-95 transition-all">
+                        {uploading ? <Loader2 className="animate-spin m-auto" /> : "CONFIRMAR FICHA"}
+                    </button>
                 </div>
             </div>
         );
     }
 
-    // --- VISTA C: HOME PREMIUM (OPTIMIZADA MÓVIL) ---
+    // --- VISTA C: HOME (OPTIMIZADA) ---
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
-            
-            {/* SIDEBAR CON PWA INTEGRADO */}
-            <aside className="w-16 sm:w-20 bg-red-950/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 sm:space-y-8 z-50">
-                <button className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg"><Home size={24} /></button>
-                <button className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Calendar size={24} /></button>
-                <button className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Trophy size={24} /></button>
-                
-                {/* 📲 REEMPLAZO DINÁMICO: Si se puede instalar, sale la nube; si no, el icono de estadísticas */}
+            <aside className="w-16 sm:w-20 bg-red-950/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 z-50">
+                <button className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg"><Home size={24} /></button>
+                <button className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Calendar size={24} /></button>
+                <button className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Trophy size={24} /></button>
                 {showInstallBtn ? (
-                    <button onClick={handleInstallClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_15px_rgba(163,230,53,0.3)] animate-pulse">
-                        <UploadCloud size={24} />
-                    </button>
+                    <button onClick={handleInstallClick} className="w-12 h-12 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_15px_rgba(163,230,53,0.3)] animate-pulse"><UploadCloud size={24} /></button>
                 ) : (
-                    <button className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><BarChart2 size={24} /></button>
+                    <button className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><BarChart2 size={24} /></button>
                 )}
-                
-                <button onClick={() => setShowTutorial(true)} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={24} /></button>
+                <button onClick={() => setShowTutorial(true)} className="w-12 h-12 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={24} /></button>
             </aside>
 
             {showTutorial && <WelcomeTutorial user={user} onFinish={() => setShowTutorial(false)} />}
 
-            <main className="flex-1 flex flex-col items-center justify-start relative px-4 sm:px-6 overflow-y-auto pt-6 sm:pt-10 pb-6">
-                
-                {/* 🃏 CROMO EMPUJADO HACIA ARRIBA */}
-                <div 
-                    onClick={() => setView('SELFIE')} 
-                    className="cursor-pointer transform scale-[0.65] sm:scale-85 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-40px] sm:mt-[-20px]"
-                >
+            <main className="flex-1 flex flex-col items-center justify-start relative px-4 overflow-y-auto pt-0 pb-6"> {/* ✅ pt-0 para subirlo */}
+                <div onClick={() => setView('SELFIE')} className="cursor-pointer transform scale-[0.65] sm:scale-85 active:scale-95 transition-all mt-[-95px] sm:mt-[-40px]"> {/* ✅ mt-[-95px] para subirlo */}
                     <FutCard player={user} size="large" />
-                    <div className="absolute -bottom-8 left-0 w-full text-center">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 animate-pulse">Toca para editar tu ficha</p>
-                    </div>
                 </div>
-
-                {/* ⚽ PRÓXIMO PARTIDO COMPACTO */}
-                <div className="mt-2 sm:mt-8 text-center space-y-3 w-full max-w-xs sm:max-w-sm">
-                    <div className="inline-block px-5 py-1.5 bg-amber-400 text-black text-[10px] font-black uppercase italic rounded-full tracking-[0.2em] shadow-lg">Siguiente Encuentro</div>
-                    <div className="space-y-1 text-white bg-zinc-950/40 backdrop-blur-md border border-white/10 rounded-3xl py-4 px-2 shadow-2xl">
-                        <h2 className="text-2xl sm:text-3xl font-black uppercase italic tracking-tighter">
-                            {matches[0]?.home_team || 'POR DEFINIR'} <span className="text-amber-400 text-lg sm:text-xl">VS</span> {matches[0]?.away_team || 'POR DEFINIR'}
-                        </h2>
-                        <p className="text-sm sm:text-lg font-bold opacity-90">
-                            {matches[0] ? new Date(matches[0].match_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Próximamente'}
-                        </p>
-                        <p className="text-[10px] sm:text-xs uppercase tracking-[0.3em] font-black text-amber-400">
-                            {matches[0]?.venue_name || 'ESTADIO VORA'} {matches[0]?.match_time ? `— ${matches[0].match_time.slice(0, 5)}H` : ''}
-                        </p>
-                    </div>
-                </div>
+                <MatchSlider matches={matches} />
             </main>
         </div>
     );
