@@ -10,23 +10,19 @@ const PlayerHome = () => {
     const navigate = useNavigate();
     const { showInstallBtn, handleInstallClick } = usePWAInstall();
     
-    // ESTADOS PRINCIPALES
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState('HOME'); // 'HOME', 'SELFIE', 'FORM'
+    const [view, setView] = useState('HOME');
     
-    // ESTADOS CÁMARA Y SUBIDA
+    // --- ESTADO TUTORIAL ---
+    const [showTutorial, setShowTutorial] = useState(false);
+    
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
     
-    // ESTADO FORMULARIO: Aquí es donde corregimos el pre-llenado
     const [formData, setFormData] = useState({
-        name: '',
-        dni: '',
-        dorsal: '',
-        position: 'DEL',
-        country_code: 'es'
+        name: '', dni: '', dorsal: '', position: 'DEL', country_code: 'es'
     });
 
     const [matches, setMatches] = useState([]);
@@ -43,11 +39,8 @@ const PlayerHome = () => {
                 const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
                 const data = await res.json();
                 
-                console.log("Dato recibido del server:", data);
-
                 if (data) {
                     setUser(data);
-                    
                     setFormData({
                         name: data.name || '',
                         dni: data.dni || '',
@@ -56,8 +49,14 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
+                    // --- LÓGICA DE ACTIVACIÓN DEL TUTORIAL ---
                     if (!data.photo_url) {
-                        setView('SELFIE');
+                        const hasSeen = localStorage.getItem('tutorialSeen');
+                        if (!hasSeen) {
+                            setShowTutorial(true);
+                        } else {
+                            setView('SELFIE');
+                        }
                     }
 
                     if (data.team_id) {
@@ -71,6 +70,15 @@ const PlayerHome = () => {
         fetchUserData();
         return () => stopCamera();
     }, []);
+
+    // Función para cerrar el tutorial
+    const finishTutorial = () => {
+        localStorage.setItem('tutorialSeen', 'true');
+        setShowTutorial(false);
+        setView('SELFIE');
+    };
+
+    // ... (Mantén tus funciones startCamera, stopCamera, capturePhoto y handleFinalUpdate exactamente igual)
 
     const startCamera = async () => {
         setTempPhoto(null);
@@ -94,10 +102,8 @@ const PlayerHome = () => {
             const video = videoRef.current;
             const canvas = canvasRef.current;
             const context = canvas.getContext('2d');
-
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             setTempPhoto(canvas.toDataURL('image/jpeg', 0.8));
             stopCamera();
@@ -108,7 +114,6 @@ const PlayerHome = () => {
         setUploading(true);
         try {
             let finalPhotoUrl = user.photo_url;
-
             if (tempPhoto) {
                 const cloudFormData = new FormData();
                 cloudFormData.append('file', tempPhoto);
@@ -120,7 +125,6 @@ const PlayerHome = () => {
                 const cloudData = await cloudRes.json();
                 finalPhotoUrl = cloudData.secure_url;
             }
-
             const response = await fetch(`${API_BASE_URL}/api/auth/update-player-full`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -130,7 +134,6 @@ const PlayerHome = () => {
                     ...formData
                 })
             });
-
             if (response.ok) {
                 setUser(prev => ({ ...prev, photo_url: finalPhotoUrl, ...formData }));
                 setTempPhoto(null);
@@ -141,7 +144,7 @@ const PlayerHome = () => {
 
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic tracking-widest">PREPARANDO VESTUARIO...</div>;
 
-    / --- RENDERIZADO DEL TUTORIAL (Paso Prioritario) ---
+    // --- RENDERIZADO DEL TUTORIAL (Paso Prioritario) ---
     if (showTutorial) return <WelcomeTutorial user={user} onFinish={finishTutorial} />;
 
     // --- VISTA A: SELFIE ---
@@ -178,6 +181,14 @@ const PlayerHome = () => {
                         >
                             Volver al inicio
                         </button>
+                        
+                        {/* Botón para volver a ver el tutorial si el jugador quiere */}
+                        <button 
+                            onClick={() => setShowTutorial(true)} 
+                            className="text-[9px] font-bold text-white/10 uppercase tracking-[0.2em] text-center mt-4 underline"
+                        >
+                            Releer tutorial
+                        </button>
                     </div>
                 ) : (
                     <div className="fixed bottom-10 left-0 right-0 z-[100] px-6 flex flex-col gap-3">
@@ -188,6 +199,7 @@ const PlayerHome = () => {
                     </div>
                 )}
 
+                {/* Overlay Cámara */}
                 {isCameraOpen && (
                     <div className="fixed inset-0 z-[120] bg-black flex flex-col">
                         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
@@ -207,10 +219,10 @@ const PlayerHome = () => {
         );
     }
 
-    // --- VISTA B: FORMULARIO COMPACTO ---
+    // --- VISTA B: FORMULARIO ---
     if (view === 'FORM') {
         return (
-            <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-8 px-6 pb-6">
+            <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-8 px-6 pb-6 overflow-y-auto">
                 <div className="w-full max-w-md space-y-6">
                     <div className="text-center">
                         <h2 className="text-2xl font-black uppercase italic text-lime-400">Datos de Ficha</h2>
@@ -220,48 +232,28 @@ const PlayerHome = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2 space-y-1">
                             <label className="text-[10px] font-black uppercase text-white/40 ml-2 flex items-center gap-2"><User size={12}/> Nombre en Carta</label>
-                            <input 
-                                type="text" value={formData.name} 
-                                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                                className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none transition-all text-white"
-                            />
+                            <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none transition-all text-white" />
                         </div>
-
                         <div className="col-span-2 space-y-1">
                             <label className="text-[10px] font-black uppercase text-white/40 ml-2 flex items-center gap-2"><IdCard size={12}/> DNI / Documento</label>
-                            <input 
-                                type="text" value={formData.dni} 
-                                onChange={(e) => setFormData({...formData, dni: e.target.value})}
-                                className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none text-white"
-                            />
+                            <input type="text" value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none text-white" />
                         </div>
-
                         <div className="space-y-1">
                             <label className="text-[10px] font-black uppercase text-white/40 ml-2 flex items-center gap-2"><Hash size={12}/> Dorsal</label>
                             <input type="text" value={formData.dorsal} readOnly className="w-full bg-white/5 border border-white/5 rounded-xl py-3 px-4 font-black text-lime-400 opacity-50 outline-none" />
                         </div>
-
                         <div className="space-y-1">
                             <label className="text-[10px] font-black uppercase text-white/40 ml-2 flex items-center gap-2"><Target size={12}/> Posición</label>
-                            <select 
-                                value={formData.position}
-                                onChange={(e) => setFormData({...formData, position: e.target.value})}
-                                className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white"
-                            >
+                            <select value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white">
                                 <option value="PO" className="bg-[#1a1a1a]">PO</option>
                                 <option value="DFC" className="bg-[#1a1a1a]">DFC</option>
                                 <option value="MC" className="bg-[#1a1a1a]">MC</option>
                                 <option value="DEL" className="bg-[#1a1a1a]">DEL</option>
                             </select>
                         </div>
-
                         <div className="col-span-2 space-y-1">
                             <label className="text-[10px] font-black uppercase text-white/40 ml-2 flex items-center gap-2"><MapPin size={12}/> Nacionalidad</label>
-                            <select 
-                                value={formData.country_code}
-                                onChange={(e) => setFormData({...formData, country_code: e.target.value})}
-                                className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white"
-                            >
+                            <select value={formData.country_code} onChange={(e) => setFormData({...formData, country_code: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white">
                                 <option value="es" className="bg-[#1a1a1a]">ESPAÑA 🇪🇸</option>
                                 <option value="ar" className="bg-[#1a1a1a]">ARGENTINA 🇦🇷</option>
                                 <option value="fr" className="bg-[#1a1a1a]">FRANCIA 🇫🇷</option>
@@ -272,11 +264,7 @@ const PlayerHome = () => {
                     </div>
 
                     <div className="pt-6">
-                        <button 
-                            onClick={handleFinalUpdate} 
-                            disabled={uploading || !formData.name}
-                            className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-30"
-                        >
+                        <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3">
                             {uploading ? <Loader2 className="animate-spin" /> : "CONFIRMAR FICHA"}
                         </button>
                         <button onClick={() => setView('SELFIE')} className="w-full mt-2 py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Volver a la foto</button>
@@ -286,7 +274,7 @@ const PlayerHome = () => {
         );
     }
 
-    // --- VISTA C: HOME PREMIUM ---
+    // --- VISTA C: HOME ---
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
             <aside className="w-20 bg-red-950/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-12 space-y-8 z-50">
