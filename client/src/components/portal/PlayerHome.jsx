@@ -4,6 +4,7 @@ import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2,
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
+import WelcomeTutorial from './WelcomeTutorial';
 
 const PlayerHome = () => {
     const navigate = useNavigate();
@@ -14,12 +15,15 @@ const PlayerHome = () => {
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('HOME'); // 'HOME', 'SELFIE', 'FORM'
     
+    // ESTADO TUTORIAL
+    const [showTutorial, setShowTutorial] = useState(false);
+
     // ESTADOS CÁMARA Y SUBIDA
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
     
-    // ESTADO FORMULARIO: Aquí es donde corregimos el pre-llenado
+    // ESTADO FORMULARIO
     const [formData, setFormData] = useState({
         name: '',
         dni: '',
@@ -41,8 +45,6 @@ const PlayerHome = () => {
                 
                 const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
                 const data = await res.json();
-                
-                console.log("Dato recibido del server:", data);
 
                 if (data) {
                     setUser(data);
@@ -55,8 +57,14 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
-                    if (!data.photo_url) {
-                        setView('SELFIE');
+                    // LÓGICA DE CONTROL (Base de Datos)
+                    if (data.tutorial_seen === 0) {
+                        setShowTutorial(true); 
+                        setView('SELFIE'); 
+                    } else if (!data.photo_url) {
+                        setView('SELFIE'); 
+                    } else {
+                        setView('HOME'); 
                     }
 
                     if (data.team_id) {
@@ -70,6 +78,17 @@ const PlayerHome = () => {
         fetchUserData();
         return () => stopCamera();
     }, []);
+
+    const finishTutorial = async () => {
+        try {
+            await fetch(`${API_BASE_URL}/api/auth/complete-tutorial`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email })
+            });
+            setShowTutorial(false);
+        } catch (err) { console.error(err); }
+    };
 
     const startCamera = async () => {
         setTempPhoto(null);
@@ -144,6 +163,8 @@ const PlayerHome = () => {
     if (view === 'SELFIE') {
         return (
             <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-10 px-6 relative overflow-hidden">
+                {showTutorial && <WelcomeTutorial user={user} onFinish={finishTutorial} />}
+
                 <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transform scale-90">
                     <FutCard 
                         player={{
@@ -282,42 +303,56 @@ const PlayerHome = () => {
         );
     }
 
-    // --- VISTA C: HOME PREMIUM ---
+    // --- VISTA C: HOME PREMIUM (OPTIMIZADA MÓVIL) ---
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
-            <aside className="w-20 bg-red-950/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-12 space-y-8 z-50">
-                <button className="w-14 h-14 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg"><Home size={28} /></button>
-                <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Calendar size={28} /></button>
-                <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Trophy size={28} /></button>
-                <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><BarChart2 size={28} /></button>
-                <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={28} /></button>
-            </aside>
-
-            <main className="flex-1 flex flex-col items-center justify-center relative px-6 overflow-y-auto pt-10 pb-10">
-                {showInstallBtn && (
-                    <button onClick={handleInstallClick} className="absolute top-6 right-6 bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-3xl text-white animate-pulse z-40">
+            
+            {/* SIDEBAR CON PWA INTEGRADO */}
+            <aside className="w-16 sm:w-20 bg-red-950/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 sm:space-y-8 z-50">
+                <button className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg"><Home size={24} /></button>
+                <button className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Calendar size={24} /></button>
+                <button className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Trophy size={24} /></button>
+                
+                {/* 📲 REEMPLAZO DINÁMICO: Si se puede instalar, sale la nube; si no, el icono de estadísticas */}
+                {showInstallBtn ? (
+                    <button onClick={handleInstallClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_15px_rgba(163,230,53,0.3)] animate-pulse">
                         <UploadCloud size={24} />
                     </button>
+                ) : (
+                    <button className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><BarChart2 size={24} /></button>
                 )}
+                
+                <button onClick={() => setShowTutorial(true)} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={24} /></button>
+            </aside>
 
+            {showTutorial && <WelcomeTutorial user={user} onFinish={() => setShowTutorial(false)} />}
+
+            <main className="flex-1 flex flex-col items-center justify-start relative px-4 sm:px-6 overflow-y-auto pt-6 sm:pt-10 pb-6">
+                
+                {/* 🃏 CROMO EMPUJADO HACIA ARRIBA */}
                 <div 
                     onClick={() => setView('SELFIE')} 
-                    className="cursor-pointer transform scale-[0.7] sm:scale-85 active:scale-95 transition-all drop-shadow-[0_45px_45px_rgba(0,0,0,0.7)]"
+                    className="cursor-pointer transform scale-[0.65] sm:scale-85 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-40px] sm:mt-[-20px]"
                 >
                     <FutCard player={user} size="large" />
-                    <div className="absolute -bottom-12 left-0 w-full text-center">
+                    <div className="absolute -bottom-8 left-0 w-full text-center">
                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 animate-pulse">Toca para editar tu ficha</p>
                     </div>
                 </div>
 
-                <div className="mt-20 text-center space-y-4">
-                    <div className="inline-block px-5 py-1.5 bg-amber-400 text-black text-[10px] font-black uppercase italic rounded-full tracking-[0.2em]">Siguiente Encuentro</div>
-                    <div className="space-y-2 text-white">
-                        <h2 className="text-4xl font-black uppercase italic tracking-tighter">
-                            {matches[0]?.home_team || 'POR DEFINIR'} <span className="text-amber-400 text-2xl">VS</span> {matches[0]?.away_team || 'POR DEFINIR'}
+                {/* ⚽ PRÓXIMO PARTIDO COMPACTO */}
+                <div className="mt-2 sm:mt-8 text-center space-y-3 w-full max-w-xs sm:max-w-sm">
+                    <div className="inline-block px-5 py-1.5 bg-amber-400 text-black text-[10px] font-black uppercase italic rounded-full tracking-[0.2em] shadow-lg">Siguiente Encuentro</div>
+                    <div className="space-y-1 text-white bg-zinc-950/40 backdrop-blur-md border border-white/10 rounded-3xl py-4 px-2 shadow-2xl">
+                        <h2 className="text-2xl sm:text-3xl font-black uppercase italic tracking-tighter">
+                            {matches[0]?.home_team || 'POR DEFINIR'} <span className="text-amber-400 text-lg sm:text-xl">VS</span> {matches[0]?.away_team || 'POR DEFINIR'}
                         </h2>
-                        <p className="text-xl font-bold opacity-90">{matches[0] ? new Date(matches[0].match_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Próximamente'}</p>
-                        <p className="text-xs uppercase tracking-[0.3em] font-black text-amber-400">{matches[0]?.venue_name || 'ESTADIO VORA'}</p>
+                        <p className="text-sm sm:text-lg font-bold opacity-90">
+                            {matches[0] ? new Date(matches[0].match_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Próximamente'}
+                        </p>
+                        <p className="text-[10px] sm:text-xs uppercase tracking-[0.3em] font-black text-amber-400">
+                            {matches[0]?.venue_name || 'ESTADIO VORA'} {matches[0]?.match_time ? `— ${matches[0].match_time.slice(0, 5)}H` : ''}
+                        </p>
                     </div>
                 </div>
             </main>
