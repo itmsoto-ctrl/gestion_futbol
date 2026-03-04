@@ -5,6 +5,7 @@ import { Camera, Check, ArrowRight, ArrowLeft, Smartphone, Zap, Star } from 'luc
 const WelcomeTutorial = ({ user, onFinish }) => {
     const [currentStep, setCurrentStep] = useState(1);
 
+    // Datos dinámicos del usuario (Asegúrate de que el backend los envía)
     const playerName = user?.name?.split(' ')[0].toUpperCase() || 'JUGADOR';
     const leagueName = user?.league_name || 'tu liga oficial';
     const teamName = user?.team_name || 'tu equipo';
@@ -12,7 +13,7 @@ const WelcomeTutorial = ({ user, onFinish }) => {
     const steps = [
         {
             title: `¡BIENVENIDO,\n${playerName}!`,
-            content: `Has sido oficialmente convocado para participar en la liga ${leagueName}.\n\nDefenderás los colores de ${teamName}.\n\nPrepárate para demostrar tu talento y liderar a tu equipo hacia la victoria.`,
+            content: `Has sido formalmente convocado para disputar la liga ${leagueName}.\n\nDefenderás los colores de ${teamName}.\n\nPrepárate para demostrar tu talento y liderar a tu equipo hacia la victoria.`,
             icon: <Star className="text-lime-400" size={50} />
         },
         {
@@ -84,6 +85,7 @@ const WelcomeTutorial = ({ user, onFinish }) => {
                 </motion.div>
             </AnimatePresence>
 
+            {/* Botones de Navegación Fijos abajo del todo */}
             <div className="fixed bottom-10 left-0 right-0 px-8 flex items-center justify-between max-w-md mx-auto w-full z-10">
                 <button 
                     onClick={prev}

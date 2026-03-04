@@ -10,12 +10,13 @@ const PlayerHome = () => {
     const navigate = useNavigate();
     const { showInstallBtn, handleInstallClick } = usePWAInstall();
     
-    // ESTADOS
+    // ESTADOS DE NAVEGACIÓN
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('HOME'); // 'HOME', 'CARD_MENU', 'CALENDAR', 'FORM'
     const [showTutorial, setShowTutorial] = useState(false);
     
+    // ESTADOS CÁMARA Y DATOS
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
@@ -35,29 +36,27 @@ const PlayerHome = () => {
                 const savedEmail = localStorage.getItem('userEmail');
                 if (!savedEmail) { setLoading(false); return; }
                 
+                // 1. CARGAMOS PERFIL (Asegúrate de que el SQL JOIN traiga league_name y team_name)
                 const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
                 const data = await res.json();
                 
                 if (data) {
                     setUser(data);
                     setFormData({
-                        name: data.name || '',
-                        dni: data.dni || '',
-                        dorsal: data.dorsal || '',
-                        position: data.position || 'DEL',
-                        country_code: data.country_code || 'es'
+                        name: data.name || '', dni: data.dni || '', dorsal: data.dorsal || '',
+                        position: data.position || 'DEL', country_code: data.country_code || 'es'
                     });
 
-                    // 🛠 LÓGICA DE NAVEGACIÓN "12:15H" RECUPERADA
+                    // 🛠 LÓGICA DE NAVEGACIÓN RECUPERADA (12:15H)
                     if (!data.photo_url || data.photo_url === "" || data.photo_url === "null") {
                         const hasSeen = localStorage.getItem('tutorialSeen');
                         if (!hasSeen) setShowTutorial(true);
-                        setView('CARD_MENU'); // Bloqueamos el Home si no hay foto
+                        setView('CARD_MENU'); // Obligamos a pasar por gestión si no hay foto
                     } else {
                         setView('HOME');
                     }
 
-                    // CARGA DE CALENDARIO DEL EQUIPO
+                    // 2. CARGAMOS CALENDARIO (OBJETIVO DE HOY)
                     if (data.team_id) {
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`);
                         const mData = await mRes.json();
@@ -143,7 +142,7 @@ const PlayerHome = () => {
                 <button onClick={() => setView('CALENDAR')} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${view === 'CALENDAR' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30'}`}><Calendar size={28} /></button>
                 <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><Trophy size={28} /></button>
                 <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30"><BarChart2 size={28} /></button>
-                <button onClick={() => setShowTutorial(true)} className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto active:scale-95"><Settings size={28} /></button>
+                <button onClick={() => setShowTutorial(true)} className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto"><Settings size={28} /></button>
             </aside>
 
             {showTutorial && <WelcomeTutorial user={user} onFinish={finishTutorial} />}
@@ -165,7 +164,7 @@ const PlayerHome = () => {
                             </div>
                         </div>
 
-                        {/* INFO PRÓXIMO PARTIDO (RECUPERADO 12:15H) */}
+                        {/* INFO PRÓXIMO PARTIDO */}
                         <div className="mt-20 text-center space-y-4 text-white">
                             <div className="inline-block px-5 py-1.5 bg-amber-400 text-black text-[10px] font-black uppercase rounded-full tracking-[0.2em]">Siguiente Encuentro</div>
                             <div className="space-y-2">
@@ -185,32 +184,32 @@ const PlayerHome = () => {
                     </div>
                 )}
 
-                {/* VISTA 2: CALENDARIO DE EQUIPO (OBJETIVO DE HOY) */}
+                {/* VISTA 2: CALENDARIO COMPLETO (OBJETIVO DE HOY) */}
                 {view === 'CALENDAR' && (
                     <div className="w-full max-w-md animate-in slide-in-from-right duration-500 space-y-6">
                         <div className="text-center">
-                            <h2 className="text-3xl font-black uppercase italic text-lime-400">Mi Calendario</h2>
+                            <h2 className="text-3xl font-black uppercase italic text-lime-400">Calendario Oficial</h2>
                             <p className="text-[10px] uppercase font-bold text-white/30 tracking-widest">{user?.team_name}</p>
                         </div>
                         <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
                             {matches.length > 0 ? matches.map((m, idx) => (
                                 <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
                                     <div className="flex flex-col">
-                                        <p className="text-[10px] font-black text-lime-400 uppercase tracking-tighter">{new Date(m.match_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(m.match_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</p>
+                                        <p className="text-[10px] font-black text-lime-400 uppercase">{new Date(m.match_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} — {new Date(m.match_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</p>
                                         <p className="text-lg font-black text-white leading-none mt-1 uppercase tracking-tighter">{m.home_team} VS {m.away_team}</p>
                                         <p className="text-[10px] font-bold text-white/30 uppercase mt-1 flex items-center gap-1"><MapPin size={10}/> {m.venue_name}</p>
                                     </div>
                                     <ChevronRight className="text-white/20" />
                                 </div>
                             )) : (
-                                <p className="text-center text-white/20 font-bold uppercase py-10">No hay partidos programados</p>
+                                <p className="text-center text-white/20 font-bold uppercase py-10 tracking-widest">No hay partidos programados</p>
                             )}
                         </div>
                         <button onClick={() => setView('HOME')} className="w-full py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Volver al inicio</button>
                     </div>
                 )}
 
-                {/* VISTAS RESTANTES (CARD_MENU, FORM, ETC) SIN CAMBIOS PARA SEGURIDAD */}
+                {/* VISTA 3: MENÚ DEL CROMO (CARD_MENU) */}
                 {view === 'CARD_MENU' && (
                     <div className="w-full flex flex-col items-center animate-in zoom-in-95 duration-500">
                          <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transform scale-[0.8]">
@@ -232,6 +231,7 @@ const PlayerHome = () => {
                     </div>
                 )}
 
+                {/* VISTA 4: FORMULARIO */}
                 {view === 'FORM' && (
                     <div className="w-full max-w-md space-y-6 animate-in slide-in-from-bottom-10 duration-500">
                         <div className="text-center"><h2 className="text-2xl font-black uppercase italic text-lime-400 leading-none">Datos de Ficha</h2></div>
@@ -262,7 +262,7 @@ const PlayerHome = () => {
                             <button onClick={handleFinalUpdate} disabled={uploading || !formData.name} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl flex items-center justify-center gap-3">
                                 {uploading ? <Loader2 className="animate-spin" /> : "CONFIRMAR FICHA"}
                             </button>
-                            <button onClick={() => setView('CARD_MENU')} className="w-full mt-2 py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Volver al inicio</button>
+                            <button onClick={() => setView('CARD_MENU')} className="w-full mt-2 py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Volver</button>
                         </div>
                     </div>
                 )}
