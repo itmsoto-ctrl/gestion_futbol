@@ -1,172 +1,176 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Camera, X, RefreshCw, Check, ShieldCheck } from 'lucide-react';
-import API_BASE_URL from '../../apiConfig';
-import FutCard from '../FutCard'; 
+import React, { useState, useEffect } from 'react';
+import { Home, Calendar, Trophy, BarChart2, Settings, Camera, Check, Loader2, UploadCloud } from 'lucide-react';
+import FutCard from '../FutCard';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
-
+import API_BASE_URL from '../../apiConfig';
 
 const PlayerHome = () => {
-    const { showInstallBtn, handleInstallClick } = usePWAInstall(); // ¡Y listo!
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [tempPhoto, setTempPhoto] = useState(null);
-
-    const videoRef = useRef(null);
-    const canvasRef = useRef(null);
-    const streamRef = useRef(null);
+    const [uploading, setUploading] = useState(false);
+    const [matches, setMatches] = useState([]);
+    const { showInstallBtn, handleInstallClick } = usePWAInstall();
 
     useEffect(() => {
-        const fetchUserData = async () => {
-            try {
-                const savedEmail = localStorage.getItem('userEmail');
-                if (!savedEmail) { setLoading(false); return; }
-                const res = await fetch(`${API_BASE_URL}/api/auth/check-email`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: savedEmail })
-                });
-                const data = await res.json();
-                if (data.exists) setUser(data);
-            } catch (err) { console.error(err); } finally { setLoading(false); }
-        };
-        fetchUserData();
-        return () => stopCamera();
-    }, []);
-
-    const startCamera = async () => {
-        setTempPhoto(null);
-        setIsCameraOpen(true);
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1350 } } 
-            });
-            streamRef.current = stream;
-            if (videoRef.current) videoRef.current.srcObject = stream;
-        } catch (err) { alert("Error cámara"); setIsCameraOpen(false); }
-    };
-
-    const stopCamera = () => {
-        if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-        setIsCameraOpen(false);
-    };
-
-    const capturePhoto = () => {
-        if (videoRef.current && canvasRef.current) {
-            const context = canvasRef.current.getContext('2d');
-            canvasRef.current.width = videoRef.current.videoWidth;
-            canvasRef.current.height = videoRef.current.videoHeight;
-            context.drawImage(videoRef.current, 0, 0);
-            setTempPhoto(canvasRef.current.toDataURL('image/jpeg', 0.8));
-            stopCamera();
+        const email = localStorage.getItem('userEmail');
+        if (email) {
+            fetch(`${API_BASE_URL}/api/auth/user-profile?email=${email}`)
+                .then(res => res.json())
+                .then(data => {
+                    setUser(data);
+                    setLoading(false);
+                    if (data.team_id) {
+                        fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`)
+                            .then(res => res.json())
+                            .then(setMatches);
+                    }
+                })
+                .catch(() => setLoading(false));
         }
-    };
+    }, []);
 
     const handleAccept = async () => {
         if (!tempPhoto) return;
-        setLoading(true);
-    
+        setUploading(true);
         try {
-            // 1️⃣ SUBIR A CLOUDINARY (Directo desde el móvil)
             const formData = new FormData();
-            formData.append('file', tempPhoto); // El base64 capturado
-            formData.append('upload_preset', 'vora_players'); // Tu preset de Cloudinary
-    
+            formData.append('file', tempPhoto);
+            formData.append('upload_preset', 'vora_players');
+
             const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', {
                 method: 'POST',
                 body: formData
             });
             const cloudData = await cloudRes.json();
             
-            if (!cloudData.secure_url) throw new Error("Error en Cloudinary");
-    
-            const finalUrl = cloudData.secure_url;
-            const savedEmail = localStorage.getItem('userEmail');
-    
-            // 2️⃣ GUARDAR SOLO LA URL EN TU BASE DE DATOS
-            const response = await fetch(`${API_BASE_URL}/api/auth/update-photo`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: savedEmail,
-                    photo_url: finalUrl // <-- Ahora es un enlace corto: https://res.cloudinary...
-                })
-            });
-    
-            const data = await response.json();
-    
-            if (data.success) {
-                setUser(prev => ({ ...prev, photo_url: finalUrl }));
-                setTempPhoto(null);
-                alert("¡Cromo guardado en la nube! 🚀");
+            if (cloudData.secure_url) {
+                const response = await fetch(`${API_BASE_URL}/api/auth/update-photo`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: user.email,
+                        photo_url: cloudData.secure_url
+                    })
+                });
+                if (response.ok) {
+                    setUser({ ...user, photo_url: cloudData.secure_url });
+                    setTempPhoto(null);
+                }
             }
         } catch (err) {
-            console.error("Error en el proceso:", err);
-            alert("Fallo al guardar la foto profesional.");
+            alert("Error al guardar la foto");
         } finally {
-            setLoading(false);
+            setUploading(false);
         }
     };
 
-    if (loading) return <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center text-lime-400 font-black italic">Preparando terreno...</div>;
+    if (loading) return (
+        <div className="min-h-screen bg-black flex items-center justify-center">
+            <Loader2 className="animate-spin text-lime-400" size={40} />
+        </div>
+    );
 
-    return (
-        <div className="min-h-screen bg-[#665C5A] text-white flex flex-col items-center pt-10 relative overflow-hidden">
-            
-
-            <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform">
-                <FutCard 
-                    key={user?.photo_url || tempPhoto || 'empty'} 
-                    player={{
-                        name: user?.name || 'JUGADOR',
-                        rating: 85,
-                        photo_url: tempPhoto || user?.photo_url,
-                        pac: 80, sho: 85, pas: 72, dri: 84, def: 35, phy: 70
-                    }} 
-                />
+    // 1. ESTADO DE CAPTURA: Si no hay foto guardada ni captura temporal
+    if (!user?.photo_url && !tempPhoto) {
+        return (
+            <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-white font-sans">
+                <div className="w-full max-w-sm bg-zinc-900 rounded-[3rem] p-10 border border-zinc-800 text-center space-y-8 shadow-2xl">
+                    <div className="space-y-2">
+                        <h2 className="text-3xl font-black uppercase italic tracking-tighter">Crea tu Ficha</h2>
+                        <p className="text-[10px] text-lime-400 font-black uppercase tracking-[0.2em]">Paso Obligatorio</p>
+                    </div>
+                    <div className="w-56 h-56 bg-zinc-800 rounded-full mx-auto flex items-center justify-center border-2 border-dashed border-lime-400/30 overflow-hidden relative group active:scale-95 transition-transform">
+                        <Camera size={56} className="text-zinc-600 group-hover:text-lime-400 transition-colors" />
+                        <input type="file" accept="image/*" capture="user" className="absolute inset-0 opacity-0 cursor-pointer" 
+                               onChange={(e) => {
+                                   const reader = new FileReader();
+                                   reader.onload = () => setTempPhoto(reader.result);
+                                   reader.readAsDataURL(e.target.files[0]);
+                               }} />
+                    </div>
+                    <p className="text-xs text-zinc-500 font-bold uppercase leading-relaxed">Hazte un selfie para generar tu carta personalizada de la liga</p>
+                </div>
             </div>
+        );
+    }
 
-            {!tempPhoto && (
-                <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-lime-400 animate-pulse">
-                    {user?.photo_url ? "Toca para cambiar foto" : "Toca para añadir foto"}
-                </p>
-            )}
-
-            {tempPhoto && (
-                <div className="fixed bottom-10 left-0 right-0 z-[100] px-6 flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-10">
-                    <button 
-                        onClick={handleAccept} 
-                        className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-[0_10px_30px_rgba(163,230,53,0.5)] active:scale-95 transition-all"
-                    >
-                        ¡ESTÁ DE LOCOS!
-                    </button>
-                    <button 
-                        onClick={startCamera} 
-                        className="w-full bg-white/20 backdrop-blur-md text-white font-black py-4 rounded-2xl uppercase italic border border-white/20 active:scale-95 transition-all"
-                    >
-                        REPETIR SELFIE
-                    </button>
+    // 2. ESTADO DE PREVIEW: Cuando te acabas de hacer la foto
+    if (tempPhoto && !user?.photo_url) {
+        return (
+            <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 space-y-10">
+                <div className="animate-in zoom-in duration-500">
+                    <FutCard player={{ ...user, photo_url: tempPhoto }} />
                 </div>
-            )}
+                <button onClick={handleAccept} disabled={uploading} className="w-full max-w-xs bg-lime-400 text-black font-black py-5 rounded-[2.5rem] uppercase italic flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(163,230,53,0.3)] active:scale-95 transition-all">
+                    {uploading ? <Loader2 className="animate-spin" /> : <><Check size={24} /> ¡ESTÁ DE LOCOS!</>}
+                </button>
+            </div>
+        );
+    }
 
-            {isCameraOpen && (
-                <div className="fixed inset-0 z-[60] bg-black flex flex-col">
-                    <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-                        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                        <canvas ref={canvasRef} className="hidden" />
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-72 h-96 border-[3px] border-lime-400/50 border-dashed rounded-[50%_50%_45%_45%] shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]"></div>
+    // 3. EL HOME "PREMIUM": Fondo rojo, botones laterales y texto inferior
+    return (
+        <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" 
+             style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
+            
+            {/* SIDEBAR IZQUIERDA (Menú de botones) */}
+            <aside className="w-20 bg-red-950/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-12 space-y-8 z-50">
+                <button className="w-14 h-14 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg shadow-amber-400/20 active:scale-90 transition-transform">
+                    <Home size={28} />
+                </button>
+                <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:text-white hover:border-white/30 transition-all">
+                    <Calendar size={28} />
+                </button>
+                <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:text-white hover:border-white/30 transition-all">
+                    <Trophy size={28} />
+                </button>
+                <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:text-white hover:border-white/30 transition-all">
+                    <BarChart2 size={28} />
+                </button>
+                <button className="w-14 h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:text-white hover:border-white/30 transition-all mt-auto">
+                    <Settings size={28} />
+                </button>
+            </aside>
+
+            {/* CONTENIDO PRINCIPAL */}
+            <main className="flex-1 flex flex-col items-center justify-center relative px-6">
+                
+                {/* BOTÓN PWA (Discreto y flotante) */}
+                {showInstallBtn && (
+                    <button onClick={handleInstallClick} className="absolute top-8 right-8 bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-3xl text-white animate-pulse active:scale-90 transition-transform">
+                        <UploadCloud size={24} />
+                    </button>
+                )}
+
+                {/* EL CROMO (Con sombra para que flote) */}
+                <div className="transform scale-[0.85] sm:scale-100 drop-shadow-[0_45px_45px_rgba(0,0,0,0.7)] animate-in slide-in-from-bottom-10 duration-700">
+                    <FutCard player={user} />
+                </div>
+
+                {/* DATOS PRÓXIMO ENCUENTRO (Estilo texto limpio) */}
+                <div className="mt-14 text-center space-y-4 animate-in fade-in duration-1000 delay-300">
+                    <div className="inline-block px-5 py-1.5 bg-amber-400 text-black text-[10px] font-black uppercase italic rounded-full tracking-[0.2em]">
+                        Próximo Encuentro
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <h2 className="text-4xl font-black uppercase italic tracking-tighter text-white">
+                            {matches[0]?.home_team || 'LOS GALÁCTICOS'} <span className="text-amber-400 text-2xl">VS</span> {matches[0]?.away_team || 'VORA FC'}
+                        </h2>
+                        <div className="flex flex-col gap-1">
+                            <p className="text-xl font-bold text-white/90">
+                               {matches[0] ? new Date(matches[0].match_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Sábado 15 de Marzo'}
+                            </p>
+                            <p className="text-xs uppercase tracking-[0.3em] font-black text-amber-400">
+                               {matches[0]?.venue_name || 'Estadio Municipal VORA'} — {matches[0] ? new Date(matches[0].match_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '18:00H'}
+                            </p>
                         </div>
-                        <button onClick={stopCamera} className="absolute top-6 right-6 text-white bg-black/50 p-3 rounded-full"><X /></button>
-                    </div>
-                    <div className="h-40 flex items-center justify-center bg-[#1a1a1a] border-t border-white/10">
-                        <button onClick={capturePhoto} className="w-20 h-20 bg-lime-400 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(163,230,53,0.4)] active:scale-90 transition-all">
-                            <Camera size={32} className="text-black" />
-                        </button>
                     </div>
                 </div>
-            )}
+            </main>
         </div>
     );
 };
+
 export default PlayerHome;
