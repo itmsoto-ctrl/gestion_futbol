@@ -1,146 +1,137 @@
 import React, { useRef, useEffect, useState, memo } from 'react';
 import { motion, animate } from 'framer-motion';
+import useInteractionSounds from '../hooks/useInteractionSounds';
 
-// ✅ COMPONENTE RECUPERADO: Contador animado para la media
-const RatingCounter = memo(({ targetValue }) => {
-  const [displayValue, setDisplayValue] = useState(0);
-  const hasAnimated = useRef(false);
+// 🔢 Contador Animado Blindado
+const RatingCounter = memo(({ targetValue, onComplete }) => {
+  const [displayValue, setDisplayValue] = useState(() => {
+    const isDone = sessionStorage.getItem('vora_rating_done');
+    return isDone === 'true' ? targetValue : 0;
+  });
+  
+  const { playScore } = useInteractionSounds();
+  const hasStarted = useRef(false);
 
   useEffect(() => {
-    // Usamos sessionStorage para que solo se anime una vez por sesión
-    const sessionKey = `vora_rating_animated_${targetValue}`;
-    if (sessionStorage.getItem(sessionKey) || targetValue === 0) {
-      setDisplayValue(targetValue);
+    const isDone = sessionStorage.getItem('vora_rating_done');
+    if (isDone === 'true' || targetValue === 0 || hasStarted.current) {
+      if (targetValue > 0) setDisplayValue(targetValue);
+      if (onComplete) onComplete();
       return;
     }
-
-    if (!hasAnimated.current && targetValue > 0) {
-      const controls = animate(0, targetValue, {
-        duration: 1.5,
-        ease: "easeOut",
-        onUpdate: (value) => setDisplayValue(Math.round(value)),
-        onComplete: () => {
-          hasAnimated.current = true;
-          sessionStorage.setItem(sessionKey, 'true');
-        }
-      });
-      return () => controls.stop();
-    }
-  }, [targetValue]);
+    
+    hasStarted.current = true;
+    if (playScore) playScore(0.3); 
+    
+    const controls = animate(0, targetValue, {
+      duration: 1.5,
+      ease: [0.33, 1, 0.68, 1],
+      onUpdate: (v) => setDisplayValue(Math.floor(v)),
+      onComplete: () => {
+        sessionStorage.setItem('vora_rating_done', 'true');
+        if (onComplete) onComplete();
+      }
+    });
+    return () => controls.stop();
+  }, [targetValue, onComplete, playScore]);
 
   return <span>{displayValue}</span>;
 });
 
-const FutCard = ({ player, isFlipped, onFlip, size = "large" }) => {
-  const stats = player?.stats || { pac: 0, sho: 0, pas: 0, dri: 0, def: 0, phy: 0 };
-  const rating = player?.rating || 60; // Valor por defecto si no hay rating
+const FutCard = ({ player, isFlipped, onFlip }) => {
+  const videoRef = useRef(null);
+  const [isRatingDone, setIsRatingDone] = useState(() => sessionStorage.getItem('vora_rating_done') === 'true');
   
-  // Definición de tamaños (manteniendo la proporción de carta de FUT)
-  const sizes = {
-    small: { w: 180, h: 260, title: 'text-xl', stats: 'text-xs', rating: 'text-3xl' },
-    medium: { w: 240, h: 340, title: 'text-2xl', stats: 'text-sm', rating: 'text-5xl' },
-    large: { w: 320, h: 460, title: 'text-[32px]', stats: 'text-[22px]', rating: 'text-[70px]' }
-  };
-  const current = sizes[size] || sizes.large;
+  const stats = player?.stats || { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 };
+  const rating = player?.rating || 60;
 
-  // Color del texto (un marrón oscuro dorado típico de las cartas)
-  const textColor = "text-[#5e4c35]";
+  useEffect(() => { 
+    if (videoRef.current) videoRef.current.play().catch(() => {});
+  }, [player?.photo_url]);
 
   return (
-    <div 
-      className="relative perspective-1000 cursor-pointer select-none font-oswald font-bold"
-      style={{ width: current.w, height: current.h }}
-      onClick={onFlip}
-    >
+    // Aplicamos la fuente Oswald directamente aquí
+    <div className="relative select-none" style={{ width: '350px', height: '504px', perspective: "2000px", fontFamily: "'Oswald', sans-serif" }}>
       <motion.div
-        className="w-full h-full relative preserve-3d"
-        animate={{ rotateY: isFlipped ? 180 : 0 }}
-        transition={{ duration: 0.6 }}
-        style={{ transformStyle: "preserve-3d" }}
+        animate={{ 
+          rotateY: isFlipped ? 180 : [-6, 6, -6], 
+          rotateX: [2, -2, 2],
+          y: [0, -5, 0] 
+        }}
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        style={{ width: '100%', height: '100%', transformStyle: "preserve-3d" }}
+        onClick={onFlip}
       >
-        {/* --- CARA FRONTAL --- */}
-        <div className="absolute inset-0 backface-hidden rounded-[15%] overflow-hidden shadow-2xl"
-             style={{ 
-               backgroundImage: "url('/bronce.png')", 
-               backgroundSize: '100% 100%',
-               boxShadow: 'inset 0 0 20px rgba(0,0,0,0.1)'
-             }}>
+        <div className="absolute inset-0 w-full h-full rounded-[45px] overflow-hidden shadow-2xl" style={{ backfaceVisibility: "hidden" }}>
           
-          {/* FOTO DEL JUGADOR (Con máscara de recorte en la base) */}
+          {/* ✨ Brillo Metálico */}
+          <div className="absolute inset-0 z-[40] pointer-events-none">
+            <div className="absolute -inset-[100%] bg-gradient-to-tr from-transparent via-white/20 to-transparent rotate-45 animate-[shine_3s_infinite]" />
+          </div>
+
+          {/* Fondo Base */}
+          <video ref={videoRef} className="absolute inset-0 z-0 w-full h-full object-cover opacity-40" src="/particulas_oro.mp4" muted autoPlay loop playsInline />
+          <img src="/bronce.png" alt="Card" className="w-full h-auto relative z-10" />
+          
+          {/* FOTO JUGADOR CON DIFUMINADO INFERIOR (Estilo FUT) */}
           {player?.photo_url && (
-            <div 
-              className="absolute top-[15%] left-[25%] w-[70%] h-[60%] bg-cover bg-top z-0 pointer-events-none contrast-[1.1] saturate-[1.1]"
-              style={{ 
+            <div className="absolute top-[35px] left-[115px] w-[215px] h-[255px] z-[15] pointer-events-none"
+              style={{
                 backgroundImage: `url(${player.photo_url})`,
-                maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
-                WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)'
+                backgroundSize: 'cover', 
+                backgroundPosition: 'center 10%',
+                WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%)',
+                maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%)',
               }}
             />
           )}
 
-          {/* BLOQUE SUPERIOR IZQUIERDO (Rating, Posición, Banderas) */}
-          <div className={`absolute top-[12%] left-[10%] flex flex-col items-center leading-none z-10 ${textColor}`}>
-            {/* ✅ Rating Animado */}
-            <div className={current.rating}>
-                <RatingCounter targetValue={rating} />
-            </div>
-            <div className="text-2xl uppercase tracking-tighter">{player?.position || 'MCO'}</div>
-            
-            <div className="flex flex-col gap-2 mt-3 items-center">
-                {/* Bandera País */}
-                <img 
-                  src={`https://flagcdn.com/w40/${player?.country_code || 'es'}.png`} 
-                  alt="country" 
-                  className="w-8 shadow-sm border border-[#5e4c35]/20"
-                />
-                {/* Escudo Equipo */}
-                {player?.team_logo && (
-                  <img src={player?.team_logo} alt="team" className="w-9 h-9 object-contain filter drop-shadow-sm" />
-                )}
+          {/* RATING Y POSICION */}
+          <div className="absolute top-[60px] left-[45px] z-20 flex flex-col items-center text-[#3a2d0f] font-bold text-center">
+            <motion.div 
+              animate={isRatingDone ? { scale: [1, 1.15, 1], filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"] } : {}}
+              className="text-[85px] leading-[0.7] font-black tracking-tighter"
+            >
+              <RatingCounter targetValue={rating} onComplete={() => setIsRatingDone(true)} />
+            </motion.div>
+            <div className="text-[26px] uppercase mt-1 opacity-90">{player?.position || 'MCO'}</div>
+            <div className="flex flex-col items-center gap-2 mt-2">
+               <img src={`https://flagcdn.com/w80/${player?.country_code || 'es'}.png`} className="w-10 shadow-sm" alt="Flag" />
+               <img src={player?.team_logo || '/default-team.png'} className="w-11 h-11 object-contain opacity-90 contrast-125" alt="Club" />
             </div>
           </div>
 
           {/* NOMBRE JUGADOR Y LÍNEA SEPARADORA */}
-          <div className={`absolute top-[62%] w-full text-center z-20 ${textColor}`}>
-              <div className={`${current.title} uppercase tracking-tight truncate px-4`}>
-                {player?.name || 'JUGADOR VORA'}
-              </div>
-              {/* Línea separadora */}
-              <div className="w-[85%] h-[2px] bg-[#5e4c35]/30 mx-auto mt-1"></div>
+          <div className="absolute top-[290px] left-0 w-full text-center z-30 text-[#3a2d0f] text-[36px] font-black uppercase italic tracking-tighter mx-auto flex flex-col items-center">
+            <span className="px-4 leading-none">{player?.name || 'URIEL BOTAS'}</span>
+            <div className="w-[70%] h-[2px] bg-[#3a2d0f]/20 mt-2"></div>
           </div>
 
-          {/* BLOQUE DE ESTADÍSTICAS (Rejilla con separador vertical) */}
-          <div className={`absolute bottom-[10%] w-full flex justify-center items-center z-20 ${textColor} leading-tight`}>
-            
+          {/* ESTADÍSTICAS EN REJILLA */}
+          <div className="absolute top-[355px] left-1/2 -translate-x-1/2 w-[80%] z-30 flex justify-center items-center py-2">
             {/* Columna Izquierda */}
-            <div className={`flex flex-col text-right pr-4 border-r-2 border-[#5e4c35]/30 ${current.stats}`}>
-              <div><span className="font-black mr-1">{stats.pac}</span><span className="font-medium opacity-80">PAC</span></div>
-              <div><span className="font-black mr-1">{stats.sho}</span><span className="font-medium opacity-80">SHO</span></div>
-              <div><span className="font-black mr-1">{stats.pas}</span><span className="font-medium opacity-80">PAS</span></div>
+            <div className="flex flex-col gap-0.5 pr-5 border-r-2 border-[#3a2d0f]/20 text-[24px] font-black text-[#3a2d0f] leading-none">
+              <div className="flex items-center gap-2"><span className="w-8 text-right">{stats.pac}</span> <span className="text-[18px] font-medium opacity-80">PAC</span></div>
+              <div className="flex items-center gap-2"><span className="w-8 text-right">{stats.sho}</span> <span className="text-[18px] font-medium opacity-80">SHO</span></div>
+              <div className="flex items-center gap-2"><span className="w-8 text-right">{stats.pas}</span> <span className="text-[18px] font-medium opacity-80">PAS</span></div>
             </div>
-
             {/* Columna Derecha */}
-            <div className={`flex flex-col text-left pl-4 ${current.stats}`}>
-              <div><span className="font-black mr-1">{stats.dri}</span><span className="font-medium opacity-80">DRI</span></div>
-              <div><span className="font-black mr-1">{stats.def}</span><span className="font-medium opacity-80">DEF</span></div>
-              <div><span className="font-black mr-1">{stats.phy}</span><span className="font-medium opacity-80">PHY</span></div>
+            <div className="flex flex-col gap-0.5 pl-5 text-[24px] font-black text-[#3a2d0f] leading-none">
+              <div className="flex items-center gap-2"><span className="w-8 text-right">{stats.dri}</span> <span className="text-[18px] font-medium opacity-80">DRI</span></div>
+              <div className="flex items-center gap-2"><span className="w-8 text-right">{stats.def}</span> <span className="text-[18px] font-medium opacity-80">DEF</span></div>
+              <div className="flex items-center gap-2"><span className="w-8 text-right">{stats.phy}</span> <span className="text-[18px] font-medium opacity-80">PHY</span></div>
             </div>
-
           </div>
 
         </div>
 
-        {/* --- CARA TRASERA (Reverso) --- */}
-        <div className="absolute inset-0 backface-hidden rounded-[15%] overflow-hidden shadow-2xl"
-             style={{ 
-               backgroundImage: "url('/bronce.png')",
-               backgroundSize: '100% 100%', 
-               transform: "rotateY(180deg)" 
-             }}>
-             <div className="flex items-center justify-center h-full bg-black/50">
-                <img src="/logo-vora.png" alt="Vora" className="w-1/2 opacity-50" />
-             </div>
+        {/* CARA TRASERA */}
+        <div className="absolute inset-0 w-full h-full rounded-[45px] overflow-hidden shadow-2xl bg-[#3a2d0f]" style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
+          <div className="absolute inset-0 flex items-center justify-center">
+             <img src="/logo-vora.png" alt="Vora" className="w-1/2 opacity-30" />
+          </div>
         </div>
+
       </motion.div>
     </div>
   );
