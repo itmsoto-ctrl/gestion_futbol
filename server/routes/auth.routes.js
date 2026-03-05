@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/db'); // Tu conexión de Railway
+const db = require('../config/db'); 
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { verifyToken } = require('../middleware/auth.middleware');
@@ -9,7 +9,7 @@ const { verifyToken } = require('../middleware/auth.middleware');
 // 1. AUTENTICACIÓN Y REGISTRO
 // ==========================================
 
-// Comprobar si un email ya está registrado
+// Comprobar si un email ya está registrado y devolver sus datos
 router.post('/check-email', async (req, res) => {
     const { email } = req.body;
     try {
@@ -25,7 +25,7 @@ router.post('/check-email', async (req, res) => {
     }
 });
 
-// REGISTRO BÁSICO
+// REGISTRO BÁSICO (Para el Slide 2 del jugador)
 router.post('/register-basic', async (req, res) => {
     const { email, name, password } = req.body;
     try {
@@ -56,7 +56,7 @@ router.post('/register-basic', async (req, res) => {
 
 // LOGIN (Usuarios y Admin)
 router.post('/login', async (req, res) => {
-    const { email, password, is_pwa } = req.body; // 👈 Recibimos el chivato de la PWA
+    const { email, password, is_pwa } = req.body;
     try {
         const [users] = await db.execute('SELECT * FROM users WHERE email = ?', [email]);
 
@@ -66,33 +66,30 @@ router.post('/login', async (req, res) => {
 
         const user = users[0];
 
-        // Comprobamos la contraseña
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
             return res.status(401).json({ message: "Contraseña incorrecta" });
         }
 
-        // 📱 ACTUALIZACIÓN SILENCIOSA DE PWA (El sitio correcto)
+        // 📱 ACTUALIZACIÓN DE PWA AL ENTRAR
         if (is_pwa === 1) {
             await db.execute(
                 'UPDATE users SET is_pwa = 1 WHERE id = ? AND (is_pwa = 0 OR is_pwa IS NULL)', 
                 [user.id]
             );
+            user.is_pwa = 1; // Actualizamos en memoria para el front
         }
 
-        // Generamos el Token
         const secret = process.env.JWT_SECRET || 'frase-super-secreta-de-daniel-2026';
         const token = jwt.sign({ id: user.id, role: user.role }, secret, { expiresIn: '24h' });
+
+        // 🔥 LA CORRECCIÓN: Separamos la contraseña, pero enviamos TODO lo demás al Front
+        const { password: userPassword, ...userData } = user;
 
         res.json({
             message: "Login exitoso",
             token,
-            user: { 
-                id: user.id, 
-                name: user.name, 
-                email: user.email,
-                role: user.role 
-            }
+            user: userData // <-- Aquí va el tutorial_seen, role, name, id, is_pwa...
         });
     } catch (error) {
         console.error("Error en login:", error);
@@ -135,8 +132,19 @@ router.get('/venues/search', async (req, res) => {
 });
 
 // ==========================================
-// 3. ACTUALIZACIÓN DE PERFIL
+// 3. ACTUALIZACIÓN DE PERFIL Y PWA
 // ==========================================
+
+// RUTA NUEVA: Chivato silencioso de PWA
+router.post('/confirm-pwa', verifyToken, async (req, res) => {
+    try {
+        await db.execute('UPDATE users SET is_pwa = 1 WHERE id = ? AND (is_pwa = 0 OR is_pwa IS NULL)', [req.user.id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Error confirmando PWA:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 router.post('/update-profile', verifyToken, async (req, res) => {
     const { dni, photo_url, phone, age } = req.body;
