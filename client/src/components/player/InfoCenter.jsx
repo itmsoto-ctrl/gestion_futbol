@@ -32,17 +32,33 @@ const InfoCenter = ({ matches, onMatchClick }) => {
       )
     },
     {
-      id: 'premium',
-      content: (
-        <div className="bg-lime-400 p-4 rounded-3xl flex items-center justify-between shadow-[0_0_30px_rgba(163,230,53,0.3)] cursor-pointer">
-          <div>
-            <p className="text-black font-black italic text-xl uppercase tracking-tighter">EXPERIENCIA PREMIUM</p>
-            <p className="text-black/60 text-[10px] font-bold uppercase">Pulsa para saber más</p>
+        id: 'premium',
+        content: (
+          // Cambiamos a flex-col y añadimos overflow-hidden para que la imagen no se salga de las esquinas redondeadas
+          <div className="bg-lime-400 p-4 rounded-3xl flex flex-col justify-between shadow-[0_0_30px_rgba(163,230,53,0.3)] cursor-pointer active:scale-95 transition-all w-full overflow-hidden">
+            
+            {/* Parte superior: Textos y Corona */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-black font-black italic text-xl uppercase tracking-tighter leading-none">EXPERIENCIA PREMIUM</p>
+                <p className="text-black/60 text-[10px] font-bold uppercase mt-1">Pulsa para descubrirlo</p>
+              </div>
+              <Crown className="text-black" size={28} />
+            </div>
+  
+            {/* Parte inferior: La imagen */}
+            <div className="w-full h-16 mt-3 rounded-xl overflow-hidden border border-black/10">
+              {/* Sustituye la ruta por la imagen que quieras poner en public/ */}
+              <img 
+                src="/premium-banner.png" 
+                alt="Premium Banner" 
+                className="w-full h-full object-cover" 
+              />
+            </div>
+  
           </div>
-          <Crown className="text-black" size={32} />
-        </div>
-      )
-    }
+        )
+      }
   ];
 
   useEffect(() => {
@@ -51,7 +67,7 @@ const InfoCenter = ({ matches, onMatchClick }) => {
   }, [slides.length]);
 
   return (
-    <div className="w-full max-w-sm h-28 relative mt-[-20px] z-10 px-4">
+    <div className="w-full max-w-sm h-50 relative mt-[-20px] z-10 px-4">
       <AnimatePresence mode="wait">
         <motion.div
           key={index}
