@@ -1,35 +1,24 @@
 import React, { useRef, useEffect, useState, memo } from 'react';
 import { motion, animate } from 'framer-motion';
-import useInteractionSounds from '../hooks/useInteractionSounds';
 
-// 🔢 Contador Animado Blindado a Prueba de Bombas
+// 🔢 Contador Animado Limpio y Estable
 const RatingCounter = memo(({ targetValue, onComplete }) => {
   const [displayValue, setDisplayValue] = useState(0);
-  const { playScore } = useInteractionSounds();
-  
-  // 🛡️ TRUCO PRO: Guardamos las funciones en un ref para que los re-renderizados 
-  // del padre no interrumpan la animación del contador.
-  const callbacks = useRef({ onComplete, playScore });
-  useEffect(() => {
-    callbacks.current = { onComplete, playScore };
-  });
 
   useEffect(() => {
     if (targetValue === 0) return;
 
-    if (callbacks.current.playScore) callbacks.current.playScore(0.3); 
-    
     const controls = animate(0, targetValue, {
       duration: 1.5,
       ease: "easeOut",
       onUpdate: (v) => setDisplayValue(Math.floor(v)),
       onComplete: () => {
-        if (callbacks.current.onComplete) callbacks.current.onComplete();
+        if (onComplete) onComplete();
       }
     });
     
     return () => controls.stop();
-  }, [targetValue]); // Solo depende del targetValue. ¡No más reinicios locos!
+  }, [targetValue, onComplete]); 
 
   return <span>{displayValue}</span>;
 });
@@ -42,11 +31,13 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
   const rating = player?.rating || 60;
 
   useEffect(() => { 
-    if (videoRef.current) videoRef.current.play().catch(() => {});
+    // Capturamos el error silenciosamente por si el iPhone también bloquea el autoplay del video
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => console.log("Autoplay del video bloqueado por el navegador"));
+    }
   }, [player?.photo_url]);
 
   return (
-    // Aplicamos la fuente Oswald directamente al contenedor principal
     <div className="relative select-none" style={{ width: '350px', height: '504px', perspective: "2000px", fontFamily: "'Oswald', sans-serif" }}>
       <motion.div
         animate={{ 
@@ -66,7 +57,7 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
           </div>
 
           {/* Fondo de la Carta */}
-          <video ref={videoRef} className="absolute inset-0 z-0 w-full h-full object-cover opacity-40" src="/particulas_oro.mp4" muted autoPlay loop playsInline />
+          <video ref={videoRef} className="absolute inset-0 z-0 w-full h-full object-cover opacity-40" src="/particulas_oro.mp4" muted autoPlay loop playsInline playsinline webkit-playsinline />
           <img src="/bronce.png" alt="Card" className="w-full h-auto relative z-10" />
           
           {/* 📸 FOTO JUGADOR CON MÁSCARA CORREGIDA (Estilo FUT Exacto) */}
@@ -76,14 +67,13 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
                 backgroundImage: `url(${player.photo_url})`,
                 backgroundSize: 'cover', 
                 backgroundPosition: 'center top',
-                // Máscara robusta usando RGBA, que no falla en iOS
                 WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%)',
                 maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%)',
               }}
             />
           )}
 
-          {/* ⭐ RATING, POSICIÓN Y ESCUDOS (Alineado a la izquierda) */}
+          {/* ⭐ RATING, POSICIÓN Y ESCUDOS */}
           <div className="absolute top-[14%] left-[12%] z-20 flex flex-col items-center text-[#4a3b2c] font-bold text-center">
             <motion.div 
               animate={isRatingDone ? { scale: [1, 1.15, 1], filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"] } : {}}
@@ -104,10 +94,8 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
             <div className="w-[80%] h-[2px] bg-[#4a3b2c]/30 mt-1"></div>
           </div>
 
-          {/* 📊 ESTADÍSTICAS (Rejilla Perfecta) */}
+          {/* 📊 ESTADÍSTICAS */}
           <div className="absolute top-[71%] left-1/2 -translate-x-1/2 w-[85%] z-30 flex justify-center items-center py-2">
-            
-            {/* Columna Izquierda */}
             <div className="flex flex-col gap-0.5 pr-6 border-r-2 border-[#4a3b2c]/30 text-[26px] font-black text-[#4a3b2c] leading-none">
               <div className="flex items-center justify-between w-[90px]">
                 <span>{stats.pac}</span> <span className="text-[18px] font-medium opacity-80">PAC</span>
@@ -119,8 +107,6 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
                 <span>{stats.pas}</span> <span className="text-[18px] font-medium opacity-80">PAS</span>
               </div>
             </div>
-
-            {/* Columna Derecha */}
             <div className="flex flex-col gap-0.5 pl-6 text-[26px] font-black text-[#4a3b2c] leading-none">
               <div className="flex items-center justify-between w-[90px]">
                 <span>{stats.dri}</span> <span className="text-[18px] font-medium opacity-80">DRI</span>
@@ -132,7 +118,6 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
                 <span>{stats.phy}</span> <span className="text-[18px] font-medium opacity-80">PHY</span>
               </div>
             </div>
-
           </div>
 
         </div>
