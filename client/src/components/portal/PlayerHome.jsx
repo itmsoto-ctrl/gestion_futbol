@@ -1,23 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2, UploadCloud, User } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import WelcomeTutorial from './WelcomeTutorial';
-import MatchSlider from '../player/MatchSlider';
+import InfoCenter from '../player/InfoCenter'; 
+import StandingsModal from '../player/StandingsModal'; // ✅ Importamos el modal
 import useInteractionSounds from '../../hooks/useInteractionSounds';
 
 const PlayerHome = () => {
     const { playClick, playSwipe } = useInteractionSounds();
 
-    // 🔊 Función para manejar el slide con sonido y vibración
-    const onSlideChange = () => {
-        playSwipe();
-        if (window.navigator.vibrate) window.navigator.vibrate(15);
-    };
-
-    // 🔊 Al confirmar la ficha
     const handleConfirm = () => {
         playClick();
         if (window.navigator.vibrate) window.navigator.vibrate([30, 50, 30]);
@@ -35,14 +30,37 @@ const PlayerHome = () => {
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
     
+    const [modalView, setModalView] = useState(null); 
+    const [standings, setStandings] = useState([]);
+    
     const [formData, setFormData] = useState({
         name: '', dni: '', dorsal: '', position: 'DEL', country_code: 'es'
     });
 
     const [matches, setMatches] = useState([]);
     const videoRef = useRef(null);
-    const canvasRef = useRef(null); // ✅ Referencia lista
+    const canvasRef = useRef(null); 
     const streamRef = useRef(null);
+
+    const calculateStandings = (matchesData) => {
+        const table = {};
+        matchesData.forEach(m => {
+            [m.home_team, m.away_team].forEach(t => {
+                if (!table[t]) table[t] = { name: t, pj: 0, pts: 0, gf: 0, gc: 0 };
+            });
+            if (m.home_team_goals !== null && m.home_team_goals !== undefined) {
+                const h = table[m.home_team];
+                const a = table[m.away_team];
+                h.pj++; a.pj++;
+                h.gf += m.home_team_goals; h.gc += m.away_team_goals;
+                a.gf += m.away_team_goals; a.gc += m.home_team_goals;
+                if (m.home_team_goals > m.away_team_goals) h.pts += 3;
+                else if (m.home_team_goals < m.away_team_goals) a.pts += 3;
+                else { h.pts += 1; a.pts += 1; }
+            }
+        });
+        return Object.values(table).sort((a,b) => b.pts - a.pts || (b.gf-b.gc) - (a.gf-a.gc));
+    };
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -67,7 +85,7 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
-                    if (data.tutorial_seen === 0) {
+                    if (data.is_pwa === 0 || data.tutorial_seen === 0) {
                         setShowTutorial(true); 
                         setView('SELFIE'); 
                     } else if (!data.photo_url) {
@@ -80,6 +98,7 @@ const PlayerHome = () => {
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`);
                         const mData = await mRes.json();
                         setMatches(mData);
+                        setStandings(calculateStandings(mData));
                     }
                 }
             } catch (err) { console.error(err); } finally { setLoading(false); }
@@ -91,26 +110,18 @@ const PlayerHome = () => {
     const finishTutorial = async () => {
         try {
             await fetch(`${API_BASE_URL}/api/auth/complete-tutorial`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: user.email })
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email })
             });
             setShowTutorial(false);
         } catch (err) { console.error(err); }
     };
 
     const startCamera = async () => {
-        setTempPhoto(null);
-        setIsCameraOpen(true);
+        setTempPhoto(null); setIsCameraOpen(true);
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1350 } } 
-            });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1350 } } });
             streamRef.current = stream;
-            // Un pequeño delay asegura que el elemento video esté montado
-            setTimeout(() => {
-                if (videoRef.current) videoRef.current.srcObject = stream;
-            }, 100);
+            setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = stream; }, 100);
         } catch (err) { alert("Error cámara"); setIsCameraOpen(false); }
     };
 
@@ -120,58 +131,36 @@ const PlayerHome = () => {
     };
 
     const capturePhoto = () => {
-        // ✅ CORRECCIÓN CLAVE: Ahora el canvas existe en el DOM
         if (videoRef.current && canvasRef.current) {
             const video = videoRef.current;
             const canvas = canvasRef.current;
             const context = canvas.getContext('2d');
-            
-            // Ajustar tamaño del canvas al del video real
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            // Dibujar el frame actual del video en el canvas
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // Convertir a imagen y guardar
             setTempPhoto(canvas.toDataURL('image/jpeg', 0.8));
             stopCamera();
-        } else {
-            console.error("No se pudo capturar: videoRef o canvasRef es null");
-        }
+        } else { console.error("No se pudo capturar: videoRef o canvasRef es null"); }
     };
 
     const handleFinalUpdate = async () => {
         setUploading(true);
         try {
             let finalPhotoUrl = user.photo_url;
-
             if (tempPhoto) {
                 const cloudFormData = new FormData();
                 cloudFormData.append('file', tempPhoto);
                 cloudFormData.append('upload_preset', 'vora_players'); 
-                const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', {
-                    method: 'POST', body: cloudFormData
-                });
+                const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', { method: 'POST', body: cloudFormData });
                 const cloudData = await cloudRes.json();
                 finalPhotoUrl = cloudData.secure_url;
             }
-
             const response = await fetch(`${API_BASE_URL}/api/auth/update-player-full`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: user.email,
-                    photo_url: finalPhotoUrl,
-                    ...formData,
-                    stats: user.stats
-                })
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email, photo_url: finalPhotoUrl, ...formData, stats: user.stats })
             });
-
             if (response.ok) {
                 setUser(prev => ({ ...prev, photo_url: finalPhotoUrl, ...formData }));
-                setTempPhoto(null);
-                setView('HOME');
+                setTempPhoto(null); setView('HOME');
             }
         } catch (err) { alert(`🚨 Error: ${err.message}`); } finally { setUploading(false); }
     };
@@ -198,10 +187,7 @@ const PlayerHome = () => {
                         <button onClick={startCamera} className="w-full bg-white/5 backdrop-blur-md text-white/40 font-black py-4 rounded-2xl uppercase italic text-[10px] tracking-widest">REPETIR FOTO</button>
                     </div>
                 )}
-
-                {/* ✅ EL CANVAS DEBE ESTAR AQUÍ PARA QUE LA CAPTURA FUNCIONE */}
                 <canvas ref={canvasRef} className="hidden" />
-
                 {isCameraOpen && (
                     <div className="fixed inset-0 z-[120] bg-black flex flex-col">
                         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
@@ -266,27 +252,24 @@ const PlayerHome = () => {
     }
 
     return (
-        <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
+        <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans relative" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
             <aside className="w-16 sm:w-20 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 sm:space-y-8 z-50">
-                <button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-[0_0_15px_rgba(255,255,255,0.15)]"><Home size={24} /></button>
-                <button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Calendar size={24} /></button>
-                <button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Trophy size={24} /></button>
+                <button onClick={() => { playClick(); setModalView(null); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${!modalView ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Home size={24} /></button>
+                <button onClick={() => { playClick(); setModalView('CALENDAR'); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${modalView === 'CALENDAR' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Calendar size={24} /></button>
+                <button onClick={() => { playClick(); setModalView('STANDINGS'); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${modalView === 'STANDINGS' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Trophy size={24} /></button>
                 
                 {showInstallBtn ? (
-                    <button onClick={() => { playClick(); handleInstallClick(); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse">
-                        <UploadCloud size={24} />
-                    </button>
+                    <button onClick={() => { playClick(); handleInstallClick(); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse"><UploadCloud size={24} /></button>
                 ) : (
-                    <button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><BarChart2 size={24} /></button>
+                    <button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:text-white transition-all"><BarChart2 size={24} /></button>
                 )}
                 
-                <button onClick={() => { playClick(); setShowTutorial(true); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto hover:shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all"><Settings size={24} /></button>
+                <button onClick={() => { playClick(); setShowTutorial(true); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto hover:text-white transition-all"><Settings size={24} /></button>
             </aside>
 
             {showTutorial && <WelcomeTutorial user={user} onFinish={() => { playClick(); setShowTutorial(false); }} />}
 
             <main className="flex-1 flex flex-col items-center justify-start relative px-4 sm:px-6 overflow-y-auto pt-6 sm:pt-10 pb-6">
-                
                 <div 
                     onClick={() => { playClick(); setView('SELFIE'); }} 
                     className="cursor-pointer transform scale-[0.54] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-115px] sm:mt-[-90px]"
@@ -297,11 +280,43 @@ const PlayerHome = () => {
                     </div>
                 </div>
 
-                <div onClick={onSlideChange} className="w-full flex justify-center">
-                    <MatchSlider matches={matches} />
-                </div>
-                
+                <InfoCenter matches={matches} onMatchClick={() => { playClick(); setModalView('CALENDAR'); }} />
             </main>
+
+            {/* 📅 MODAL DE CALENDARIO VERTICAL */}
+            <AnimatePresence>
+                {modalView === 'CALENDAR' && (
+                    <motion.div initial={{y:'100%'}} animate={{y:0}} exit={{y:'100%'}} transition={{type: 'spring', damping: 25, stiffness: 200}} className="absolute inset-0 z-[100] bg-zinc-950 p-6 pt-16 overflow-y-auto ml-16 sm:ml-20">
+                        <button onClick={() => { playClick(); setModalView(null); }} className="absolute top-6 right-6 text-white/40 active:scale-90"><X size={32}/></button>
+                        <h2 className="text-3xl font-black italic text-lime-400 uppercase mb-6 tracking-tighter">Calendario</h2>
+                        <div className="space-y-3 pb-10">
+                            {matches.map((m, i) => (
+                                <div key={i} className="bg-white/5 border border-white/10 p-4 rounded-2xl flex items-center justify-between shadow-lg">
+                                    <div className="flex-1 text-left">
+                                        <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">Jornada {i+1}</p>
+                                        <div className="flex flex-col gap-1">
+                                            <span className={`font-bold uppercase text-sm ${m.home_team_goals > m.away_team_goals ? 'text-lime-400' : 'text-white'}`}>{m.home_team}</span>
+                                            <span className={`font-bold uppercase text-sm ${m.away_team_goals > m.home_team_goals ? 'text-lime-400' : 'text-white'}`}>{m.away_team}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end justify-center gap-1 border-l border-white/10 pl-4 ml-4">
+                                        <span className="text-lime-400 font-black italic text-lg leading-none">{m.home_team_goals ?? '-'}</span>
+                                        <span className="text-lime-400 font-black italic text-lg leading-none">{m.away_team_goals ?? '-'}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* 🏆 MODAL DE CLASIFICACIÓN (Importado) */}
+            <AnimatePresence>
+                {modalView === 'STANDINGS' && (
+                    <StandingsModal standings={standings} onClose={() => { playClick(); setModalView(null); }} />
+                )}
+            </AnimatePresence>
+
         </div>
     );
 };

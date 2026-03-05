@@ -129,3 +129,21 @@ html, body {
   font-family: 'Oswald', sans-serif;
 }
 
+/* Bloqueo visual de rotación para iOS */
+@media screen and (min-width: 480px) and (orientation: landscape) {
+  #root::after {
+    content: "POR FAVOR, GIRA TU MÓVIL 📱";
+    position: fixed;
+    inset: 0;
+    background: #09090b;
+    color: #a3e635;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-style: italic;
+    font-size: 1.5rem;
+    letter-spacing: 0.2em;
+  }
+}
