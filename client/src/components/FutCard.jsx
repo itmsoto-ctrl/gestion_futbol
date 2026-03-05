@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, memo } from 'react';
 import { motion, animate } from 'framer-motion';
 
-// 🔢 Contador animado blindado (SIN sonido para que iOS no lo bloquee)
+// 🔢 Contador animado blindado
 const RatingCounter = memo(({ targetValue, onComplete }) => {
   const [displayValue, setDisplayValue] = useState(() => {
     const done = sessionStorage.getItem('vora_rating_done');
@@ -13,7 +13,6 @@ const RatingCounter = memo(({ targetValue, onComplete }) => {
   useEffect(() => {
     const isDone = sessionStorage.getItem('vora_rating_done');
     
-    // Si ya animó antes o si el valor es 0, no hacer nada
     if (isDone === 'true' || targetValue === 0 || animatedRef.current) {
       setDisplayValue(targetValue);
       if (onComplete) onComplete();
@@ -47,7 +46,6 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
   const rating = player?.rating || 60;
 
   useEffect(() => { 
-    // Captura de error por si iOS bloquea el autoplay
     if (videoRef.current) {
       videoRef.current.play().catch(() => {});
     }
@@ -71,7 +69,6 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
       >
         <div className="absolute inset-0 w-full h-full rounded-[45px] overflow-hidden shadow-2xl" style={{ backfaceVisibility: "hidden" }}>
           
-          {/* ✨ Brillo Metálico Dinámico */}
           <div className="absolute inset-0 z-[40] pointer-events-none">
             <div className="absolute -inset-[100%] bg-gradient-to-tr from-transparent via-white/20 to-transparent rotate-45 animate-[shine_3s_infinite]" />
           </div>
@@ -86,7 +83,6 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
                 backgroundImage: `url(${player.photo_url})`,
                 backgroundSize: 'cover', 
                 backgroundPosition: 'center 10%',
-                // Ajustamos el inicio del degradado para que coincida con la nueva posición
                 WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 90%)',
                 maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 90%)',
               }}
@@ -114,9 +110,8 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
             <div className="w-[70%] h-[2px] bg-[#4a3b2c]/30 mt-1"></div>
           </div>
 
-          {/* 📊 ESTADÍSTICAS EN ESPAÑOL Y POSICIÓN AJUSTADA */}
+          {/* 📊 ESTADÍSTICAS EN ESPAÑOL */}
           <div className="absolute top-[335px] left-1/2 -translate-x-1/2 w-[85%] z-30 flex justify-center items-center py-2">
-            {/* Columna Izquierda */}
             <div className="flex flex-col gap-0.5 pr-6 border-r-2 border-[#4a3b2c]/30 text-[26px] font-black text-[#4a3b2c] leading-none">
               <div className="flex items-center justify-between w-[90px]">
                 <span>{stats.pac}</span> <span className="text-[18px] font-medium opacity-80">RIT</span>
@@ -128,7 +123,6 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
                 <span>{stats.pas}</span> <span className="text-[18px] font-medium opacity-80">PAS</span>
               </div>
             </div>
-            {/* Columna Derecha */}
             <div className="flex flex-col gap-0.5 pl-6 text-[26px] font-black text-[#4a3b2c] leading-none">
               <div className="flex items-center justify-between w-[90px]">
                 <span>{stats.dri}</span> <span className="text-[18px] font-medium opacity-80">REG</span>
@@ -144,7 +138,6 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
 
         </div>
 
-        {/* 🔄 CARA TRASERA */}
         <div className="absolute inset-0 w-full h-full rounded-[45px] overflow-hidden shadow-2xl bg-[#2a2218]" style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
           <div className="absolute inset-0 flex items-center justify-center">
              <img src="/logo-vora.png" alt="Vora" className="w-1/2 opacity-30" />
