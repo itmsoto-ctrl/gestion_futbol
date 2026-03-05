@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, memo } from 'react';
 import { motion, animate } from 'framer-motion';
 
-// 🔢 Contador Animado Blindado (Sin sonido para evitar bloqueos en iOS)
+// 🔢 Contador Animado Blindado (Sin sonido para que no falle en iOS)
 const RatingCounter = memo(({ targetValue, onComplete }) => {
   const [displayValue, setDisplayValue] = useState(() => {
     const done = sessionStorage.getItem('vora_rating_done');
@@ -69,7 +69,7 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
       >
         <div className="absolute inset-0 w-full h-full rounded-[45px] overflow-hidden shadow-2xl" style={{ backfaceVisibility: "hidden" }}>
           
-          {/* ✨ Brillo Metálico */}
+          {/* ✨ Brillo Metálico Dinámico */}
           <div className="absolute inset-0 z-[40] pointer-events-none">
             <div className="absolute -inset-[100%] bg-gradient-to-tr from-transparent via-white/20 to-transparent rotate-45 animate-[shine_3s_infinite]" />
           </div>
@@ -77,16 +77,15 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
           <video ref={videoRef} className="absolute inset-0 z-0 w-full h-full object-cover opacity-40" src="/particulas_oro.mp4" muted autoPlay loop playsInline />
           <img src="/bronce.png" alt="Card" className="w-full h-auto relative z-10" />
           
-          {/* 📸 FOTO SUBIDA Y CON MÁSCARA ANTI-BUGS DE IPHONE */}
+          {/* 📸 LA FOTO DE AYER EXACTA: Tamaño original y degradado radial que funciona */}
           {player?.photo_url && (
-            <div className="absolute top-[20px] left-[110px] w-[220px] h-[250px] z-[15] pointer-events-none"
+            <div className="absolute top-[35px] left-[115px] w-[215px] h-[255px] z-[15] pointer-events-none"
               style={{
                 backgroundImage: `url(${player.photo_url})`,
                 backgroundSize: 'cover', 
-                backgroundPosition: 'center top',
-                // Máscara lineal usando 180deg y black/transparent (La única que no falla en iOS)
-                WebkitMaskImage: 'linear-gradient(180deg, black 60%, transparent 100%)',
-                maskImage: 'linear-gradient(180deg, black 60%, transparent 100%)',
+                backgroundPosition: 'center 10%',
+                WebkitMaskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 85%)',
+                maskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 85%)',
               }}
             />
           )}
@@ -106,7 +105,7 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
             </div>
           </div>
 
-          {/* 👤 NOMBRE JUGADOR (SIN CURSIVA Y LÍNEA SEPARADORA) */}
+          {/* 👤 NOMBRE JUGADOR (SIN CURSIVA Y CON LÍNEA) */}
           <div className="absolute top-[290px] left-0 w-full text-center z-30 text-[#4a3b2c] text-[36px] font-black uppercase tracking-tighter mx-auto flex flex-col items-center">
             <span className="px-4 leading-none w-full truncate">{player?.name || 'JUGADOR'}</span>
             <div className="w-[70%] h-[2px] bg-[#4a3b2c]/30 mt-1"></div>
