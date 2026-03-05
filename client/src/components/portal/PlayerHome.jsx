@@ -6,16 +6,22 @@ import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import WelcomeTutorial from './WelcomeTutorial';
+import MatchSlider from '../player/MatchSlider';
 import InfoCenter from '../player/InfoCenter'; 
-import StandingsModal from '../player/StandingsModal'; // ✅ Importamos el modal
+import StandingsModal from '../player/StandingsModal';
 import useInteractionSounds from '../../hooks/useInteractionSounds';
 
 const PlayerHome = () => {
     const { playClick, playSwipe } = useInteractionSounds();
 
+    const onSlideChange = () => {
+        playSwipe(); 
+        if (window.navigator.vibrate) window.navigator.vibrate(15); 
+    };
+
     const handleConfirm = () => {
         playClick();
-        if (window.navigator.vibrate) window.navigator.vibrate([30, 50, 30]);
+        if (window.navigator.vibrate) window.navigator.vibrate([30, 50, 30]); 
         handleFinalUpdate();
     };
 
@@ -30,9 +36,9 @@ const PlayerHome = () => {
     const [tempPhoto, setTempPhoto] = useState(null);
     const [uploading, setUploading] = useState(false);
     
-    const [modalView, setModalView] = useState(null); 
+    const [modalView, setModalView] = useState(null);
     const [standings, setStandings] = useState([]);
-    
+
     const [formData, setFormData] = useState({
         name: '', dni: '', dorsal: '', position: 'DEL', country_code: 'es'
     });
@@ -42,6 +48,7 @@ const PlayerHome = () => {
     const canvasRef = useRef(null); 
     const streamRef = useRef(null);
 
+    // 📊 Lógica de Clasificación
     const calculateStandings = (matchesData) => {
         const table = {};
         matchesData.forEach(m => {
@@ -85,6 +92,7 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
+                    // 🛡️ is_pwa force tutorial
                     if (data.is_pwa === 0 || data.tutorial_seen === 0) {
                         setShowTutorial(true); 
                         setView('SELFIE'); 
@@ -110,18 +118,25 @@ const PlayerHome = () => {
     const finishTutorial = async () => {
         try {
             await fetch(`${API_BASE_URL}/api/auth/complete-tutorial`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email })
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email })
             });
             setShowTutorial(false);
         } catch (err) { console.error(err); }
     };
 
     const startCamera = async () => {
-        setTempPhoto(null); setIsCameraOpen(true);
+        setTempPhoto(null);
+        setIsCameraOpen(true);
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1350 } } });
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1350 } } 
+            });
             streamRef.current = stream;
-            setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = stream; }, 100);
+            setTimeout(() => {
+                if (videoRef.current) videoRef.current.srcObject = stream;
+            }, 100);
         } catch (err) { alert("Error cámara"); setIsCameraOpen(false); }
     };
 
@@ -131,15 +146,17 @@ const PlayerHome = () => {
     };
 
     const capturePhoto = () => {
+        // ✅ AQUÍ ESTABA EL ERROR: Necesita el canvas HTML renderizado para funcionar
         if (videoRef.current && canvasRef.current) {
             const video = videoRef.current;
             const canvas = canvasRef.current;
             const context = canvas.getContext('2d');
-            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             setTempPhoto(canvas.toDataURL('image/jpeg', 0.8));
             stopCamera();
-        } else { console.error("No se pudo capturar: videoRef o canvasRef es null"); }
+        }
     };
 
     const handleFinalUpdate = async () => {
@@ -150,17 +167,26 @@ const PlayerHome = () => {
                 const cloudFormData = new FormData();
                 cloudFormData.append('file', tempPhoto);
                 cloudFormData.append('upload_preset', 'vora_players'); 
-                const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', { method: 'POST', body: cloudFormData });
+                const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dqoplz61y/image/upload', {
+                    method: 'POST', body: cloudFormData
+                });
                 const cloudData = await cloudRes.json();
                 finalPhotoUrl = cloudData.secure_url;
             }
             const response = await fetch(`${API_BASE_URL}/api/auth/update-player-full`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: user.email, photo_url: finalPhotoUrl, ...formData, stats: user.stats })
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: user.email,
+                    photo_url: finalPhotoUrl,
+                    ...formData,
+                    stats: user.stats
+                })
             });
             if (response.ok) {
                 setUser(prev => ({ ...prev, photo_url: finalPhotoUrl, ...formData }));
-                setTempPhoto(null); setView('HOME');
+                setTempPhoto(null);
+                setView('HOME');
             }
         } catch (err) { alert(`🚨 Error: ${err.message}`); } finally { setUploading(false); }
     };
@@ -171,7 +197,7 @@ const PlayerHome = () => {
         return (
             <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-10 px-6 relative overflow-hidden">
                 {showTutorial && <WelcomeTutorial user={user} onFinish={finishTutorial} />}
-                <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transform scale-90">
+                <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transform scale-[0.80]">
                     <FutCard player={{ ...user, name: formData.name || 'JUGADOR', photo_url: tempPhoto || user?.photo_url, position: formData.position }} />
                 </div>
                 {!tempPhoto ? (
@@ -187,7 +213,10 @@ const PlayerHome = () => {
                         <button onClick={startCamera} className="w-full bg-white/5 backdrop-blur-md text-white/40 font-black py-4 rounded-2xl uppercase italic text-[10px] tracking-widest">REPETIR FOTO</button>
                     </div>
                 )}
+
+                {/* ✅ EL CANVAS REQUERIDO PARA QUE LA FOTO SE DISPARE */}
                 <canvas ref={canvasRef} className="hidden" />
+
                 {isCameraOpen && (
                     <div className="fixed inset-0 z-[120] bg-black flex flex-col">
                         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
@@ -254,12 +283,14 @@ const PlayerHome = () => {
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans relative" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
             <aside className="w-16 sm:w-20 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 sm:space-y-8 z-50">
-                <button onClick={() => { playClick(); setModalView(null); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${!modalView ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Home size={24} /></button>
-                <button onClick={() => { playClick(); setModalView('CALENDAR'); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${modalView === 'CALENDAR' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Calendar size={24} /></button>
-                <button onClick={() => { playClick(); setModalView('STANDINGS'); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${modalView === 'STANDINGS' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Trophy size={24} /></button>
+                <button onClick={() => { playClick(); setModalView(null); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${!modalView ? 'bg-amber-400 text-black shadow-[0_0_15px_rgba(255,255,255,0.15)]' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Home size={24} /></button>
+                <button onClick={() => { playClick(); setModalView('CALENDAR'); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${modalView === 'CALENDAR' ? 'bg-amber-400 text-black shadow-[0_0_15px_rgba(255,255,255,0.15)]' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Calendar size={24} /></button>
+                <button onClick={() => { playClick(); setModalView('STANDINGS'); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${modalView === 'STANDINGS' ? 'bg-amber-400 text-black shadow-[0_0_15px_rgba(255,255,255,0.15)]' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Trophy size={24} /></button>
                 
                 {showInstallBtn ? (
-                    <button onClick={() => { playClick(); handleInstallClick(); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse"><UploadCloud size={24} /></button>
+                    <button onClick={() => { playClick(); handleInstallClick(); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse">
+                        <UploadCloud size={24} />
+                    </button>
                 ) : (
                     <button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:text-white transition-all"><BarChart2 size={24} /></button>
                 )}
@@ -270,16 +301,19 @@ const PlayerHome = () => {
             {showTutorial && <WelcomeTutorial user={user} onFinish={() => { playClick(); setShowTutorial(false); }} />}
 
             <main className="flex-1 flex flex-col items-center justify-start relative px-4 sm:px-6 overflow-y-auto pt-6 sm:pt-10 pb-6">
+                
                 <div 
                     onClick={() => { playClick(); setView('SELFIE'); }} 
                     className="cursor-pointer transform scale-[0.54] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-115px] sm:mt-[-90px]"
                 >
-                    <FutCard player={user} size="large" />
+                    {/* ✅ Pasamos formData también al HOME para asegurar que se vea lo editado */}
+                    <FutCard player={{ ...user, name: formData.name || user?.name || 'JUGADOR', position: formData.position || user?.position || 'MCO' }} size="large" />
                     <div className="absolute -bottom-10 left-0 w-full text-center">
                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 animate-pulse italic">Toca para editar tu ficha</p>
                     </div>
                 </div>
 
+                {/* ✅ INFO CENTER (Sustituye a MatchSlider) */}
                 <InfoCenter matches={matches} onMatchClick={() => { playClick(); setModalView('CALENDAR'); }} />
             </main>
 
@@ -310,7 +344,7 @@ const PlayerHome = () => {
                 )}
             </AnimatePresence>
 
-            {/* 🏆 MODAL DE CLASIFICACIÓN (Importado) */}
+            {/* 🏆 MODAL DE CLASIFICACIÓN */}
             <AnimatePresence>
                 {modalView === 'STANDINGS' && (
                     <StandingsModal standings={standings} onClose={() => { playClick(); setModalView(null); }} />
