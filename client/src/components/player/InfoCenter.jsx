@@ -40,8 +40,8 @@ const InfoCenter = ({ matches, onMatchClick }) => {
             {/* Parte superior: Textos y Corona */}
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-black font-black italic text-xl uppercase tracking-tighter leading-none">EXPERIENCIA PREMIUM</p>
-                <p className="text-black/60 text-[10px] font-bold uppercase mt-1">Pulsa para descubrirlo</p>
+                <p className="text-black font-black italic text-xl uppercase tracking-tighter leading-none">PRONTO DISPONIBLE EXPERIENCIA PREMIUM</p>
+                <p className="text-black/60 text-[10px] font-bold uppercase mt-1">Para que tu tarjeta fut muestre tú realidad del campo</p>
               </div>
               <Crown className="text-black" size={28} />
             </div>
@@ -67,7 +67,7 @@ const InfoCenter = ({ matches, onMatchClick }) => {
   }, [slides.length]);
 
   return (
-    <div className="w-full max-w-sm h-50 relative mt-[-20px] z-10 px-4">
+    <div className="w-full max-w-sm h-90 relative mt-[-20px] z-10 px-4">
       <AnimatePresence mode="wait">
         <motion.div
           key={index}

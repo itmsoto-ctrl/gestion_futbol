@@ -2,36 +2,34 @@ import React, { useRef, useEffect, useState, memo } from 'react';
 import { motion, animate } from 'framer-motion';
 import useInteractionSounds from '../hooks/useInteractionSounds';
 
-// 🔢 Contador Animado (Liberado del sessionStorage para que siempre anime al cargar)
+// 🔢 Contador Animado Blindado a Prueba de Bombas
 const RatingCounter = memo(({ targetValue, onComplete }) => {
   const [displayValue, setDisplayValue] = useState(0);
   const { playScore } = useInteractionSounds();
-  const hasAnimated = useRef(false);
+  
+  // 🛡️ TRUCO PRO: Guardamos las funciones en un ref para que los re-renderizados 
+  // del padre no interrumpan la animación del contador.
+  const callbacks = useRef({ onComplete, playScore });
+  useEffect(() => {
+    callbacks.current = { onComplete, playScore };
+  });
 
   useEffect(() => {
-    // Si el valor aún es 0 (cargando), no hacemos nada
     if (targetValue === 0) return;
 
-    // Si ya animó en este renderizado, lo dejamos fijo
-    if (hasAnimated.current) {
-      setDisplayValue(targetValue);
-      return;
-    }
-
-    hasAnimated.current = true;
-    if (playScore) playScore(0.3); 
+    if (callbacks.current.playScore) callbacks.current.playScore(0.3); 
     
     const controls = animate(0, targetValue, {
       duration: 1.5,
       ease: "easeOut",
       onUpdate: (v) => setDisplayValue(Math.floor(v)),
       onComplete: () => {
-        if (onComplete) onComplete();
+        if (callbacks.current.onComplete) callbacks.current.onComplete();
       }
     });
     
     return () => controls.stop();
-  }, [targetValue, onComplete, playScore]);
+  }, [targetValue]); // Solo depende del targetValue. ¡No más reinicios locos!
 
   return <span>{displayValue}</span>;
 });
@@ -78,9 +76,9 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
                 backgroundImage: `url(${player.photo_url})`,
                 backgroundSize: 'cover', 
                 backgroundPosition: 'center top',
-                // Máscara robusta para iOS/Safari usando black y transparent
-                WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 95%)',
-                maskImage: 'linear-gradient(to bottom, black 50%, transparent 95%)',
+                // Máscara robusta usando RGBA, que no falla en iOS
+                WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%)',
+                maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%)',
               }}
             />
           )}
