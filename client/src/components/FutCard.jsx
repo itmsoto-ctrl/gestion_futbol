@@ -79,20 +79,21 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
           <video ref={videoRef} className="absolute inset-0 z-0 w-full h-full object-cover opacity-40" src="/particulas_oro.mp4" muted autoPlay loop playsInline />
           <img src="/bronce.png" alt="Card" className="w-full h-auto relative z-10" />
           
-          {/* 📸 FOTO CON TU DIFUMINADO RADIAL ORIGINAL (El que funciona perfecto) */}
+          {/* 📸 FOTO CON POSICIÓN AJUSTADA Y DIFUMINADO */}
           {player?.photo_url && (
-            <div className="absolute top-[35px] left-[115px] w-[215px] h-[255px] z-[15] pointer-events-none"
+            <div className="absolute top-[20px] left-[115px] w-[215px] h-[240px] z-[15] pointer-events-none"
               style={{
                 backgroundImage: `url(${player.photo_url})`,
                 backgroundSize: 'cover', 
                 backgroundPosition: 'center 10%',
-                WebkitMaskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 85%)',
-                maskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 85%)',
+                // Ajustamos el inicio del degradado para que coincida con la nueva posición
+                WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 90%)',
+                maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 90%)',
               }}
             />
           )}
 
-          {/* ⭐ RATING Y POSICIÓN (Estilo PRO) */}
+          {/* ⭐ RATING Y POSICIÓN */}
           <div className="absolute top-[60px] left-[45px] z-20 flex flex-col items-center text-[#4a3b2c] font-bold text-center">
             <motion.div 
               animate={isRatingDone ? { scale: [1, 1.15, 1], filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"] } : {}}
@@ -107,21 +108,21 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
             </div>
           </div>
 
-          {/* 👤 NOMBRE JUGADOR CON LÍNEA DIVISORIA */}
-          <div className="absolute top-[290px] left-0 w-full text-center z-30 text-[#4a3b2c] text-[36px] font-black uppercase italic tracking-tighter mx-auto flex flex-col items-center">
+          {/* 👤 NOMBRE JUGADOR (SIN CURSIVA) */}
+          <div className="absolute top-[290px] left-0 w-full text-center z-30 text-[#4a3b2c] text-[36px] font-black uppercase tracking-tighter mx-auto flex flex-col items-center">
             <span className="px-4 leading-none w-full truncate">{player?.name || 'JUGADOR'}</span>
             <div className="w-[70%] h-[2px] bg-[#4a3b2c]/30 mt-1"></div>
           </div>
 
-          {/* 📊 ESTADÍSTICAS REJILLA PRO */}
-          <div className="absolute top-[355px] left-1/2 -translate-x-1/2 w-[85%] z-30 flex justify-center items-center py-2">
+          {/* 📊 ESTADÍSTICAS EN ESPAÑOL Y POSICIÓN AJUSTADA */}
+          <div className="absolute top-[335px] left-1/2 -translate-x-1/2 w-[85%] z-30 flex justify-center items-center py-2">
             {/* Columna Izquierda */}
             <div className="flex flex-col gap-0.5 pr-6 border-r-2 border-[#4a3b2c]/30 text-[26px] font-black text-[#4a3b2c] leading-none">
               <div className="flex items-center justify-between w-[90px]">
-                <span>{stats.pac}</span> <span className="text-[18px] font-medium opacity-80">PAC</span>
+                <span>{stats.pac}</span> <span className="text-[18px] font-medium opacity-80">RIT</span>
               </div>
               <div className="flex items-center justify-between w-[90px]">
-                <span>{stats.sho}</span> <span className="text-[18px] font-medium opacity-80">SHO</span>
+                <span>{stats.sho}</span> <span className="text-[18px] font-medium opacity-80">TIR</span>
               </div>
               <div className="flex items-center justify-between w-[90px]">
                 <span>{stats.pas}</span> <span className="text-[18px] font-medium opacity-80">PAS</span>
@@ -130,13 +131,13 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
             {/* Columna Derecha */}
             <div className="flex flex-col gap-0.5 pl-6 text-[26px] font-black text-[#4a3b2c] leading-none">
               <div className="flex items-center justify-between w-[90px]">
-                <span>{stats.dri}</span> <span className="text-[18px] font-medium opacity-80">DRI</span>
+                <span>{stats.dri}</span> <span className="text-[18px] font-medium opacity-80">REG</span>
               </div>
               <div className="flex items-center justify-between w-[90px]">
                 <span>{stats.def}</span> <span className="text-[18px] font-medium opacity-80">DEF</span>
               </div>
               <div className="flex items-center justify-between w-[90px]">
-                <span>{stats.phy}</span> <span className="text-[18px] font-medium opacity-80">PHY</span>
+                <span>{stats.phy}</span> <span className="text-[18px] font-medium opacity-80">FIS</span>
               </div>
             </div>
           </div>
