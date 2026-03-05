@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, X, Check, Home, Calendar, Trophy, BarChart2, Settings, Loader2, UploadCloud, User } from 'lucide-react';
+import { Camera, X, Check, Home, Calendar, Trophy, Users, BarChart2, Settings, Loader2, UploadCloud, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
@@ -10,6 +10,7 @@ import InfoCenter from '../player/InfoCenter';
 import StandingsModal from '../player/StandingsModal';
 import CalendarModal from '../player/CalendarModal'; // ✅ Importamos el nuevo componente
 import useInteractionSounds from '../../hooks/useInteractionSounds';
+import RosterModal from '../player/RosterModal';
 
 const PlayerHome = () => {
     const { playClick, playSwipe } = useInteractionSounds();
@@ -39,6 +40,7 @@ const PlayerHome = () => {
     });
 
     const [matches, setMatches] = useState([]);
+    const [roster, setRoster] = useState([]);
     const videoRef = useRef(null);
     const canvasRef = useRef(null); 
     const streamRef = useRef(null);
@@ -96,10 +98,33 @@ const PlayerHome = () => {
                     }
 
                     if (data.team_id) {
+                        
+
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`);
                         const mData = await mRes.json();
                         setMatches(mData);
                         setStandings(calculateStandings(mData));
+
+                        // 2. Plantilla (Copia y pega este bloque exacto)
+                        try {
+                            const rosterUrl = `${API_BASE_URL}/api/leagues/teams/${data.team_id}/players`;
+                            console.log("🌐 Intentando cargar plantilla desde:", rosterUrl);
+
+                            const rRes = await fetch(rosterUrl);
+                            
+                            if(rRes.ok) {
+                                const rData = await rRes.json();
+                                console.log("✅ Jugadores cargados:", rData);
+                                setRoster(rData);
+                            } else {
+                                const errorText = await rRes.text();
+                                console.error("❌ Error en la respuesta del servidor:", rRes.status, errorText);
+                            }
+                        } catch(err) { 
+                            console.error("❌ Error de red o conexión cargando plantilla:", err); 
+                        }
+
+
                     }
                 }
             } catch (err) { console.error(err); } finally { setLoading(false); }
@@ -258,6 +283,7 @@ const PlayerHome = () => {
                 <button onClick={() => { playClick(); setModalView(null); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${!modalView ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Home size={24} /></button>
                 <button onClick={() => { playClick(); setModalView('CALENDAR'); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${modalView === 'CALENDAR' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Calendar size={24} /></button>
                 <button onClick={() => { playClick(); setModalView('STANDINGS'); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${modalView === 'STANDINGS' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Trophy size={24} /></button>
+                <button onClick={() => { playClick(); setModalView('ROSTER'); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${modalView === 'ROSTER' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Users size={24} /></button>
                 
                 {showInstallBtn ? (
                     <button onClick={() => { playClick(); handleInstallClick(); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse"><UploadCloud size={24} /></button>
@@ -292,6 +318,10 @@ const PlayerHome = () => {
                 {modalView === 'STANDINGS' && (
                     <StandingsModal standings={standings} onClose={() => { playClick(); setModalView(null); }} />
                 )}
+
+                {modalView === 'ROSTER' && (
+                <RosterModal roster={roster} onClose={() => { playClick(); setModalView(null); }} />
+                )}   
             </AnimatePresence>
 
         </div>

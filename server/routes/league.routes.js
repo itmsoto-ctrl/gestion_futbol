@@ -307,4 +307,44 @@ router.get('/my-calendar/:teamId', async (req, res) => {
     }
 });
 
+// 👥 RUTA PARA LA PLANTILLA (Fusión league_players + users)
+// 👥 RUTA PARA LA PLANTILLA (Roster) - LA QUE DABA 404
+router.get('/teams/:teamId/players', async (req, res) => {
+    const { teamId } = req.params;
+    console.log("🛠️ Intentando obtener plantilla para equipo ID:", teamId);
+    try {
+        const [players] = await pool.execute(
+            `SELECT 
+                p.id, 
+                p.full_name as name, 
+                u.photo_url, 
+                p.dorsal,
+                u.position,
+                u.country_code
+            FROM league_players p
+            LEFT JOIN users u ON p.user_id = u.id
+            WHERE p.team_id = ? AND p.status = 'active'`,
+            [teamId]
+        );
+
+        // Mapeamos para asegurar que el frontend no rompa
+        const formatted = players.map(p => ({
+            ...p,
+            name: p.name || 'JUGADOR',
+            position: p.position || 'MCO',
+            country_code: p.country_code || 'es',
+            rating: 60,
+            stats: { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 }
+        }));
+
+        res.json(formatted);
+    } catch (err) {
+        console.error("🚨 Error SQL en Roster:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+
+
 module.exports = router;
