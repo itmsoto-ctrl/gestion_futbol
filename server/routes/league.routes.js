@@ -320,9 +320,11 @@ router.get('/teams/:teamId/players', async (req, res) => {
                 u.photo_url, 
                 p.dorsal,
                 u.position,
-                u.country_code
+                u.country_code,
+                s.logo as team_logo
             FROM league_players p
             LEFT JOIN users u ON p.user_id = u.id
+            LEFT JOIN league_teams s ON p.team_id = s.id
             WHERE p.team_id = ? AND p.status = 'active'`,
             [teamId]
         );
