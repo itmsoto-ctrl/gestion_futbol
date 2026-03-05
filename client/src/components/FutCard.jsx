@@ -1,39 +1,55 @@
 import React, { useRef, useEffect, useState, memo } from 'react';
 import { motion, animate } from 'framer-motion';
 
-// 🔢 Contador Animado Limpio y Estable
+// 🔢 Contador animado blindado (SIN sonido para que iOS no lo bloquee)
 const RatingCounter = memo(({ targetValue, onComplete }) => {
-  const [displayValue, setDisplayValue] = useState(0);
+  const [displayValue, setDisplayValue] = useState(() => {
+    const done = sessionStorage.getItem('vora_rating_done');
+    return done === 'true' ? targetValue : 0;
+  });
+  
+  const animatedRef = useRef(false);
 
   useEffect(() => {
-    if (targetValue === 0) return;
+    const isDone = sessionStorage.getItem('vora_rating_done');
+    
+    // Si ya animó antes o si el valor es 0, no hacer nada
+    if (isDone === 'true' || targetValue === 0 || animatedRef.current) {
+      setDisplayValue(targetValue);
+      if (onComplete) onComplete();
+      return;
+    }
+
+    animatedRef.current = true;
 
     const controls = animate(0, targetValue, {
-      duration: 1.5,
-      ease: "easeOut",
+      duration: 2,
+      ease: [0.33, 1, 0.68, 1],
       onUpdate: (v) => setDisplayValue(Math.floor(v)),
       onComplete: () => {
+        sessionStorage.setItem('vora_rating_done', 'true');
         if (onComplete) onComplete();
       }
     });
-    
     return () => controls.stop();
-  }, [targetValue, onComplete]); 
+  }, [targetValue, onComplete]);
 
   return <span>{displayValue}</span>;
 });
 
 const FutCard = ({ player, isFlipped, onFlip }) => {
   const videoRef = useRef(null);
-  const [isRatingDone, setIsRatingDone] = useState(false);
-  
+  const [isRatingDone, setIsRatingDone] = useState(() => {
+    return sessionStorage.getItem('vora_rating_done') === 'true';
+  });
+
   const stats = player?.stats || { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 };
   const rating = player?.rating || 60;
 
   useEffect(() => { 
-    // Capturamos el error silenciosamente por si el iPhone también bloquea el autoplay del video
+    // Captura de error por si iOS bloquea el autoplay
     if (videoRef.current) {
-      videoRef.current.play().catch(() => console.log("Autoplay del video bloqueado por el navegador"));
+      videoRef.current.play().catch(() => {});
     }
   }, [player?.photo_url]);
 
@@ -41,11 +57,15 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
     <div className="relative select-none" style={{ width: '350px', height: '504px', perspective: "2000px", fontFamily: "'Oswald', sans-serif" }}>
       <motion.div
         animate={{ 
-          rotateY: isFlipped ? 180 : [-6, 6, -6], 
+          rotateY: isFlipped ? 180 : [-8, 8, -8], 
           rotateX: [2, -2, 2],
           y: [0, -5, 0] 
         }}
-        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        transition={{ 
+          rotateY: isFlipped ? { duration: 0.8 } : { duration: 8, repeat: Infinity, ease: "easeInOut" },
+          rotateX: { duration: 6, repeat: Infinity, ease: "easeInOut" },
+          y: { duration: 4, repeat: Infinity, ease: "easeInOut" }
+        }}
         style={{ width: '100%', height: '100%', transformStyle: "preserve-3d" }}
         onClick={onFlip}
       >
@@ -56,25 +76,24 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
             <div className="absolute -inset-[100%] bg-gradient-to-tr from-transparent via-white/20 to-transparent rotate-45 animate-[shine_3s_infinite]" />
           </div>
 
-          {/* Fondo de la Carta */}
-          <video ref={videoRef} className="absolute inset-0 z-0 w-full h-full object-cover opacity-40" src="/particulas_oro.mp4" muted autoPlay loop playsInline playsinline webkit-playsinline />
+          <video ref={videoRef} className="absolute inset-0 z-0 w-full h-full object-cover opacity-40" src="/particulas_oro.mp4" muted autoPlay loop playsInline />
           <img src="/bronce.png" alt="Card" className="w-full h-auto relative z-10" />
           
-          {/* 📸 FOTO JUGADOR CON MÁSCARA CORREGIDA (Estilo FUT Exacto) */}
+          {/* 📸 FOTO CON TU DIFUMINADO RADIAL ORIGINAL (El que funciona perfecto) */}
           {player?.photo_url && (
-            <div className="absolute top-[12%] right-[8%] w-[65%] h-[50%] z-[15] pointer-events-none"
+            <div className="absolute top-[35px] left-[115px] w-[215px] h-[255px] z-[15] pointer-events-none"
               style={{
                 backgroundImage: `url(${player.photo_url})`,
                 backgroundSize: 'cover', 
-                backgroundPosition: 'center top',
-                WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%)',
-                maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%)',
+                backgroundPosition: 'center 10%',
+                WebkitMaskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 85%)',
+                maskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 85%)',
               }}
             />
           )}
 
-          {/* ⭐ RATING, POSICIÓN Y ESCUDOS */}
-          <div className="absolute top-[14%] left-[12%] z-20 flex flex-col items-center text-[#4a3b2c] font-bold text-center">
+          {/* ⭐ RATING Y POSICIÓN (Estilo PRO) */}
+          <div className="absolute top-[60px] left-[45px] z-20 flex flex-col items-center text-[#4a3b2c] font-bold text-center">
             <motion.div 
               animate={isRatingDone ? { scale: [1, 1.15, 1], filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"] } : {}}
               className="text-[85px] leading-[0.75] font-black tracking-tighter"
@@ -88,14 +107,15 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
             </div>
           </div>
 
-          {/* 👤 NOMBRE JUGADOR CON LÍNEA */}
-          <div className="absolute top-[60%] left-0 w-full text-center z-30 text-[#4a3b2c] text-[36px] font-black uppercase italic tracking-tighter mx-auto flex flex-col items-center">
-            <span className="px-4 leading-none w-full truncate">{player?.name || 'URIEL BOTAS'}</span>
-            <div className="w-[80%] h-[2px] bg-[#4a3b2c]/30 mt-1"></div>
+          {/* 👤 NOMBRE JUGADOR CON LÍNEA DIVISORIA */}
+          <div className="absolute top-[290px] left-0 w-full text-center z-30 text-[#4a3b2c] text-[36px] font-black uppercase italic tracking-tighter mx-auto flex flex-col items-center">
+            <span className="px-4 leading-none w-full truncate">{player?.name || 'JUGADOR'}</span>
+            <div className="w-[70%] h-[2px] bg-[#4a3b2c]/30 mt-1"></div>
           </div>
 
-          {/* 📊 ESTADÍSTICAS */}
-          <div className="absolute top-[71%] left-1/2 -translate-x-1/2 w-[85%] z-30 flex justify-center items-center py-2">
+          {/* 📊 ESTADÍSTICAS REJILLA PRO */}
+          <div className="absolute top-[355px] left-1/2 -translate-x-1/2 w-[85%] z-30 flex justify-center items-center py-2">
+            {/* Columna Izquierda */}
             <div className="flex flex-col gap-0.5 pr-6 border-r-2 border-[#4a3b2c]/30 text-[26px] font-black text-[#4a3b2c] leading-none">
               <div className="flex items-center justify-between w-[90px]">
                 <span>{stats.pac}</span> <span className="text-[18px] font-medium opacity-80">PAC</span>
@@ -107,6 +127,7 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
                 <span>{stats.pas}</span> <span className="text-[18px] font-medium opacity-80">PAS</span>
               </div>
             </div>
+            {/* Columna Derecha */}
             <div className="flex flex-col gap-0.5 pl-6 text-[26px] font-black text-[#4a3b2c] leading-none">
               <div className="flex items-center justify-between w-[90px]">
                 <span>{stats.dri}</span> <span className="text-[18px] font-medium opacity-80">DRI</span>
