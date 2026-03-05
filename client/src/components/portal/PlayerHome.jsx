@@ -8,7 +8,7 @@ import { usePWAInstall } from '../../hooks/usePWAInstall';
 import WelcomeTutorial from './WelcomeTutorial';
 import InfoCenter from '../player/InfoCenter'; 
 import StandingsModal from '../player/StandingsModal';
-import CalendarModal from '../player/CalendarModal'; // ✅ Importamos el nuevo componente
+import CalendarModal from '../player/CalendarModal'; 
 import useInteractionSounds from '../../hooks/useInteractionSounds';
 import RosterModal from '../player/RosterModal';
 
@@ -88,7 +88,8 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
-                    if (data.is_pwa === 0 || data.tutorial_seen === 0) {
+                    // 🔥 EL FIX DEL TUTORIAL: Solo sale si tutorial_seen es 0
+                    if (data.tutorial_seen === 0) {
                         setShowTutorial(true); 
                         setView('SELFIE'); 
                     } else if (!data.photo_url) {
@@ -98,14 +99,11 @@ const PlayerHome = () => {
                     }
 
                     if (data.team_id) {
-                        
-
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`);
                         const mData = await mRes.json();
                         setMatches(mData);
                         setStandings(calculateStandings(mData));
 
-                        // 2. Plantilla (Copia y pega este bloque exacto)
                         try {
                             const rosterUrl = `${API_BASE_URL}/api/leagues/teams/${data.team_id}/players`;
                             console.log("🌐 Intentando cargar plantilla desde:", rosterUrl);
@@ -123,13 +121,31 @@ const PlayerHome = () => {
                         } catch(err) { 
                             console.error("❌ Error de red o conexión cargando plantilla:", err); 
                         }
-
-
                     }
                 }
             } catch (err) { console.error(err); } finally { setLoading(false); }
         };
+
+        // 🔥 EL CHIVATO SILENCIOSO DE LA PWA
+        const checkPWAStatus = async () => {
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+            const token = localStorage.getItem('token');
+            if (isStandalone && token) {
+                try {
+                    await fetch(`${API_BASE_URL}/api/auth/confirm-pwa`, {
+                        method: 'POST',
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json' 
+                        }
+                    });
+                } catch (error) { console.error("Error silencioso PWA:", error); }
+            }
+        };
+
         fetchUserData();
+        checkPWAStatus(); // Se ejecuta de fondo al abrir la app
+
         return () => stopCamera();
     }, []);
 
@@ -146,19 +162,17 @@ const PlayerHome = () => {
         setTempPhoto(null); 
         setIsCameraOpen(true);
         
-        // 1. Limpieza de seguridad (Evita que la cámara se quede "bloqueada" por un intento previo)
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => track.stop());
         }
     
-        // 2. Configuración híbrida (Equilibrio entre resolución y compatibilidad)
         const constraints = {
             video: {
-                facingMode: "user", // "user" para la frontal. En Android e iOS es la clave.
+                facingMode: "user", 
                 width: { ideal: 1280 },
                 height: { ideal: 720 }
             },
-            audio: false // Importante: No pedir micro reduce errores de permisos
+            audio: false 
         };
     
         try {
@@ -168,8 +182,6 @@ const PlayerHome = () => {
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
                 
-                // 3. El "Trick" para iOS y navegadores estrictos
-                // Forzamos el play() y capturamos si el sistema intenta bloquearlo
                 const playPromise = videoRef.current.play();
                 if (playPromise !== undefined) {
                     playPromise.catch(error => {
@@ -179,7 +191,6 @@ const PlayerHome = () => {
             }
         } catch (err) {
             console.error("Error acceso cámara:", err);
-            // Plan B: Si falla por la resolución, intentamos lo más básico posible
             try {
                 const basicStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 streamRef.current = basicStream;
@@ -260,8 +271,8 @@ const PlayerHome = () => {
                         <video 
                         ref={videoRef} 
                         autoPlay 
-                        playsInline      // 👈 CRÍTICO: Sin esto, iOS bloquea el vídeo o lo abre en pantalla completa
-                        muted            // 👈 CRÍTICO: iOS a veces bloquea vídeos con autoplay si no están muteados
+                        playsInline      
+                        muted            
                         className="w-full h-full object-cover" 
                         />
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -356,7 +367,6 @@ const PlayerHome = () => {
                 <InfoCenter matches={matches} onMatchClick={() => { playClick(); setModalView('CALENDAR'); }} />
             </main>
 
-            {/* ✅ Modales extraídos y limpios */}
             <AnimatePresence>
                 {modalView === 'CALENDAR' && (
                     <CalendarModal matches={matches} onClose={() => { playClick(); setModalView(null); }} />
