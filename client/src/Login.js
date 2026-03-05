@@ -13,6 +13,9 @@ const Login = ({ onLogin }) => {
     const [inviteData, setInviteData] = useState(null);
     const inviteToken = searchParams.get('token');
     const destination = searchParams.get('dest');
+    
+    // 📱 Detector mágico de la App Instalada (PWA)
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone ? 1 : 0;
 
     // 1. Cargamos el contexto de la invitación para saber a qué equipo ir
     useEffect(() => {
@@ -34,8 +37,13 @@ const Login = ({ onLogin }) => {
         setLoading(true);
 
         try {
-            // 2. LOGIN CENTRALIZADO
-            const res = await axios.post(`${API_BASE_URL}/api/auth/login`, form);
+            // 2. LOGIN CENTRALIZADO (Ahora enviamos también el chivato de la PWA)
+            const payload = {
+                ...form,
+                is_pwa: isPWA
+            };
+            
+            const res = await axios.post(`${API_BASE_URL}/api/auth/login`, payload);
             const { token, user } = res.data;
             
             localStorage.setItem('token', token);
@@ -47,7 +55,6 @@ const Login = ({ onLogin }) => {
                 // Si el objetivo era reclamar capitanía (dest=claim)
                 if (destination === 'claim') {
                     try {
-                        // 💡 CORRECCIÓN: Enviamos teamId (el ID numérico) no el token
                         await axios.post(`${API_BASE_URL}/api/leagues/claim-team`, 
                             { teamId: inviteData.team.id },
                             { headers: { 'Authorization': `Bearer ${token}` } }
@@ -59,7 +66,6 @@ const Login = ({ onLogin }) => {
                 }
 
                 // 4. VERIFICACIÓN DE REQUISITOS (Foto, DNI, etc.)
-                // 💡 CORRECCIÓN: Usamos la ruta que espera el leagueId numérico
                 const checkRes = await axios.get(`${API_BASE_URL}/api/leagues/check-requirements/${inviteData.team.league_id}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -67,7 +73,7 @@ const Login = ({ onLogin }) => {
                 if (checkRes.data.isComplete) {
                     navigate('/admin/dashboard'); 
                 } else {
-                    // 🚀 SALTO AL PERFIL: Pasamos los IDs exactos que necesita CompleteProfile
+                    // 🚀 SALTO AL PERFIL
                     navigate('/complete-profile', { 
                         state: { 
                             leagueId: inviteData.team.league_id, 
@@ -77,7 +83,7 @@ const Login = ({ onLogin }) => {
                     });
                 }
             } else {
-                // Login normal de administrador
+                // Login normal
                 navigate(user.role === 'admin' ? '/admin/dashboard' : '/home');
             }
         } catch (error) { 

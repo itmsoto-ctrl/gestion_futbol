@@ -307,7 +307,7 @@ router.get('/my-calendar/:teamId', async (req, res) => {
     }
 });
 
-// 👥 RUTA PARA LA PLANTILLA (Fusión league_players + users)
+
 // 👥 RUTA PARA LA PLANTILLA (Roster) - LA QUE DABA 404
 router.get('/teams/:teamId/players', async (req, res) => {
     const { teamId } = req.params;
