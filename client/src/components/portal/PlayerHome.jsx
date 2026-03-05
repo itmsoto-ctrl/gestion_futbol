@@ -143,12 +143,52 @@ const PlayerHome = () => {
     };
 
     const startCamera = async () => {
-        setTempPhoto(null); setIsCameraOpen(true);
+        setTempPhoto(null); 
+        setIsCameraOpen(true);
+        
+        // 1. Limpieza de seguridad (Evita que la cámara se quede "bloqueada" por un intento previo)
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+        }
+    
+        // 2. Configuración híbrida (Equilibrio entre resolución y compatibilidad)
+        const constraints = {
+            video: {
+                facingMode: "user", // "user" para la frontal. En Android e iOS es la clave.
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
+            audio: false // Importante: No pedir micro reduce errores de permisos
+        };
+    
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1350 } } });
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             streamRef.current = stream;
-            setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = stream; }, 100);
-        } catch (err) { alert("Error cámara"); setIsCameraOpen(false); }
+            
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                
+                // 3. El "Trick" para iOS y navegadores estrictos
+                // Forzamos el play() y capturamos si el sistema intenta bloquearlo
+                const playPromise = videoRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.error("Error en autoplay (posible bloqueo de ahorro de energía):", error);
+                    });
+                }
+            }
+        } catch (err) {
+            console.error("Error acceso cámara:", err);
+            // Plan B: Si falla por la resolución, intentamos lo más básico posible
+            try {
+                const basicStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                streamRef.current = basicStream;
+                if (videoRef.current) videoRef.current.srcObject = basicStream;
+            } catch (finalErr) {
+                alert("⚠️ Error de cámara: Asegúrate de dar permisos en los ajustes del navegador y de no tener el modo 'Ahorro de batería' activado.");
+                setIsCameraOpen(false);
+            }
+        }
     };
 
     const stopCamera = () => {
@@ -217,7 +257,13 @@ const PlayerHome = () => {
                 {isCameraOpen && (
                     <div className="fixed inset-0 z-[120] bg-black flex flex-col">
                         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-                            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                        <video 
+                        ref={videoRef} 
+                        autoPlay 
+                        playsInline      // 👈 CRÍTICO: Sin esto, iOS bloquea el vídeo o lo abre en pantalla completa
+                        muted            // 👈 CRÍTICO: iOS a veces bloquea vídeos con autoplay si no están muteados
+                        className="w-full h-full object-cover" 
+                        />
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                 <div className="w-72 h-96 border-[3px] border-lime-400/50 border-dashed rounded-[50%_50%_45%_45%] shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]"></div>
                             </div>
