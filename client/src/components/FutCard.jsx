@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, memo } from 'react';
 import { motion, animate } from 'framer-motion';
 
-// 🔢 Contador animado blindado
+// 🔢 Contador Animado Blindado (Sin sonido para evitar bloqueos en iOS)
 const RatingCounter = memo(({ targetValue, onComplete }) => {
   const [displayValue, setDisplayValue] = useState(() => {
     const done = sessionStorage.getItem('vora_rating_done');
@@ -69,6 +69,7 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
       >
         <div className="absolute inset-0 w-full h-full rounded-[45px] overflow-hidden shadow-2xl" style={{ backfaceVisibility: "hidden" }}>
           
+          {/* ✨ Brillo Metálico */}
           <div className="absolute inset-0 z-[40] pointer-events-none">
             <div className="absolute -inset-[100%] bg-gradient-to-tr from-transparent via-white/20 to-transparent rotate-45 animate-[shine_3s_infinite]" />
           </div>
@@ -76,15 +77,16 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
           <video ref={videoRef} className="absolute inset-0 z-0 w-full h-full object-cover opacity-40" src="/particulas_oro.mp4" muted autoPlay loop playsInline />
           <img src="/bronce.png" alt="Card" className="w-full h-auto relative z-10" />
           
-          {/* 📸 FOTO CON POSICIÓN AJUSTADA Y DIFUMINADO */}
+          {/* 📸 FOTO SUBIDA Y CON MÁSCARA ANTI-BUGS DE IPHONE */}
           {player?.photo_url && (
-            <div className="absolute top-[20px] left-[115px] w-[215px] h-[240px] z-[15] pointer-events-none"
+            <div className="absolute top-[20px] left-[110px] w-[220px] h-[250px] z-[15] pointer-events-none"
               style={{
                 backgroundImage: `url(${player.photo_url})`,
                 backgroundSize: 'cover', 
-                backgroundPosition: 'center 10%',
-                WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 90%)',
-                maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 90%)',
+                backgroundPosition: 'center top',
+                // Máscara lineal usando 180deg y black/transparent (La única que no falla en iOS)
+                WebkitMaskImage: 'linear-gradient(180deg, black 60%, transparent 100%)',
+                maskImage: 'linear-gradient(180deg, black 60%, transparent 100%)',
               }}
             />
           )}
@@ -99,12 +101,12 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
             </motion.div>
             <div className="text-[26px] uppercase mt-0 opacity-90">{player?.position || 'MCO'}</div>
             <div className="flex flex-col items-center gap-1 mt-2">
-               <img src={`https://flagcdn.com/w80/${player?.country_code || 'es'}.png`} className="w-10 shadow-sm" alt="Flag" />
+               <img src={`https://flagcdn.com/w80/${player?.country_code || 'es'}.png`} className="w-10 shadow-sm border border-[#4a3b2c]/10" alt="Flag" />
                <img src={player?.team_logo || '/default-team.png'} className="w-12 h-12 object-contain opacity-90 contrast-125 mt-1" alt="Club" />
             </div>
           </div>
 
-          {/* 👤 NOMBRE JUGADOR (SIN CURSIVA) */}
+          {/* 👤 NOMBRE JUGADOR (SIN CURSIVA Y LÍNEA SEPARADORA) */}
           <div className="absolute top-[290px] left-0 w-full text-center z-30 text-[#4a3b2c] text-[36px] font-black uppercase tracking-tighter mx-auto flex flex-col items-center">
             <span className="px-4 leading-none w-full truncate">{player?.name || 'JUGADOR'}</span>
             <div className="w-[70%] h-[2px] bg-[#4a3b2c]/30 mt-1"></div>
@@ -138,6 +140,7 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
 
         </div>
 
+        {/* 🔄 CARA TRASERA */}
         <div className="absolute inset-0 w-full h-full rounded-[45px] overflow-hidden shadow-2xl bg-[#2a2218]" style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
           <div className="absolute inset-0 flex items-center justify-center">
              <img src="/logo-vora.png" alt="Vora" className="w-1/2 opacity-30" />
