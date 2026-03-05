@@ -47,7 +47,7 @@ const InfoCenter = ({ matches, onMatchClick }) => {
             </div>
   
             {/* Parte inferior: La imagen */}
-            <div className="w-full h-16 mt-3 rounded-xl overflow-hidden border border-black/10">
+            <div className="w-full h-46 mt-3 rounded-xl overflow-hidden border border-black/10">
               {/* Sustituye la ruta por la imagen que quieras poner en public/ */}
               <img 
                 src="/premium-banner.png" 
@@ -67,7 +67,7 @@ const InfoCenter = ({ matches, onMatchClick }) => {
   }, [slides.length]);
 
   return (
-    <div className="w-full max-w-sm h-120 relative mt-[-20px] z-10 px-4">
+    <div className="w-full max-w-sm h-[450px] relative mt-[-20px] z-10 px-4">
       <AnimatePresence mode="wait">
         <motion.div
           key={index}

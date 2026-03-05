@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, memo } from 'react';
 import { motion, animate } from 'framer-motion';
 
-// 🔢 Contador Animado Blindado (Sin sonido para que no falle en iOS)
+// 🔢 Contador Animado Blindado (Versión Definitiva)
 const RatingCounter = memo(({ targetValue, onComplete }) => {
   const [displayValue, setDisplayValue] = useState(() => {
     const done = sessionStorage.getItem('vora_rating_done');
@@ -13,6 +13,7 @@ const RatingCounter = memo(({ targetValue, onComplete }) => {
   useEffect(() => {
     const isDone = sessionStorage.getItem('vora_rating_done');
     
+    // Si ya animó antes o si el valor es 0, no hacer nada
     if (isDone === 'true' || targetValue === 0 || animatedRef.current) {
       setDisplayValue(targetValue);
       if (onComplete) onComplete();
@@ -77,9 +78,9 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
           <video ref={videoRef} className="absolute inset-0 z-0 w-full h-full object-cover opacity-40" src="/particulas_oro.mp4" muted autoPlay loop playsInline />
           <img src="/bronce.png" alt="Card" className="w-full h-auto relative z-10" />
           
-          {/* 📸 LA FOTO DE AYER EXACTA: Tamaño original y degradado radial que funciona */}
+          {/* 👇👇👇 AQUÍ AJUSTAS LA ALTURA DE LA FOTO (Cambia el top-[20px]) 👇👇👇 */}
           {player?.photo_url && (
-            <div className="absolute top-[35px] left-[115px] w-[215px] h-[255px] z-[15] pointer-events-none"
+            <div className="absolute top-[20px] left-[115px] w-[215px] h-[255px] z-[15] pointer-events-none"
               style={{
                 backgroundImage: `url(${player.photo_url})`,
                 backgroundSize: 'cover', 
@@ -89,6 +90,7 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
               }}
             />
           )}
+          {/* 👆👆👆 FIN DEL BLOQUE DE LA FOTO 👆👆👆 */}
 
           {/* ⭐ RATING Y POSICIÓN */}
           <div className="absolute top-[60px] left-[45px] z-20 flex flex-col items-center text-[#4a3b2c] font-bold text-center">
@@ -105,7 +107,7 @@ const FutCard = ({ player, isFlipped, onFlip }) => {
             </div>
           </div>
 
-          {/* 👤 NOMBRE JUGADOR (SIN CURSIVA Y CON LÍNEA) */}
+          {/* 👤 NOMBRE JUGADOR (Sin cursiva y con línea) */}
           <div className="absolute top-[290px] left-0 w-full text-center z-30 text-[#4a3b2c] text-[36px] font-black uppercase tracking-tighter mx-auto flex flex-col items-center">
             <span className="px-4 leading-none w-full truncate">{player?.name || 'JUGADOR'}</span>
             <div className="w-[70%] h-[2px] bg-[#4a3b2c]/30 mt-1"></div>
