@@ -1,87 +1,159 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Star, Crown, ChevronRight } from 'lucide-react';
+import React, { useRef, useEffect, useState, memo } from 'react';
+import { motion, animate } from 'framer-motion';
 
-const InfoCenter = ({ matches, onMatchClick }) => {
-  const [index, setIndex] = useState(0);
+// 🔢 Contador animado blindado (SIN sonido para que iOS no lo bloquee)
+const RatingCounter = memo(({ targetValue, onComplete }) => {
+  const [displayValue, setDisplayValue] = useState(() => {
+    const done = sessionStorage.getItem('vora_rating_done');
+    return done === 'true' ? targetValue : 0;
+  });
   
-  const slides = [
-    {
-      id: 'match',
-      content: (
-        <div onClick={onMatchClick} className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-3xl flex items-center justify-between shadow-xl cursor-pointer active:scale-95 transition-all">
-          <div>
-            <p className="text-[10px] font-black text-amber-400 italic">PRÓXIMA JORNADA</p>
-            <h3 className="text-white font-bold text-lg uppercase leading-tight">{matches[0]?.home_team || 'POR DEFINIR'} vs {matches[0]?.away_team || '???'}</h3>
-            <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Toca para ver detalles</p>
-          </div>
-          <div className="bg-amber-400 p-2 rounded-xl text-black"><ChevronRight size={20}/></div>
-        </div>
-      )
-    },
-    {
-      id: 'potw',
-      content: (
-        <div className="bg-gradient-to-r from-amber-400/20 to-transparent backdrop-blur-md border border-amber-400/20 p-4 rounded-3xl flex items-center gap-4">
-          <div className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center text-black shadow-lg shadow-amber-400/20"><Star fill="currentColor" size={24}/></div>
-          <div>
-            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Jugador de la Semana</p>
-            <h3 className="text-white font-black italic text-xl uppercase tracking-tighter">URIEL BOTAS</h3>
-          </div>
-        </div>
-      )
-    },
-    {
-        id: 'premium',
-        content: (
-          // Cambiamos a flex-col y añadimos overflow-hidden para que la imagen no se salga de las esquinas redondeadas
-          <div className="bg-lime-400 p-4 rounded-3xl flex flex-col justify-between shadow-[0_0_30px_rgba(163,230,53,0.3)] cursor-pointer active:scale-95 transition-all w-full overflow-hidden">
-            
-            {/* Parte superior: Textos y Corona */}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-black font-black italic text-xl uppercase tracking-tighter leading-none">PRONTO DISPONIBLE EXPERIENCIA PREMIUM</p>
-                <p className="text-black/60 text-[10px] font-bold uppercase mt-1">Para que tu tarjeta fut muestre tú realidad del campo</p>
-              </div>
-              <Crown className="text-black" size={28} />
-            </div>
-  
-            {/* Parte inferior: La imagen */}
-            <div className="w-full h-16 mt-3 rounded-xl overflow-hidden border border-black/10">
-              {/* Sustituye la ruta por la imagen que quieras poner en public/ */}
-              <img 
-                src="/premium-banner.png" 
-                alt="Premium Banner" 
-                className="w-full h-full object-cover" 
-              />
-            </div>
-  
-          </div>
-        )
-      }
-  ];
+  const animatedRef = useRef(false);
 
   useEffect(() => {
-    const timer = setInterval(() => setIndex(prev => (prev + 1) % slides.length), 5000);
-    return () => clearInterval(timer);
-  }, [slides.length]);
+    const isDone = sessionStorage.getItem('vora_rating_done');
+    
+    // Si ya animó antes o si el valor es 0, no hacer nada
+    if (isDone === 'true' || targetValue === 0 || animatedRef.current) {
+      setDisplayValue(targetValue);
+      if (onComplete) onComplete();
+      return;
+    }
+
+    animatedRef.current = true;
+
+    const controls = animate(0, targetValue, {
+      duration: 2,
+      ease: [0.33, 1, 0.68, 1],
+      onUpdate: (v) => setDisplayValue(Math.floor(v)),
+      onComplete: () => {
+        sessionStorage.setItem('vora_rating_done', 'true');
+        if (onComplete) onComplete();
+      }
+    });
+    return () => controls.stop();
+  }, [targetValue, onComplete]);
+
+  return <span>{displayValue}</span>;
+});
+
+const FutCard = ({ player, isFlipped, onFlip }) => {
+  const videoRef = useRef(null);
+  const [isRatingDone, setIsRatingDone] = useState(() => {
+    return sessionStorage.getItem('vora_rating_done') === 'true';
+  });
+
+  const stats = player?.stats || { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 };
+  const rating = player?.rating || 60;
+
+  useEffect(() => { 
+    // Captura de error por si iOS bloquea el autoplay
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  }, [player?.photo_url]);
 
   return (
-    <div className="w-full max-w-sm h-90 relative mt-[-20px] z-10 px-4">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={index}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.5 }}
-          className="absolute inset-0"
-        >
-          {slides[index].content}
-        </motion.div>
-      </AnimatePresence>
+    <div className="relative select-none" style={{ width: '350px', height: '504px', perspective: "2000px", fontFamily: "'Oswald', sans-serif" }}>
+      <motion.div
+        animate={{ 
+          rotateY: isFlipped ? 180 : [-8, 8, -8], 
+          rotateX: [2, -2, 2],
+          y: [0, -5, 0] 
+        }}
+        transition={{ 
+          rotateY: isFlipped ? { duration: 0.8 } : { duration: 8, repeat: Infinity, ease: "easeInOut" },
+          rotateX: { duration: 6, repeat: Infinity, ease: "easeInOut" },
+          y: { duration: 4, repeat: Infinity, ease: "easeInOut" }
+        }}
+        style={{ width: '100%', height: '100%', transformStyle: "preserve-3d" }}
+        onClick={onFlip}
+      >
+        <div className="absolute inset-0 w-full h-full rounded-[45px] overflow-hidden shadow-2xl" style={{ backfaceVisibility: "hidden" }}>
+          
+          {/* ✨ Brillo Metálico Dinámico */}
+          <div className="absolute inset-0 z-[40] pointer-events-none">
+            <div className="absolute -inset-[100%] bg-gradient-to-tr from-transparent via-white/20 to-transparent rotate-45 animate-[shine_3s_infinite]" />
+          </div>
+
+          <video ref={videoRef} className="absolute inset-0 z-0 w-full h-full object-cover opacity-40" src="/particulas_oro.mp4" muted autoPlay loop playsInline />
+          <img src="/bronce.png" alt="Card" className="w-full h-auto relative z-10" />
+          
+          {/* 📸 FOTO CON POSICIÓN AJUSTADA Y DIFUMINADO */}
+          {player?.photo_url && (
+            <div className="absolute top-[20px] left-[115px] w-[215px] h-[240px] z-[15] pointer-events-none"
+              style={{
+                backgroundImage: `url(${player.photo_url})`,
+                backgroundSize: 'cover', 
+                backgroundPosition: 'center 10%',
+                // Ajustamos el inicio del degradado para que coincida con la nueva posición
+                WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 90%)',
+                maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 90%)',
+              }}
+            />
+          )}
+
+          {/* ⭐ RATING Y POSICIÓN */}
+          <div className="absolute top-[60px] left-[45px] z-20 flex flex-col items-center text-[#4a3b2c] font-bold text-center">
+            <motion.div 
+              animate={isRatingDone ? { scale: [1, 1.15, 1], filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"] } : {}}
+              className="text-[85px] leading-[0.75] font-black tracking-tighter"
+            >
+              <RatingCounter targetValue={rating} onComplete={() => setIsRatingDone(true)} />
+            </motion.div>
+            <div className="text-[26px] uppercase mt-0 opacity-90">{player?.position || 'MCO'}</div>
+            <div className="flex flex-col items-center gap-1 mt-2">
+               <img src={`https://flagcdn.com/w80/${player?.country_code || 'es'}.png`} className="w-10 shadow-sm" alt="Flag" />
+               <img src={player?.team_logo || '/default-team.png'} className="w-12 h-12 object-contain opacity-90 contrast-125 mt-1" alt="Club" />
+            </div>
+          </div>
+
+          {/* 👤 NOMBRE JUGADOR (SIN CURSIVA) */}
+          <div className="absolute top-[290px] left-0 w-full text-center z-30 text-[#4a3b2c] text-[36px] font-black uppercase tracking-tighter mx-auto flex flex-col items-center">
+            <span className="px-4 leading-none w-full truncate">{player?.name || 'JUGADOR'}</span>
+            <div className="w-[70%] h-[2px] bg-[#4a3b2c]/30 mt-1"></div>
+          </div>
+
+          {/* 📊 ESTADÍSTICAS EN ESPAÑOL Y POSICIÓN AJUSTADA */}
+          <div className="absolute top-[335px] left-1/2 -translate-x-1/2 w-[85%] z-30 flex justify-center items-center py-2">
+            {/* Columna Izquierda */}
+            <div className="flex flex-col gap-0.5 pr-6 border-r-2 border-[#4a3b2c]/30 text-[26px] font-black text-[#4a3b2c] leading-none">
+              <div className="flex items-center justify-between w-[90px]">
+                <span>{stats.pac}</span> <span className="text-[18px] font-medium opacity-80">RIT</span>
+              </div>
+              <div className="flex items-center justify-between w-[90px]">
+                <span>{stats.sho}</span> <span className="text-[18px] font-medium opacity-80">TIR</span>
+              </div>
+              <div className="flex items-center justify-between w-[90px]">
+                <span>{stats.pas}</span> <span className="text-[18px] font-medium opacity-80">PAS</span>
+              </div>
+            </div>
+            {/* Columna Derecha */}
+            <div className="flex flex-col gap-0.5 pl-6 text-[26px] font-black text-[#4a3b2c] leading-none">
+              <div className="flex items-center justify-between w-[90px]">
+                <span>{stats.dri}</span> <span className="text-[18px] font-medium opacity-80">REG</span>
+              </div>
+              <div className="flex items-center justify-between w-[90px]">
+                <span>{stats.def}</span> <span className="text-[18px] font-medium opacity-80">DEF</span>
+              </div>
+              <div className="flex items-center justify-between w-[90px]">
+                <span>{stats.phy}</span> <span className="text-[18px] font-medium opacity-80">FIS</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* 🔄 CARA TRASERA */}
+        <div className="absolute inset-0 w-full h-full rounded-[45px] overflow-hidden shadow-2xl bg-[#2a2218]" style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
+          <div className="absolute inset-0 flex items-center justify-center">
+             <img src="/logo-vora.png" alt="Vora" className="w-1/2 opacity-30" />
+          </div>
+        </div>
+
+      </motion.div>
     </div>
   );
 };
 
-export default InfoCenter;
+export default FutCard;
