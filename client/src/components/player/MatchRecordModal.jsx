@@ -1,21 +1,19 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, AlertCircle, Zap } from 'lucide-react';
+import { Check, X, AlertCircle, Zap, Loader2 } from 'lucide-react'; // 👈 Añadido Loader2
 import API_BASE_URL from '../../apiConfig';
 
 const MatchRecordModal = ({ match, user, onComplete }) => {
-    // 🛡️ ESCUDO: Si no hay match, no renderizamos nada (evita el crash)
-    if (!match || !user) return null;
-
-    // Inicializamos con 0 si vienen NULL de la DB
-    const [scoreHome, setScoreHome] = useState(match.score_home ?? 0);
-    const [scoreAway, setScoreAway] = useState(match.score_away ?? 0);
+    // 🛡️ LOS HOOKS SIEMPRE ARRIBA (Sin condiciones antes)
+    const [scoreHome, setScoreHome] = useState(match?.score_home ?? 0);
+    const [scoreAway, setScoreAway] = useState(match?.score_away ?? 0);
     const [loading, setLoading] = useState(false);
 
-    console.log("🛠️ MODAL ACTA: Renderizando partido", match.id, "Estado:", match.status);
+    // 🛡️ AHORA SÍ: Si no hay datos, retornamos null después de los hooks
+    if (!match || !user) return null;
 
-    // ¿Soy yo el que tiene que validar lo que puso el otro?
-    // Comprobamos que score_proposer_id no sea mi ID
+    console.log("🛠️ MODAL ACTA: Renderizando partido", match.id);
+
     const isValidationMode = match.status === 'awaiting_validation' && 
                             match.score_proposer_id !== user.id &&
                             match.score_proposer_id !== null;
@@ -40,14 +38,13 @@ const MatchRecordModal = ({ match, user, onComplete }) => {
             });
 
             if (res.ok) {
-                console.log("✅ Resultado enviado con éxito");
                 onComplete();
             } else {
                 const errorData = await res.json();
-                alert(`Error: ${errorData.error || 'No se pudo enviar el resultado'}`);
+                alert(`Error: ${errorData.error || 'No se pudo enviar'}`);
             }
         } catch (err) { 
-            console.error("🚨 Error enviando acta:", err); 
+            console.error("🚨 Error:", err); 
         } finally {
             setLoading(false);
         }
@@ -105,7 +102,7 @@ const MatchRecordModal = ({ match, user, onComplete }) => {
                                 disabled={loading}
                                 className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic flex items-center justify-center gap-2 active:scale-95 transition-all"
                             >
-                                {loading ? <Loader2 className="animate-spin"/> : <><Check size={20}/> CONFIRMAR RESULTADO</>}
+                                {loading ? <Loader2 className="animate-spin text-black"/> : <><Check size={20}/> CONFIRMAR RESULTADO</>}
                             </button>
                             <button 
                                 onClick={() => handleSubmit(false)} 
@@ -119,16 +116,12 @@ const MatchRecordModal = ({ match, user, onComplete }) => {
                         <button 
                             onClick={() => handleSubmit(false)} 
                             disabled={loading}
-                            className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic active:scale-95 transition-all"
+                            className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic active:scale-95 transition-all flex items-center justify-center"
                         >
-                            {loading ? "ENVIANDO..." : "ENVIAR PARA VALIDACIÓN"}
+                            {loading ? <Loader2 className="animate-spin text-black" /> : "ENVIAR PARA VALIDACIÓN"}
                         </button>
                     )}
                 </div>
-                
-                <p className="mt-6 text-[9px] text-center text-zinc-500 uppercase font-bold px-4">
-                    Al confirmar, se habilitará el reclamo de goles para los jugadores.
-                </p>
             </div>
         </motion.div>
     );
