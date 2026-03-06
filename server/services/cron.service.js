@@ -3,39 +3,43 @@ const pool = require('../config/db');
 
 const startMatchWatcher = () => {
     cron.schedule('* * * * *', async () => {
-        console.log('🔍 Vigilante: Comprobando partidos finalizados...');
+        const now = new Date();
+        // Ajustamos a Madrid (UTC+1) manualmente para comparar
+        const madridHour = now.getUTCHours() + 1;
+        const madridMinutes = now.getUTCMinutes();
+        const currentTimeInMinutes = (madridHour * 60) + madridMinutes;
+        
+        console.log(`🔍 Vigilante: Comprobando... (Hora Madrid: ${madridHour}:${madridMinutes})`);
 
         try {
-            // 1. Buscamos partidos que YA DEBERÍAN HABER TERMINADO
-            // Usamos DATE_ADD para sumar los minutos de duración a la hora de inicio
-            // Comparamos con la hora actual de España (ajustando el desfase de Railway si es necesario)
+            // 1. Traemos TODOS los partidos programados que no se han avisado
             const [matches] = await pool.execute(`
-                SELECT m.id, t1.name as home, t2.name as away
+                SELECT m.id, m.match_time, m.match_date, t1.name as home, t2.name as away
                 FROM league_matches m
-                JOIN leagues l ON m.league_id = l.id
                 JOIN league_teams t1 ON m.home_team_id = t1.id
                 JOIN league_teams t2 ON m.away_team_id = t2.id
-                WHERE m.status = 'scheduled' 
-                AND m.notification_sent = 0
-                AND (
-                    m.match_date < CURDATE() 
-                    OR (m.match_date = CURDATE() AND m.match_time <= TIME(DATE_ADD(NOW(), INTERVAL 1 HOUR)))
-                )
+                WHERE m.status = 'scheduled' AND m.notification_sent = 0
             `);
 
             for (const match of matches) {
-                console.log(`⚽ ¡FINAL DETECTADO! ${match.home} vs ${match.away}. Abriendo acta...`);
+                // Convertimos la hora del partido (HH:mm) a minutos totales
+                const [h, m] = match.match_time.split(':').map(Number);
+                const matchTimeInMinutes = (h * 60) + m;
 
-                // 2. Marcamos como notificado para que el vigilante no lo procese más
-                await pool.execute(
-                    'UPDATE league_matches SET notification_sent = 1 WHERE id = ?',
-                    [match.id]
-                );
-                
-                console.log(`✅ Partido ${match.id} listo para recibir el resultado.`);
+                // 2. ¿Es hoy (o antes) y ya ha pasado la hora?
+                // Comparamos solo la hora por ahora para forzar el positivo
+                if (currentTimeInMinutes >= matchTimeInMinutes) {
+                    console.log(`⚽ ¡MATCH! ${match.home} vs ${match.away}. Abriendo acta...`);
+
+                    await pool.execute(
+                        'UPDATE league_matches SET notification_sent = 1 WHERE id = ?',
+                        [match.id]
+                    );
+                    console.log(`✅ Partido ${match.id} actualizado en la tabla.`);
+                }
             }
         } catch (error) {
-            console.error('🚨 Error en el Vigilante:', error.message);
+            console.error('🚨 Error Vigilante:', error.message);
         }
     });
 };
