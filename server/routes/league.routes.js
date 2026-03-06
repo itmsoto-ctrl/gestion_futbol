@@ -351,26 +351,44 @@ router.get('/team-portal/:token', async (req, res) => {
 // ==========================================
 // FICHAJE COMPLETO (Guarda al jugador)
 // ==========================================
+// --- RUTA: Registro completo del jugador (VERSIÓN RESTAURADA) ---
 router.post('/register-player-full', async (req, res) => {
     const { email, fullName, teamId, dorsal, dni, phone, age } = req.body;
+    
+    const connection = await pool.getConnection();
     try {
-        const [users] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
-        if (users.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
-        const userId = users[0].id;
+        await connection.beginTransaction();
 
-        const [team] = await pool.execute('SELECT league_id FROM league_teams WHERE id = ?', [teamId]);
-        const leagueId = team[0].league_id;
-
-        await pool.execute(
-            `INSERT INTO league_players (league_id, team_id, user_id, full_name, dni, phone, age, dorsal) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [leagueId, teamId, userId, fullName, dni || null, phone || null, age || null, dorsal || null]
+        // 1. Actualizamos los datos en la tabla 'users' (DNI, Teléfono, Edad)
+        // Estas columnas SÍ existen en tu tabla 'users'
+        await connection.execute(
+            `UPDATE users SET dni = ?, phone = ?, age = ? WHERE email = ?`,
+            [dni || null, phone || null, age || null, email]
         );
 
-        res.json({ success: true, message: "Fichaje completado con éxito" });
+        // 2. Obtenemos el ID del usuario para la relación
+        const [users] = await connection.execute('SELECT id FROM users WHERE email = ?', [email]);
+        if (users.length === 0) throw new Error("Usuario no encontrado");
+        const userId = users[0].id;
+
+        // 3. Insertamos en 'league_players' (SIN league_id para evitar el error 42S22)
+        // Usamos solo las columnas que tienes: team_id, user_id, full_name, dorsal, dni
+        await connection.execute(
+            `INSERT INTO league_players (team_id, user_id, full_name, dorsal, dni) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [teamId, userId, fullName, dorsal || null, dni || null]
+        );
+
+        await connection.commit();
+        console.log(`✅ Jugador ${fullName} registrado correctamente en el equipo ${teamId}`);
+        res.json({ success: true, message: "¡Fichaje completado con éxito!" });
+
     } catch (error) {
-        console.error("🚨 Error en registro:", error);
-        res.status(500).json({ error: error.message });
+        await connection.rollback();
+        console.error("🚨 Error en registro (Query Fallida):", error.message);
+        res.status(500).json({ error: "No se pudo completar el registro: " + error.message });
+    } finally {
+        connection.release();
     }
 });
 
