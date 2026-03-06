@@ -97,7 +97,6 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
-                    // Control de vista inicial
                     if (data.tutorial_seen === 0) {
                         setShowTutorial(true); 
                         setView('SELFIE'); 
@@ -111,7 +110,6 @@ const PlayerHome = () => {
                         const teamIdStr = String(data.team_id);
                         const cleanTeamId = teamIdStr.includes(':') ? teamIdStr.split(':')[0] : teamIdStr;
 
-                        // Carga de Calendario y Clasificación
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${cleanTeamId}`, {
                             headers: { 'Authorization': `Bearer ${token}` }
                         });
@@ -122,11 +120,9 @@ const PlayerHome = () => {
                             setStandings(calculateStandings(mData));
                         }
 
-                        // 🔥 FLUJO DE CAPITÁN CORREGIDO Y BLINDADO
+                        // 🔥 FLUJO DE CAPITÁN CON FILTRO DE PROPONENTE
                         const rawCaptain = data.is_captain ?? data.isCaptain ?? data.Is_captain;
                         const isCaptain = Number(rawCaptain) === 1;
-
-                        console.log("🧐 Verificando rol de Capitán:", { recibido: rawCaptain, interpretado: isCaptain });
 
                         if (isCaptain) { 
                             console.log("🎯 ¡CAPITÁN CONFIRMADO! Buscando acta...");
@@ -137,23 +133,28 @@ const PlayerHome = () => {
                                 
                                 if (pendingRes.ok) {
                                     const pendingData = await pendingRes.json();
-                                    console.log("📡 Respuesta de acta pendiente:", pendingData);
                                     
-                                    if (pendingData && pendingData.id) {
-                                        console.log("⚽ PARTIDO LISTO. Lanzando modal para:", pendingData.home_team, "vs", pendingData.away_team);
+                                    // 🛡️ FILTRO: ¿Soy yo el que ha enviado el resultado?
+                                    // Si el id del que propuso es el mío, no mostramos el modal.
+                                    const myUserId = data.id || data.user_id;
+                                    const alreadyProposedByMe = pendingData.score_proposer_id && 
+                                                                 Number(pendingData.score_proposer_id) === Number(myUserId);
+
+                                    if (pendingData && pendingData.id && !alreadyProposedByMe) {
+                                        console.log("⚽ Mostrando acta pendiente...");
                                         setTimeout(() => {
                                             setPendingMatch(pendingData);
                                         }, 800);
                                     } else {
-                                        console.log("ℹ️ No hay actas pendientes para este equipo.");
+                                        console.log("✅ Propuesta ya enviada por ti o no hay actas. Esperando rival.");
+                                        setPendingMatch(null); 
                                     }
                                 }
                             } catch (error) {
-                                console.error("❌ Error en el proceso de carga del acta:", error);
+                                console.error("❌ Error en carga de acta:", error);
                             }
                         }
 
-                        // Carga de Plantilla
                         try {
                             const rRes = await fetch(`${API_BASE_URL}/api/leagues/teams/${cleanTeamId}/players`, {
                                 headers: { 'Authorization': `Bearer ${token}` }
@@ -195,10 +196,7 @@ const PlayerHome = () => {
             const token = localStorage.getItem('token');
             await fetch(`${API_BASE_URL}/api/auth/complete-tutorial`, {
                 method: 'POST', 
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }, 
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
                 body: JSON.stringify({ email: user.email })
             });
             setShowTutorial(false);
@@ -213,10 +211,7 @@ const PlayerHome = () => {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
             streamRef.current = stream;
             if (videoRef.current) videoRef.current.srcObject = stream;
-        } catch (err) {
-            console.error("Error acceso cámara:", err);
-            setIsCameraOpen(false);
-        }
+        } catch (err) { console.error(err); setIsCameraOpen(false); }
     };
 
     const stopCamera = () => {
@@ -248,14 +243,10 @@ const PlayerHome = () => {
                 const cloudData = await cloudRes.json();
                 finalPhotoUrl = cloudData.secure_url;
             }
-            
             const token = localStorage.getItem('token');
             const response = await fetch(`${API_BASE_URL}/api/auth/update-player-full`, {
                 method: 'POST', 
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ email: user.email, photo_url: finalPhotoUrl, ...formData, stats: user.stats })
             });
             if (response.ok) {
@@ -368,10 +359,7 @@ const PlayerHome = () => {
             {showTutorial && <WelcomeTutorial user={user} onFinish={() => { playClick(); setShowTutorial(false); }} />}
 
             <main className="flex-1 flex flex-col items-center justify-start relative px-4 sm:px-6 overflow-y-auto pt-6 sm:pt-10 pb-6">
-                <div 
-                    onClick={() => { playClick(); setView('SELFIE'); }} 
-                    className="cursor-pointer transform scale-[0.54] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-115px] sm:mt-[-90px]"
-                >
+                <div onClick={() => { playClick(); setView('SELFIE'); }} className="cursor-pointer transform scale-[0.54] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-115px] sm:mt-[-90px]">
                     <FutCard player={{ ...user, name: formData.name || user?.name || 'JUGADOR', position: formData.position || user?.position || 'MCO' }} size="large" />
                     <div className="absolute -bottom-10 left-0 w-full text-center">
                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 animate-pulse italic">Toca para editar tu ficha</p>
@@ -381,7 +369,6 @@ const PlayerHome = () => {
             </main>
 
             <AnimatePresence>
-                {/* MODAL DE ACTA CON Z-INDEX MÁXIMO */}
                 {pendingMatch && (
                     <MatchRecordModal 
                         match={pendingMatch} 
@@ -392,7 +379,6 @@ const PlayerHome = () => {
                         }} 
                     />
                 )}
-
                 {modalView === 'CALENDAR' && (
                     <CalendarModal matches={matches} onClose={() => { playClick(); setModalView(null); }} />
                 )}
