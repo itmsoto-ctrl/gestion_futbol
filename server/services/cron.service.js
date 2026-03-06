@@ -34,7 +34,10 @@ const startMatchWatcher = () => {
                     console.log(`⚽ ¡MATCH! ${match.home} vs ${match.away}. Abriendo acta...`);
 
                     await pool.execute(
-                        'UPDATE league_matches SET notification_sent = 1 WHERE id = ?',
+                        `UPDATE league_matches 
+                         SET notification_sent = 1, 
+                             status = 'scheduled' -- Lo dejamos en scheduled pero el notification_sent=1 es la señal
+                         WHERE id = ?`,
                         [match.id]
                     );
                     console.log(`✅ Partido ${match.id} actualizado en la tabla.`);
