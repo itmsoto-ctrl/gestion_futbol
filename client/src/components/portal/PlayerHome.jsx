@@ -42,7 +42,7 @@ const PlayerHome = () => {
 
     const [matches, setMatches] = useState([]);
     const [roster, setRoster] = useState([]);
-    const [pendingMatch, setPendingMatch] = useState(null); // 🔥 NUEVO: Estado para el acta
+    const [pendingMatch, setPendingMatch] = useState(null); 
     const videoRef = useRef(null);
     const canvasRef = useRef(null); 
     const streamRef = useRef(null);
@@ -54,7 +54,6 @@ const PlayerHome = () => {
                 if (!table[t]) table[t] = { name: t, pj: 0, pts: 0, gf: 0, gc: 0 };
             });
     
-            // 🛡️ CORRECCIÓN: 'if' bien escrito y variables correctas (score_home/score_away)
             if (m.score_home !== null && m.score_home !== undefined) {
                 const h = table[m.home_team];
                 const a = table[m.away_team];
@@ -62,7 +61,6 @@ const PlayerHome = () => {
                 h.gf += m.score_home; h.gc += m.score_away;
                 a.gf += m.score_away; a.gc += m.score_home;
     
-                // 🏆 CORRECCIÓN: Usar score_home y score_away para los puntos
                 if (m.score_home > m.score_away) h.pts += 3;
                 else if (m.score_home < m.score_away) a.pts += 3;
                 else { h.pts += 1; a.pts += 1; }
@@ -94,7 +92,6 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
-                    // 🔥 EL FIX DEL TUTORIAL: Solo sale si tutorial_seen es 0
                     if (data.tutorial_seen === 0) {
                         setShowTutorial(true); 
                         setView('SELFIE'); 
@@ -105,15 +102,17 @@ const PlayerHome = () => {
                     }
 
                     if (data.team_id) {
-                        const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`);
+                        const teamIdStr = String(data.team_id);
+                        const cleanTeamId = teamIdStr.includes(':') ? teamIdStr.split(':')[0] : teamIdStr;
+
+                        const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${cleanTeamId}`);
                         const mData = await mRes.json();
                         setMatches(mData);
 
                         if (data.is_captain === 1) { 
-                            const pendingRes = await fetch(`${API_BASE_URL}/api/leagues/pending-match/${data.team_id}`);
+                            const pendingRes = await fetch(`${API_BASE_URL}/api/leagues/pending-match/${cleanTeamId}`);
                             if (pendingRes.ok) {
                                 const pendingData = await pendingRes.json();
-                                // Si hay un partido esperando resultado o validación, lo guardamos
                                 if (pendingData && pendingData.id) setPendingMatch(pendingData);
                             }
                         }
@@ -121,14 +120,11 @@ const PlayerHome = () => {
                         setStandings(calculateStandings(mData));
 
                         try {
-                            const rosterUrl = `${API_BASE_URL}/api/leagues/teams/${data.team_id}/players`;
-                            console.log("🌐 Intentando cargar plantilla desde:", rosterUrl);
-
-                            const rRes = await fetch(rosterUrl);
+                            const rosterUrl = `${API_BASE_URL}/api/leagues/teams/${cleanTeamId}/players`;
                             
+                            const rRes = await fetch(rosterUrl);
                             if(rRes.ok) {
                                 const rData = await rRes.json();
-                                console.log("✅ Jugadores cargados:", rData);
                                 setRoster(rData);
                             } else {
                                 const errorText = await rRes.text();
@@ -142,7 +138,6 @@ const PlayerHome = () => {
             } catch (err) { console.error(err); } finally { setLoading(false); }
         };
 
-        // 🔥 EL CHIVATO SILENCIOSO DE LA PWA
         const checkPWAStatus = async () => {
             const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
             const token = localStorage.getItem('token');
@@ -160,7 +155,7 @@ const PlayerHome = () => {
         };
 
         fetchUserData();
-        checkPWAStatus(); // Se ejecuta de fondo al abrir la app
+        checkPWAStatus(); 
 
         return () => stopCamera();
     }, []);
@@ -384,14 +379,13 @@ const PlayerHome = () => {
             </main>
 
             <AnimatePresence>
-
-            {pendingMatch && (
-                <MatchRecordModal 
+                {pendingMatch && (
+                    <MatchRecordModal 
                         match={pendingMatch} 
                         user={user} 
                         onComplete={() => {
-                            setPendingMatch(null); // Cerramos el modal
-                            window.location.reload(); // Refrescamos para ver la clasificación actualizada
+                            setPendingMatch(null); 
+                            window.location.reload(); 
                         }} 
                     />
                 )}
@@ -404,7 +398,7 @@ const PlayerHome = () => {
                 )}
 
                 {modalView === 'ROSTER' && (
-                <RosterModal roster={roster} onClose={() => { playClick(); setModalView(null); }} />
+                    <RosterModal roster={roster} onClose={() => { playClick(); setModalView(null); }} />
                 )}   
             </AnimatePresence>
 
