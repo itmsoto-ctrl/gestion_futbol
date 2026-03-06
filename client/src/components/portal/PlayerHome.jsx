@@ -48,9 +48,7 @@ const PlayerHome = () => {
     const streamRef = useRef(null);
 
     const calculateStandings = (matchesData) => {
-        // 🛡️ BLINDAJE: Si no es un array (ej. si el servidor devolvió un error de texto), devolvemos array vacío
         if (!Array.isArray(matchesData)) return [];
-
         const table = {};
         matchesData.forEach(m => {
             [m.home_team, m.away_team].forEach(t => {
@@ -76,12 +74,12 @@ const PlayerHome = () => {
         const fetchUserData = async () => {
             try {
                 const savedEmail = localStorage.getItem('userEmail');
-                const token = localStorage.getItem('token'); // 🔑 SACAMOS EL TOKEN
+                const token = localStorage.getItem('token');
                 
                 if (!savedEmail || !token) { setLoading(false); return; }
                 
                 const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`, {
-                    headers: { 'Authorization': `Bearer ${token}` } // 🔑 ENVIAMOS EL TOKEN
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
 
@@ -99,6 +97,7 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
+                    // Control de vista inicial
                     if (data.tutorial_seen === 0) {
                         setShowTutorial(true); 
                         setView('SELFIE'); 
@@ -112,8 +111,9 @@ const PlayerHome = () => {
                         const teamIdStr = String(data.team_id);
                         const cleanTeamId = teamIdStr.includes(':') ? teamIdStr.split(':')[0] : teamIdStr;
 
+                        // Carga de Calendario y Clasificación
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${cleanTeamId}`, {
-                            headers: { 'Authorization': `Bearer ${token}` } // 🔑 ENVIAMOS EL TOKEN
+                            headers: { 'Authorization': `Bearer ${token}` }
                         });
                         
                         if (mRes.ok) {
@@ -122,55 +122,47 @@ const PlayerHome = () => {
                             setStandings(calculateStandings(mData));
                         }
 
-                        // 🔍 SUSTITUYE ESTE BLOQUE EN TU useEffect
-                        // 🔍 BUSCA EL BLOQUE DEL CAPITÁN EN TU useEffect Y SUSTITÚYELO POR ESTE:
+                        // 🔥 FLUJO DE CAPITÁN CORREGIDO Y BLINDADO
+                        const rawCaptain = data.is_captain ?? data.isCaptain ?? data.Is_captain;
+                        const isCaptain = Number(rawCaptain) === 1;
 
-                        if (Number(data.is_captain) === 1) { 
-                            console.log("🕵️‍♂️ 7. ¡CAPITÁN DETECTADO! Buscando acta para team_id:", data.team_id);
+                        console.log("🧐 Verificando rol de Capitán:", { recibido: rawCaptain, interpretado: isCaptain });
+
+                        if (isCaptain) { 
+                            console.log("🎯 ¡CAPITÁN CONFIRMADO! Buscando acta...");
                             try {
-                                const teamIdStr = String(data.team_id);
-                                const cleanTeamId = teamIdStr.includes(':') ? teamIdStr.split(':')[0] : teamIdStr;
-                                
                                 const pendingRes = await fetch(`${API_BASE_URL}/api/leagues/pending-match/${cleanTeamId}`, {
                                     headers: { 'Authorization': `Bearer ${token}` }
                                 });
                                 
                                 if (pendingRes.ok) {
                                     const pendingData = await pendingRes.json();
-                                    console.log("🕵️‍♂️ 8. Respuesta cruda del servidor:", pendingData);
+                                    console.log("📡 Respuesta de acta pendiente:", pendingData);
                                     
                                     if (pendingData && pendingData.id) {
-                                        console.log("🎯 ¡PARTIDO ENCONTRADO! ID:", pendingData.id, "Estado:", pendingData.status);
-                                        // Usamos un pequeño delay para asegurar que el DOM esté listo
+                                        console.log("⚽ PARTIDO LISTO. Lanzando modal para:", pendingData.home_team, "vs", pendingData.away_team);
                                         setTimeout(() => {
                                             setPendingMatch(pendingData);
-                                        }, 600);
+                                        }, 800);
                                     } else {
-                                        console.log("ℹ️ No hay partidos pendientes para este equipo.");
+                                        console.log("ℹ️ No hay actas pendientes para este equipo.");
                                     }
-                                } else {
-                                    console.log("❌ Error en la petición pending-match:", pendingRes.status);
                                 }
                             } catch (error) {
-                                console.error("❌ Error fatal buscando acta:", error);
+                                console.error("❌ Error en el proceso de carga del acta:", error);
                             }
-                        } else {
-                            console.log("👤 El usuario no es capitán (is_captain =", data.is_captain, ")");
                         }
 
+                        // Carga de Plantilla
                         try {
-                            const rosterUrl = `${API_BASE_URL}/api/leagues/teams/${cleanTeamId}/players`;
-                            const rRes = await fetch(rosterUrl, {
-                                headers: { 'Authorization': `Bearer ${token}` } // 🔑 ENVIAMOS EL TOKEN
+                            const rRes = await fetch(`${API_BASE_URL}/api/leagues/teams/${cleanTeamId}/players`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
                             });
-                            
                             if(rRes.ok) {
                                 const rData = await rRes.json();
                                 setRoster(rData);
                             }
-                        } catch(err) { 
-                            console.error("❌ Error de red cargando plantilla:", err); 
-                        }
+                        } catch(err) { console.error("❌ Error cargando plantilla:", err); }
                     }
                 }
             } catch (err) { console.error(err); } finally { setLoading(false); }
@@ -216,44 +208,14 @@ const PlayerHome = () => {
     const startCamera = async () => {
         setTempPhoto(null); 
         setIsCameraOpen(true);
-        
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-        }
-    
-        const constraints = {
-            video: {
-                facingMode: "user", 
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            },
-            audio: false 
-        };
-    
+        if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
         try {
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
             streamRef.current = stream;
-            
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                
-                const playPromise = videoRef.current.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(error => {
-                        console.error("Error en autoplay (posible bloqueo de ahorro de energía):", error);
-                    });
-                }
-            }
+            if (videoRef.current) videoRef.current.srcObject = stream;
         } catch (err) {
             console.error("Error acceso cámara:", err);
-            try {
-                const basicStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                streamRef.current = basicStream;
-                if (videoRef.current) videoRef.current.srcObject = basicStream;
-            } catch (finalErr) {
-                alert("⚠️ Error de cámara: Asegúrate de dar permisos en los ajustes del navegador y de no tener el modo 'Ahorro de batería' activado.");
-                setIsCameraOpen(false);
-            }
+            setIsCameraOpen(false);
         }
     };
 
@@ -271,7 +233,7 @@ const PlayerHome = () => {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             setTempPhoto(canvas.toDataURL('image/jpeg', 0.8));
             stopCamera();
-        } else { console.error("No se pudo capturar: videoRef o canvasRef es null"); }
+        }
     };
 
     const handleFinalUpdate = async () => {
@@ -329,16 +291,7 @@ const PlayerHome = () => {
                 {isCameraOpen && (
                     <div className="fixed inset-0 z-[120] bg-black flex flex-col">
                         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-                        <video 
-                        ref={videoRef} 
-                        autoPlay 
-                        playsInline      
-                        muted            
-                        className="w-full h-full object-cover" 
-                        />
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <div className="w-72 h-96 border-[3px] border-lime-400/50 border-dashed rounded-[50%_50%_45%_45%] shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]"></div>
-                            </div>
+                            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                             <button onClick={stopCamera} className="absolute top-6 right-6 text-white bg-black/50 p-3 rounded-full"><X /></button>
                         </div>
                         <div className="h-40 flex items-center justify-center bg-zinc-950">
@@ -424,11 +377,11 @@ const PlayerHome = () => {
                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 animate-pulse italic">Toca para editar tu ficha</p>
                     </div>
                 </div>
-
                 <InfoCenter matches={matches} onMatchClick={() => { playClick(); setModalView('CALENDAR'); }} />
             </main>
 
             <AnimatePresence>
+                {/* MODAL DE ACTA CON Z-INDEX MÁXIMO */}
                 {pendingMatch && (
                     <MatchRecordModal 
                         match={pendingMatch} 
@@ -446,12 +399,10 @@ const PlayerHome = () => {
                 {modalView === 'STANDINGS' && (
                     <StandingsModal standings={standings} onClose={() => { playClick(); setModalView(null); }} />
                 )}
-
                 {modalView === 'ROSTER' && (
                     <RosterModal roster={roster} onClose={() => { playClick(); setModalView(null); }} />
                 )}   
             </AnimatePresence>
-
         </div>
     );
 };
