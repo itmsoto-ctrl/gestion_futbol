@@ -18,7 +18,9 @@ const startMatchWatcher = () => {
                 FROM league_matches m
                 JOIN league_teams t1 ON m.home_team_id = t1.id
                 JOIN league_teams t2 ON m.away_team_id = t2.id
-                WHERE m.status = 'scheduled' AND m.notification_sent = 0
+                WHERE m.status = 'scheduled' 
+                AND m.notification_sent = 0
+                AND m.match_date <= CURDATE() 
             `);
 
             for (const match of matches) {
