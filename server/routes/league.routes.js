@@ -274,7 +274,7 @@ router.get('/pending-match/:teamId', async (req, res) => {
              JOIN league_teams t1 ON m.home_team_id = t1.id
              JOIN league_teams t2 ON m.away_team_id = t2.id
              WHERE (m.home_team_id = ? OR m.away_team_id = ?)
-             AND m.status IN ('scheduled', 'awaiting_validation')
+             AND m.status IN ('awaiting_score', 'awaiting_validation')
              LIMIT 1`, 
             [teamId, teamId]
         );
