@@ -77,19 +77,18 @@ router.post('/login', async (req, res) => {
                 'UPDATE users SET is_pwa = 1 WHERE id = ? AND (is_pwa = 0 OR is_pwa IS NULL)', 
                 [user.id]
             );
-            user.is_pwa = 1; // Actualizamos en memoria para el front
+            user.is_pwa = 1; 
         }
 
         const secret = process.env.JWT_SECRET || 'frase-super-secreta-de-daniel-2026';
         const token = jwt.sign({ id: user.id, role: user.role }, secret, { expiresIn: '24h' });
 
-        // 🔥 LA CORRECCIÓN: Separamos la contraseña, pero enviamos TODO lo demás al Front
         const { password: userPassword, ...userData } = user;
 
         res.json({
             message: "Login exitoso",
             token,
-            user: userData // <-- Aquí va el tutorial_seen, role, name, id, is_pwa...
+            user: userData 
         });
     } catch (error) {
         console.error("Error en login:", error);
@@ -135,7 +134,6 @@ router.get('/venues/search', async (req, res) => {
 // 3. ACTUALIZACIÓN DE PERFIL Y PWA
 // ==========================================
 
-// RUTA NUEVA: Chivato silencioso de PWA
 router.post('/confirm-pwa', verifyToken, async (req, res) => {
     try {
         await db.execute('UPDATE users SET is_pwa = 1 WHERE id = ? AND (is_pwa = 0 OR is_pwa IS NULL)', [req.user.id]);
@@ -164,22 +162,19 @@ router.post('/update-profile', verifyToken, async (req, res) => {
     }
 });
 
-// Guardar la foto del selfie
 router.post('/update-photo', async (req, res) => {
     const { email, photo_url } = req.body;
     try {
-        const [result] = await db.execute(
+        await db.execute(
             'UPDATE users SET photo_url = ? WHERE email = ?',
             [photo_url, email]
         );
         res.json({ success: true, message: "URL guardada con éxito" });
     } catch (error) {
-        console.error("Error SQL:", error);
         res.status(500).json({ success: false, message: "Error en base de datos" });
     }
 });
 
-// Marcar tutorial como visto
 router.post('/complete-tutorial', async (req, res) => {
     const { email } = req.body;
     try {
@@ -193,8 +188,7 @@ router.post('/complete-tutorial', async (req, res) => {
     }
 });
 
-// Ruta: GET /api/auth/user-profile
-// Ruta: GET /api/auth/user-profile
+// Perfil de usuario (incluye rol de capitán)
 router.get('/user-profile', async (req, res) => {
     const { email } = req.query;
     try {
@@ -209,7 +203,7 @@ router.get('/user-profile', async (req, res) => {
         const queryTeams = `
             SELECT 
                 lp.team_id, 
-                lp.is_captain, -- 👈 ESTA ES LA COLUMNA QUE FALTABA
+                lp.is_captain, 
                 t.name AS team_name, 
                 t.logo AS team_logo, 
                 l.name AS league_name
@@ -220,7 +214,6 @@ router.get('/user-profile', async (req, res) => {
         `;
         const [teams] = await db.execute(queryTeams, [userBase.id]);
 
-        // Si el usuario está en un equipo, el primer equipo será el "activo"
         const activeTeam = teams.length > 0 ? teams[0] : { is_captain: 0 };
 
         const responseData = {
@@ -229,9 +222,7 @@ router.get('/user-profile', async (req, res) => {
             all_teams: teams       
         };
 
-        // Log para que veas en la terminal de Railway qué estás enviando
         console.log(`✅ Perfil enviado para ${email}. Capitán: ${responseData.is_captain}`);
-
         res.json(responseData);
 
     } catch (error) {
@@ -240,7 +231,7 @@ router.get('/user-profile', async (req, res) => {
     }
 });
 
-// RUTA: POST /api/auth/update-player-full
+// Actualización de ficha completa
 router.post('/update-player-full', async (req, res) => {
     const { email, photo_url, name, dni, position, country_code } = req.body;
     try {
@@ -263,9 +254,31 @@ router.post('/update-player-full', async (req, res) => {
             email
         ]);
 
-        res.json({ success: true, message: "Ficha actualizada correctamente" });
+        res.json({ success: true, message: "Ficha actualizada" });
     } catch (error) {
-        console.error("🚨 Error crítico en update-player-full:", error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Registro de suscripción Push
+router.post('/subscribe-push', verifyToken, async (req, res) => {
+    const { subscription } = req.body;
+    const userId = req.user.id;
+
+    try {
+        // Limpiamos suscripciones anteriores para este usuario
+        await db.execute('DELETE FROM user_push_subscriptions WHERE user_id = ?', [userId]);
+
+        // Guardamos la nueva suscripción
+        await db.execute(
+            'INSERT INTO user_push_subscriptions (user_id, subscription_json) VALUES (?, ?)',
+            [userId, JSON.stringify(subscription)]
+        );
+        
+        console.log(`📱 Suscripción Push guardada para el usuario ${userId}`);
+        res.status(201).json({ success: true });
+    } catch (error) {
+        console.error("🚨 Error en subscribe-push:", error);
         res.status(500).json({ error: error.message });
     }
 });

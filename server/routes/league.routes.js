@@ -18,7 +18,7 @@ router.get('/my-leagues', verifyToken, async (req, res) => {
     }
 });
 
-// 2. DETALLE DE LIGA (Equipos y Jugadores) - VERSIÓN CORREGIDA
+// 2. DETALLE DE LIGA (Equipos y Jugadores con estado PWA real)
 router.get('/league-details/:id', verifyToken, async (req, res) => {
     try {
         const identifier = req.params.id;
@@ -35,8 +35,6 @@ router.get('/league-details/:id', verifyToken, async (req, res) => {
             [realLeagueId]
         );
 
-        // 🔗 AQUÍ ESTÁ EL CAMBIO: Hacemos un JOIN con la tabla 'users'
-        // para traer el is_pwa REAL de la cuenta del usuario.
         const [players] = await pool.execute(
             `SELECT 
                 lp.team_id, 
@@ -46,7 +44,7 @@ router.get('/league-details/:id', verifyToken, async (req, res) => {
                 lp.dni, 
                 lp.photo_url, 
                 lp.is_captain, 
-                u.is_pwa -- <--- Sacamos el dato de la tabla users, no de league_players
+                u.is_pwa 
              FROM league_players lp
              LEFT JOIN users u ON lp.user_id = u.id 
              WHERE lp.team_id IN (SELECT id FROM league_teams WHERE league_id = ?)`,
@@ -65,7 +63,7 @@ router.get('/league-details/:id', verifyToken, async (req, res) => {
     }
 });
 
-// 3. CREAR LIGA (Mantiene la lógica de Calendario)
+// 3. CREAR LIGA (Con generación automática de tokens y calendario)
 router.post('/create', verifyToken, async (req, res) => {
     const { name, teamsCount, duration, startDate, selectedVenues, registrationConfig, teams, schedule } = req.body;
     const adminId = req.user?.id || req.user?.adminId || req.user?.userId || null; 
@@ -120,7 +118,7 @@ router.post('/create', verifyToken, async (req, res) => {
     }
 });
 
-// 🎖️ 4. ASIGNAR/QUITAR CAPITÁN (Nuevo)
+// 🎖️ 4. ASIGNAR/QUITAR CAPITÁN
 router.patch('/players/:playerId/toggle-captain', verifyToken, async (req, res) => {
     const { playerId } = req.params;
     try {
@@ -136,40 +134,62 @@ router.patch('/players/:playerId/toggle-captain', verifyToken, async (req, res) 
     }
 });
 
-// ⚽ 5. REPORTAR/VALIDAR MARCADOR POR CAPITÁN (Versión Doble Validación)
+// ⚽ 5. REPORTAR/VALIDAR/IMPUGNAR MARCADOR (Fase Crítica de Capitanes)
 router.post('/matches/:matchId/report-score', verifyToken, async (req, res) => {
     const { matchId } = req.params;
-    const { score_home, score_away, action } = req.body; // action: 'PROPOSE' o 'VALIDATE'
+    const { score_home, score_away, action } = req.body; 
     const userId = req.user.id;
 
     try {
-        // 1. Verificar permisos de capitán
+        // Verificar si el usuario es capitán de uno de los dos equipos
         const [perm] = await pool.execute(
-            `SELECT m.id, m.status, m.score_proposer_id FROM league_matches m
+            `SELECT m.* FROM league_matches m
              JOIN league_players lp ON (lp.team_id = m.home_team_id OR lp.team_id = m.away_team_id)
              WHERE m.id = ? AND lp.user_id = ? AND lp.is_captain = 1`,
             [matchId, userId]
         );
 
-        if (perm.length === 0) return res.status(403).json({ error: "No eres capitán de este partido" });
+        if (perm.length === 0) return res.status(403).json({ error: "No tienes permisos de capitán para este acta" });
 
         const match = perm[0];
 
         if (action === 'PROPOSE') {
-            // Primer capitán en subir el resultado
             await pool.execute(
-                `UPDATE league_matches SET score_home = ?, score_away = ?, status = 'awaiting_validation', score_proposer_id = ? WHERE id = ?`,
+                `UPDATE league_matches 
+                 SET score_home = ?, score_away = ?, status = 'awaiting_validation', score_proposer_id = ? 
+                 WHERE id = ?`,
                 [score_home, score_away, userId, matchId]
             );
+            return res.json({ success: true, message: "Resultado enviado para validación" });
+
         } else if (action === 'VALIDATE') {
-            // Segundo capitán confirma
+            // Seguridad: El proponente no puede validarse a sí mismo
+            if (Number(match.score_proposer_id) === Number(userId)) {
+                return res.status(403).json({ error: "Debes esperar a que el capitán rival valide el resultado" });
+            }
+
             await pool.execute(
                 `UPDATE league_matches SET status = 'finished' WHERE id = ?`,
                 [matchId]
             );
+            return res.json({ success: true, message: "Acta cerrada y confirmada" });
+
+        } else if (action === 'REJECT') {
+            // Seguridad: El proponente no puede impugnar su propia propuesta
+            if (Number(match.score_proposer_id) === Number(userId)) {
+                return res.status(403).json({ error: "No puedes impugnar tu propia propuesta" });
+            }
+
+            await pool.execute(
+                `UPDATE league_matches 
+                 SET status = 'awaiting_score', score_proposer_id = NULL 
+                 WHERE id = ?`,
+                [matchId]
+            );
+            return res.json({ success: true, message: "Resultado rechazado. El acta vuelve a estar abierta para corrección." });
         }
 
-        res.json({ success: true });
+        res.status(400).json({ error: "Acción no reconocida" });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -206,13 +226,13 @@ router.get('/:leagueId/full-calendar', verifyToken, async (req, res) => {
             ORDER BY m.match_date ASC, m.match_time ASC
         `, [req.params.leagueId]);
         
-        res.json(matches.map(m => ({ ...m, match_date: new Date(m.match_date).toISOString().split('T')[0] })));
+        res.json(matches.map(m => ({ ...m, match_date: m.match_date ? new Date(m.match_date).toISOString().split('T')[0] : null })));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 📅 8. OBTENER CALENDARIO DE UN EQUIPO (Para el PlayerHome)
+// 📅 8. OBTENER CALENDARIO DE UN EQUIPO (PlayerHome)
 router.get('/my-calendar/:teamId', verifyToken, async (req, res) => {
     try {
         const { teamId } = req.params;
@@ -237,12 +257,11 @@ router.get('/my-calendar/:teamId', verifyToken, async (req, res) => {
 
         res.json(formattedMatches);
     } catch (error) {
-        console.error("🚨 Error en my-calendar:", error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// 🚨 NUKE
+// 🚨 NUKE (Limpieza Total de la Liga)
 router.delete('/nuke-database', verifyToken, async (req, res) => {
     const connection = await pool.getConnection();
     try {
@@ -254,7 +273,7 @@ router.delete('/nuke-database', verifyToken, async (req, res) => {
         await connection.execute('TRUNCATE TABLE leagues');
         await connection.execute('SET FOREIGN_KEY_CHECKS = 1');
         await connection.commit();
-        res.json({ message: "Base de datos limpia" });
+        res.json({ message: "Base de datos reseteada con éxito" });
     } catch (error) {
         await connection.rollback();
         res.status(500).json({ error: error.message });
@@ -263,8 +282,7 @@ router.delete('/nuke-database', verifyToken, async (req, res) => {
     }
 });
 
-// 🔍 BUSCAR PARTIDO PENDIENTE DE ACTA (SIN PORTERO Y SIN FRENOS DE FECHA)
-// Fíjate que he quitado "verifyToken," después de la URL
+// 🔍 BUSCAR PARTIDO PENDIENTE DE ACTA (Uso Público/App)
 router.get('/pending-match/:teamId', async (req, res) => {
     const { teamId } = req.params;
     try {
@@ -280,15 +298,13 @@ router.get('/pending-match/:teamId', async (req, res) => {
         );
 
         if (rows.length === 0) return res.json(null);
-
         res.json(rows[0]);
     } catch (error) {
-        console.error("🚨 Error buscando acta:", error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// 👥 9. OBTENER PLANTILLA DE UN EQUIPO (Para el RosterModal)
+// 👥 9. OBTENER PLANTILLA DE UN EQUIPO
 router.get('/teams/:teamId/players', verifyToken, async (req, res) => {
     try {
         const { teamId } = req.params;
@@ -299,10 +315,8 @@ router.get('/teams/:teamId/players', verifyToken, async (req, res) => {
              WHERE lp.team_id = ?`,
             [teamId]
         );
-        
         res.json(players);
     } catch (error) {
-        console.error("🚨 Error en la ruta de plantilla:", error);
         res.status(500).json({ error: error.message });
     }
 });

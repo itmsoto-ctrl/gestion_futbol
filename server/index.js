@@ -65,3 +65,6 @@ app.listen(PORT, '0.0.0.0', () => {
 pool.query('SELECT 1 + 1 AS test')
     .then(() => console.log("✨ CONEXIÓN CON RAILWAY CONFIRMADA"))
     .catch(err => console.error("🚨 FALLO DB:", err.message));
+
+
+    

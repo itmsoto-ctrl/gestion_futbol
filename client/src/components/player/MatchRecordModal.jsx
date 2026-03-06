@@ -15,12 +15,12 @@ const MatchRecordModal = ({ match, user, onComplete }) => {
                             match.score_proposer_id !== null;
 
     const handleScore = (team, delta) => {
-        if (isValidationMode) return; // Si es validación, no se toca el marcador
+        if (isValidationMode) return; 
         if (team === 'home') setScoreHome(prev => Math.max(0, prev + delta));
         else setScoreAway(prev => Math.max(0, prev + delta));
     };
 
-    const handleSubmit = async (isValidating) => {
+    const handleSubmit = async (actionType) => {
         if (loading) return;
         setLoading(true);
         try {
@@ -31,74 +31,91 @@ const MatchRecordModal = ({ match, user, onComplete }) => {
                 body: JSON.stringify({
                     score_home: scoreHome,
                     score_away: scoreAway,
-                    action: isValidating ? 'VALIDATE' : 'PROPOSE'
+                    action: actionType
                 })
             });
             if (res.ok) onComplete();
-        } catch (err) { console.error("🚨 Error:", err); } 
-        finally { setLoading(false); }
+        } catch (err) { 
+            console.error("🚨 Error:", err); 
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
-            <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-[2.5rem] p-6 shadow-2xl">
+        <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4"
+        >
+            <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-[3rem] p-6 shadow-2xl overflow-hidden">
                 
                 {/* Cabecera */}
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="w-10 h-10 bg-lime-400 rounded-xl flex items-center justify-center text-black">
-                        <Zap size={20} fill="currentColor" />
+                <div className="flex flex-col items-center text-center mb-8">
+                    <div className="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center text-black mb-3 shadow-[0_0_20px_rgba(250,204,21,0.3)]">
+                        <Zap size={24} fill="currentColor" />
                     </div>
-                    <div>
-                        <h3 className="text-lg font-black uppercase italic text-white">Acta del Partido</h3>
-                        <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest leading-none">Confirmación de resultado oficial</p>
-                    </div>
+                    <h3 className="text-xl font-black uppercase italic text-white leading-tight">Acta del Partido</h3>
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mt-1">Confirmación de Marcador</p>
                 </div>
 
-                {/* Marcador Táctico */}
-                <div className="flex justify-around items-center gap-2 my-8">
+                {/* Marcador Táctico en Amarillo */}
+                <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-4 mb-8">
                     
-                    {/* Equipo Local */}
-                    <div className="flex flex-col items-center gap-3 flex-1">
-                        <p className="text-[10px] font-black uppercase text-zinc-500 truncate w-24 text-center">{match.home_team}</p>
-                        <div className="flex flex-col items-center gap-2">
+                    {/* Local */}
+                    <div className="flex flex-col items-center text-center">
+                        <div className="min-h-[45px] flex items-center justify-center mb-2">
+                            <span className="text-[12px] font-black uppercase text-yellow-400 leading-tight">
+                                {match.home_team}
+                            </span>
+                        </div>
+                        <div className="flex flex-col items-center gap-4">
                             {!isValidationMode && (
-                                <button onClick={() => handleScore('home', 1)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-lime-400 active:scale-90 transition-all"><Plus size={24}/></button>
+                                <button onClick={() => handleScore('home', 1)} className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-yellow-400 active:scale-90 transition-all border border-white/5"><Plus size={28}/></button>
                             )}
-                            <div className="text-6xl font-black text-white py-2 tabular-nums">{scoreHome}</div>
+                            <div className="text-7xl font-black text-yellow-400 tabular-nums leading-none my-2">{scoreHome}</div>
                             {!isValidationMode && (
-                                <button onClick={() => handleScore('home', -1)} className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center text-white/20 active:scale-90 transition-all"><Minus size={24}/></button>
+                                <button onClick={() => handleScore('home', -1)} className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center text-white/20 active:scale-90 transition-all border border-white/5"><Minus size={28}/></button>
                             )}
                         </div>
                     </div>
 
-                    <div className="text-xl font-black text-zinc-800 self-center mb-4">VS</div>
+                    <div className="flex flex-col items-center justify-center h-full pt-20">
+                        <div className="text-xs font-black text-zinc-700 bg-zinc-800/50 px-2 py-1 rounded-md">VS</div>
+                    </div>
 
-                    {/* Equipo Visitante */}
-                    <div className="flex flex-col items-center gap-3 flex-1">
-                        <p className="text-[10px] font-black uppercase text-zinc-500 truncate w-24 text-center">{match.away_team}</p>
-                        <div className="flex flex-col items-center gap-2">
+                    {/* Visitante */}
+                    <div className="flex flex-col items-center text-center">
+                        <div className="min-h-[45px] flex items-center justify-center mb-2">
+                            <span className="text-[12px] font-black uppercase text-yellow-400 leading-tight">
+                                {match.away_team}
+                            </span>
+                        </div>
+                        <div className="flex flex-col items-center gap-4">
                             {!isValidationMode && (
-                                <button onClick={() => handleScore('away', 1)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-lime-400 active:scale-90 transition-all"><Plus size={24}/></button>
+                                <button onClick={() => handleScore('away', 1)} className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-yellow-400 active:scale-90 transition-all border border-white/5"><Plus size={28}/></button>
                             )}
-                            <div className="text-6xl font-black text-white py-2 tabular-nums">{scoreAway}</div>
+                            <div className="text-7xl font-black text-yellow-400 tabular-nums leading-none my-2">{scoreAway}</div>
                             {!isValidationMode && (
-                                <button onClick={() => handleScore('away', -1)} className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center text-white/20 active:scale-90 transition-all"><Minus size={24}/></button>
+                                <button onClick={() => handleScore('away', -1)} className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center text-white/20 active:scale-90 transition-all border border-white/5"><Minus size={28}/></button>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Botones de Acción */}
-                <div className="space-y-3 mt-10">
+                {/* Acciones */}
+                <div className="space-y-3 mt-4">
                     {isValidationMode ? (
                         <>
-                            <button onClick={() => handleSubmit(true)} disabled={loading} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic flex items-center justify-center gap-2 active:scale-95 transition-all">
+                            <button onClick={() => handleSubmit('VALIDATE')} disabled={loading} className="w-full bg-yellow-400 text-black font-black py-5 rounded-2xl uppercase italic flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg">
                                 {loading ? <Loader2 className="animate-spin"/> : <><Check size={20}/> CONFIRMAR RESULTADO</>}
                             </button>
-                            <button onClick={() => handleSubmit(false)} disabled={loading} className="w-full bg-white/5 text-white/40 font-black py-4 rounded-2xl uppercase italic text-xs active:scale-95 transition-all">EL RESULTADO ES INCORRECTO</button>
+                            <button onClick={() => handleSubmit('REJECT')} disabled={loading} className="w-full bg-red-500/10 text-red-500 font-black py-4 rounded-2xl uppercase italic text-xs active:scale-95 transition-all border border-red-500/20">
+                                IMPUGNAR RESULTADO
+                            </button>
                         </>
                     ) : (
-                        <button onClick={() => handleSubmit(false)} disabled={loading} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic active:scale-95 transition-all flex items-center justify-center">
+                        <button onClick={() => handleSubmit('PROPOSE')} disabled={loading} className="w-full bg-yellow-400 text-black font-black py-5 rounded-2xl uppercase italic active:scale-95 transition-all flex items-center justify-center shadow-lg">
                             {loading ? <Loader2 className="animate-spin text-black" /> : "ENVIAR RESULTADO"}
                         </button>
                     )}
