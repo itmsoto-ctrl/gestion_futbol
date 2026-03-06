@@ -212,6 +212,36 @@ router.get('/:leagueId/full-calendar', verifyToken, async (req, res) => {
     }
 });
 
+// 📅 8. OBTENER CALENDARIO DE UN EQUIPO (Para el PlayerHome)
+router.get('/my-calendar/:teamId', verifyToken, async (req, res) => {
+    try {
+        const { teamId } = req.params;
+        const [matches] = await pool.execute(`
+            SELECT 
+                m.*, 
+                t1.name as home_team, 
+                t1.logo as home_logo, 
+                t2.name as away_team, 
+                t2.logo as away_logo
+            FROM league_matches m
+            JOIN league_teams t1 ON m.home_team_id = t1.id
+            JOIN league_teams t2 ON m.away_team_id = t2.id
+            WHERE m.home_team_id = ? OR m.away_team_id = ?
+            ORDER BY m.match_date ASC, m.match_time ASC
+        `, [teamId, teamId]);
+        
+        const formattedMatches = matches.map(m => ({
+            ...m,
+            match_date: m.match_date ? new Date(m.match_date).toISOString().split('T')[0] : null
+        }));
+
+        res.json(formattedMatches);
+    } catch (error) {
+        console.error("🚨 Error en my-calendar:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // 🚨 NUKE
 router.delete('/nuke-database', verifyToken, async (req, res) => {
     const connection = await pool.getConnection();
@@ -251,7 +281,6 @@ router.get('/pending-match/:teamId', verifyToken, async (req, res) => {
 
         if (rows.length === 0) return res.json(null);
 
-        // Solo lo devolvemos si ya ha pasado la hora de inicio (o fin según prefieras)
         res.json(rows[0]);
     } catch (error) {
         res.status(500).json({ error: error.message });
