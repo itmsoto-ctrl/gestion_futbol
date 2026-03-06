@@ -263,8 +263,9 @@ router.delete('/nuke-database', verifyToken, async (req, res) => {
     }
 });
 
-// 🔍 BUSCAR PARTIDO PENDIENTE DE ACTA (Para Capitanes) - VERSIÓN PERMISIVA
-router.get('/pending-match/:teamId', verifyToken, async (req, res) => {
+// 🔍 BUSCAR PARTIDO PENDIENTE DE ACTA (SIN PORTERO Y SIN FRENOS DE FECHA)
+// Fíjate que he quitado "verifyToken," después de la URL
+router.get('/pending-match/:teamId', async (req, res) => {
     const { teamId } = req.params;
     try {
         const [rows] = await pool.execute(
@@ -273,9 +274,8 @@ router.get('/pending-match/:teamId', verifyToken, async (req, res) => {
              JOIN league_teams t1 ON m.home_team_id = t1.id
              JOIN league_teams t2 ON m.away_team_id = t2.id
              WHERE (m.home_team_id = ? OR m.away_team_id = ?)
-             AND m.status IN ('scheduled', 'awaiting_validation') 
-             AND m.match_date <= CURDATE() -- 🔥 CAMBIO: Hoy o cualquier día pasado
-             ORDER BY m.match_date ASC, m.match_time ASC LIMIT 1`,
+             AND m.status IN ('scheduled', 'awaiting_validation')
+             LIMIT 1`, 
             [teamId, teamId]
         );
 
@@ -283,6 +283,26 @@ router.get('/pending-match/:teamId', verifyToken, async (req, res) => {
 
         res.json(rows[0]);
     } catch (error) {
+        console.error("🚨 Error buscando acta:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 👥 9. OBTENER PLANTILLA DE UN EQUIPO (Para el RosterModal)
+router.get('/teams/:teamId/players', verifyToken, async (req, res) => {
+    try {
+        const { teamId } = req.params;
+        const [players] = await pool.execute(
+            `SELECT lp.*, u.is_pwa 
+             FROM league_players lp
+             LEFT JOIN users u ON lp.user_id = u.id
+             WHERE lp.team_id = ?`,
+            [teamId]
+        );
+        
+        res.json(players);
+    } catch (error) {
+        console.error("🚨 Error en la ruta de plantilla:", error);
         res.status(500).json({ error: error.message });
     }
 });
