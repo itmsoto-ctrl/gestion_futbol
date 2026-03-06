@@ -69,9 +69,14 @@ const PlayerHome = () => {
         const fetchUserData = async () => {
             try {
                 const savedEmail = localStorage.getItem('userEmail');
-                if (!savedEmail) { setLoading(false); return; }
+                const token = localStorage.getItem('token'); 
+
+                if (!savedEmail || !token) { setLoading(false); return; }
                 
-                const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
+                // ✅ 1. Llamada a Perfil CON Token
+                const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 const data = await res.json();
 
                 if (data) {
@@ -88,7 +93,6 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
-                    // 👇 CAMBIO 1: Quitamos lo de is_pwa para que no entre en bucle infinito
                     if (data.tutorial_seen === 0) {
                         setShowTutorial(true); 
                         setView('SELFIE'); 
@@ -99,24 +103,24 @@ const PlayerHome = () => {
                     }
 
                     if (data.team_id) {
-                        const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`);
+                        // ✅ 2. Llamada a Calendario CON Token
+                        const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
                         const mData = await mRes.json();
                         setMatches(mData);
                         setStandings(calculateStandings(mData));
 
                         try {
+                            // ✅ 3. Llamada a Plantilla CON Token
                             const rosterUrl = `${API_BASE_URL}/api/leagues/teams/${data.team_id}/players`;
-                            console.log("🌐 Intentando cargar plantilla desde:", rosterUrl);
-
-                            const rRes = await fetch(rosterUrl);
+                            const rRes = await fetch(rosterUrl, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
                             
                             if(rRes.ok) {
                                 const rData = await rRes.json();
-                                console.log("✅ Jugadores cargados:", rData);
                                 setRoster(rData);
-                            } else {
-                                const errorText = await rRes.text();
-                                console.error("❌ Error en la respuesta del servidor:", rRes.status, errorText);
                             }
                         } catch(err) { 
                             console.error("❌ Error de red o conexión cargando plantilla:", err); 
@@ -129,7 +133,6 @@ const PlayerHome = () => {
         return () => stopCamera();
     }, []);
 
-    // 👇 CAMBIO 2: Cerramos el tutorial al instante, sin esperar a la base de datos
     const finishTutorial = async () => {
         setShowTutorial(false);
         try {
