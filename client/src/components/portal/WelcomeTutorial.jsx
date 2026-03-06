@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, Check, ArrowRight, ArrowLeft, Smartphone, Zap, Star } from 'lucide-react';
 
-const WelcomeTutorial = ({ user, onFinish }) => {
+// 👇 CAMBIO CLAVE: Cambiamos onFinish por onComplete
+const WelcomeTutorial = ({ user, onComplete }) => {
     const [currentStep, setCurrentStep] = useState(1);
 
     const playerName = user?.name?.split(' ')[0].toUpperCase() || 'JUGADOR';
@@ -33,7 +34,8 @@ const WelcomeTutorial = ({ user, onFinish }) => {
         }
     ];
 
-    const next = () => currentStep === 4 ? onFinish() : setCurrentStep(prev => prev + 1);
+    // 👇 CAMBIO CLAVE: Llamamos a onComplete() en lugar de onFinish()
+    const next = () => currentStep === 4 ? onComplete() : setCurrentStep(prev => prev + 1);
     const prev = () => setCurrentStep(prev => prev - 1);
 
     return (
