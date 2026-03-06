@@ -48,6 +48,9 @@ const PlayerHome = () => {
     const streamRef = useRef(null);
 
     const calculateStandings = (matchesData) => {
+        // 🛡️ BLINDAJE: Si no es un array (ej. si el servidor devolvió un error de texto), devolvemos array vacío
+        if (!Array.isArray(matchesData)) return [];
+
         const table = {};
         matchesData.forEach(m => {
             [m.home_team, m.away_team].forEach(t => {
@@ -73,14 +76,14 @@ const PlayerHome = () => {
         const fetchUserData = async () => {
             try {
                 const savedEmail = localStorage.getItem('userEmail');
-                console.log("🕵️‍♂️ 1. Email en LocalStorage:", savedEmail);
+                const token = localStorage.getItem('token'); // 🔑 SACAMOS EL TOKEN
                 
-                if (!savedEmail) { setLoading(false); return; }
+                if (!savedEmail || !token) { setLoading(false); return; }
                 
-                const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
+                const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`, {
+                    headers: { 'Authorization': `Bearer ${token}` } // 🔑 ENVIAMOS EL TOKEN
+                });
                 const data = await res.json();
-
-                console.log("🕵️‍♂️ 2. Perfil recibido de la BD:", data);
 
                 if (data) {
                     const statsBase = data.stats ? 
@@ -105,53 +108,43 @@ const PlayerHome = () => {
                         setView('HOME'); 
                     }
 
-                    console.log("🕵️‍♂️ 3. ¿Tiene team_id?:", data.team_id);
-
                     if (data.team_id) {
                         const teamIdStr = String(data.team_id);
                         const cleanTeamId = teamIdStr.includes(':') ? teamIdStr.split(':')[0] : teamIdStr;
-                        console.log("🕵️‍♂️ 4. ID de equipo limpio:", cleanTeamId);
 
-                        const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${cleanTeamId}`);
-                        const mData = await mRes.json();
-                        console.log("🕵️‍♂️ 5. Calendario recibido:", mData);
-                        setMatches(mData);
-
-                        console.log("🕵️‍♂️ 6. ¿Es capitán?:", data.is_captain);
-
-                        if (data.is_captain === 1 || data.is_captain === true) { 
-                            console.log("🕵️‍♂️ 7. ¡Es capitán! Buscando acta pendiente...");
-                            const pendingRes = await fetch(`${API_BASE_URL}/api/leagues/pending-match/${cleanTeamId}`);
-                            if (pendingRes.ok) {
-                                const pendingData = await pendingRes.json();
-                                console.log("🕵️‍♂️ 8. Respuesta del acta pendiente:", pendingData);
-                                if (pendingData && pendingData.id) {
-                                    console.log("🚀 ¡ACTA ENCONTRADA! Mostrando modal.");
-                                    setPendingMatch(pendingData);
-                                }
-                            } else {
-                                console.error("🚨 Error HTTP al buscar acta pendiente:", pendingRes.status);
-                            }
+                        const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${cleanTeamId}`, {
+                            headers: { 'Authorization': `Bearer ${token}` } // 🔑 ENVIAMOS EL TOKEN
+                        });
+                        
+                        if (mRes.ok) {
+                            const mData = await mRes.json();
+                            setMatches(mData);
+                            setStandings(calculateStandings(mData));
                         }
 
-                        setStandings(calculateStandings(mData));
+                        if (data.is_captain === 1 || data.is_captain === true) { 
+                            const pendingRes = await fetch(`${API_BASE_URL}/api/leagues/pending-match/${cleanTeamId}`, {
+                                headers: { 'Authorization': `Bearer ${token}` } // 🔑 ENVIAMOS EL TOKEN
+                            });
+                            if (pendingRes.ok) {
+                                const pendingData = await pendingRes.json();
+                                if (pendingData && pendingData.id) setPendingMatch(pendingData);
+                            }
+                        }
 
                         try {
                             const rosterUrl = `${API_BASE_URL}/api/leagues/teams/${cleanTeamId}/players`;
+                            const rRes = await fetch(rosterUrl, {
+                                headers: { 'Authorization': `Bearer ${token}` } // 🔑 ENVIAMOS EL TOKEN
+                            });
                             
-                            const rRes = await fetch(rosterUrl);
                             if(rRes.ok) {
                                 const rData = await rRes.json();
                                 setRoster(rData);
-                            } else {
-                                const errorText = await rRes.text();
-                                console.error("❌ Error en la respuesta del servidor:", rRes.status, errorText);
                             }
                         } catch(err) { 
-                            console.error("❌ Error de red o conexión cargando plantilla:", err); 
+                            console.error("❌ Error de red cargando plantilla:", err); 
                         }
-                    } else {
-                        console.log("⚠️ El jugador no tiene equipo asignado en la respuesta de user-profile.");
                     }
                 }
             } catch (err) { console.error(err); } finally { setLoading(false); }
@@ -181,8 +174,14 @@ const PlayerHome = () => {
 
     const finishTutorial = async () => {
         try {
+            const token = localStorage.getItem('token');
             await fetch(`${API_BASE_URL}/api/auth/complete-tutorial`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email })
+                method: 'POST', 
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }, 
+                body: JSON.stringify({ email: user.email })
             });
             setShowTutorial(false);
         } catch (err) { console.error(err); }
@@ -261,8 +260,14 @@ const PlayerHome = () => {
                 const cloudData = await cloudRes.json();
                 finalPhotoUrl = cloudData.secure_url;
             }
+            
+            const token = localStorage.getItem('token');
             const response = await fetch(`${API_BASE_URL}/api/auth/update-player-full`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                method: 'POST', 
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ email: user.email, photo_url: finalPhotoUrl, ...formData, stats: user.stats })
             });
             if (response.ok) {
