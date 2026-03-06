@@ -122,13 +122,29 @@ const PlayerHome = () => {
                             setStandings(calculateStandings(mData));
                         }
 
+                        // 🔍 SUSTITUYE ESTE BLOQUE EN TU useEffect
                         if (data.is_captain === 1 || data.is_captain === true) { 
-                            const pendingRes = await fetch(`${API_BASE_URL}/api/leagues/pending-match/${cleanTeamId}`, {
-                                headers: { 'Authorization': `Bearer ${token}` } // 🔑 ENVIAMOS EL TOKEN
-                            });
-                            if (pendingRes.ok) {
-                                const pendingData = await pendingRes.json();
-                                if (pendingData && pendingData.id) setPendingMatch(pendingData);
+                            console.log("🕵️‍♂️ 7. El usuario es capitán. Buscando acta...");
+                            try {
+                                const pendingRes = await fetch(`${API_BASE_URL}/api/leagues/pending-match/${cleanTeamId}`, {
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                
+                                if (pendingRes.ok) {
+                                    const pendingData = await pendingRes.json();
+                                    console.log("🕵️‍♂️ 8. Respuesta del servidor para acta:", pendingData);
+                                    
+                                    // 🚀 EL TRUCO: Un pequeño delay de 500ms para que el Home 
+                                    // termine de cargar su interfaz antes de lanzar el modal
+                                    if (pendingData && pendingData.id) {
+                                        setTimeout(() => {
+                                            console.log("🎯 Disparando Modal de Acta...");
+                                            setPendingMatch(pendingData);
+                                        }, 500); 
+                                    }
+                                }
+                            } catch (error) {
+                                console.error("❌ Error buscando acta pendiente:", error);
                             }
                         }
 
