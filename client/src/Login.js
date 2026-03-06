@@ -14,10 +14,8 @@ const Login = ({ onLogin }) => {
     const inviteToken = searchParams.get('token');
     const destination = searchParams.get('dest');
     
-    // 📱 Detector mágico de la App Instalada (PWA)
     const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone ? 1 : 0;
 
-    // 1. Cargamos el contexto de la invitación para saber a qué equipo ir
     useEffect(() => {
         if (inviteToken) {
             const fetchInviteInfo = async () => {
@@ -37,7 +35,6 @@ const Login = ({ onLogin }) => {
         setLoading(true);
 
         try {
-            // 2. LOGIN CENTRALIZADO (Ahora enviamos también el chivato de la PWA)
             const payload = {
                 ...form,
                 is_pwa: isPWA
@@ -46,13 +43,15 @@ const Login = ({ onLogin }) => {
             const res = await axios.post(`${API_BASE_URL}/api/auth/login`, payload);
             const { token, user } = res.data;
             
+            // 🔥 NUEVO: Guardamos el token y el email para que PlayerHome sepa quién es
             localStorage.setItem('token', token);
+            if (user && user.email) {
+                localStorage.setItem('userEmail', user.email);
+            }
+            
             if(onLogin) onLogin(res.data);
 
-            // 3. ¿Viene de una invitación de equipo?
             if (inviteToken && inviteData) {
-                
-                // Si el objetivo era reclamar capitanía (dest=claim)
                 if (destination === 'claim') {
                     try {
                         await axios.post(`${API_BASE_URL}/api/leagues/claim-team`, 
@@ -65,7 +64,6 @@ const Login = ({ onLogin }) => {
                     }
                 }
 
-                // 4. VERIFICACIÓN DE REQUISITOS (Foto, DNI, etc.)
                 const checkRes = await axios.get(`${API_BASE_URL}/api/leagues/check-requirements/${inviteData.team.league_id}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -73,7 +71,6 @@ const Login = ({ onLogin }) => {
                 if (checkRes.data.isComplete) {
                     navigate('/admin/dashboard'); 
                 } else {
-                    // 🚀 SALTO AL PERFIL
                     navigate('/complete-profile', { 
                         state: { 
                             leagueId: inviteData.team.league_id, 
@@ -83,7 +80,6 @@ const Login = ({ onLogin }) => {
                     });
                 }
             } else {
-                // Login normal
                 navigate(user.role === 'admin' ? '/admin/dashboard' : '/home');
             }
         } catch (error) { 
@@ -96,7 +92,7 @@ const Login = ({ onLogin }) => {
     return (
         <div className="min-h-screen bg-zinc-950 flex flex-col justify-center items-center p-6 font-sans">
             <div className="w-full max-w-sm space-y-8">
-                
+                {/* ... TODO TU HTML/JSX SE MANTIENE EXACTAMENTE IGUAL ... */}
                 {inviteData && (
                     <div className="animate-in fade-in slide-in-from-top duration-700">
                         <div className="bg-lime-400/10 border border-lime-400/20 p-6 rounded-[2.5rem] text-center space-y-2 relative overflow-hidden">
