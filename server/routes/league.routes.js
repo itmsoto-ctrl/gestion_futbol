@@ -322,3 +322,31 @@ router.get('/teams/:teamId/players', verifyToken, async (req, res) => {
 });
 
 module.exports = router;
+
+// --- RUTA: Datos del equipo para el portal de invitación ---
+router.get('/team-portal/:token', async (req, res) => {
+    try {
+        const { token } = req.params;
+        const [rows] = await pool.execute(`
+            SELECT t.id, t.name as teamName, t.logo, l.name as leagueName, l.id as league_id, l.player_fields_config
+            FROM league_teams t
+            JOIN leagues l ON t.league_id = l.id
+            WHERE t.team_token = ?`, [token]);
+
+        if (rows.length === 0) return res.status(404).json({ message: "Enlace no válido" });
+
+        const team = rows[0];
+        res.json({
+            team: {
+                id: team.id,
+                teamName: team.teamName,
+                logo: team.logo,
+                leagueName: team.leagueName,
+                league_id: team.league_id
+            },
+            fieldsConfig: JSON.parse(team.player_fields_config || '{}')
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});

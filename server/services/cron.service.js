@@ -52,17 +52,28 @@ const startMatchWatcher = () => {
                 });
 
                 // 5. Enviamos la notificación a cada capitán encontrado
-                captains.forEach(cap => {
+                // 5. Enviamos la notificación a cada capitán encontrado
+                for (const cap of captains) {
                     try {
                         const sub = JSON.parse(cap.subscription_json);
-                        webpush.sendNotification(sub, payload).catch(err => {
-                            // Si la suscripción ha caducado (410) o no existe (404), podrías borrarla de la DB aquí
-                            console.error(`🚨 Fallo en envío Push: ${err.statusCode}`);
+                        
+                        await webpush.sendNotification(sub, payload).catch(async (err) => {
+                            // 410 (Gone) o 404 (Not Found) significan que el usuario desinstaló la PWA 
+                            // o el navegador invalidó el token. Procedemos a limpiar.
+                            if (err.statusCode === 410 || err.statusCode === 404) {
+                                console.log(`🧹 Limpiando suscripción obsoleta del usuario en la DB...`);
+                                await pool.execute(
+                                    'DELETE FROM user_push_subscriptions WHERE subscription_json = ?',
+                                    [cap.subscription_json]
+                                );
+                            } else {
+                                console.error(`🚨 Fallo en envío Push (Estado: ${err.statusCode}):`, err.message);
+                            }
                         });
                     } catch (parseErr) {
-                        console.error("❌ Error parseando suscripción JSON:", parseErr.message);
+                        console.error("❌ Error grave en el formato de la suscripción:", parseErr.message);
                     }
-                });
+                }
             }
         } catch (error) { 
             console.error('🚨 Error crítico en el Vigilante:', error.message); 
