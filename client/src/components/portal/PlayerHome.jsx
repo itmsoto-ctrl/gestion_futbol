@@ -11,6 +11,7 @@ import StandingsModal from '../player/StandingsModal';
 import CalendarModal from '../player/CalendarModal'; 
 import useInteractionSounds from '../../hooks/useInteractionSounds';
 import RosterModal from '../player/RosterModal';
+import MatchRecordModal from '../player/MatchRecordModal';
 
 const PlayerHome = () => {
     const { playClick, playSwipe } = useInteractionSounds();
@@ -41,6 +42,7 @@ const PlayerHome = () => {
 
     const [matches, setMatches] = useState([]);
     const [roster, setRoster] = useState([]);
+    const [pendingMatch, setPendingMatch] = useState(null); // 🔥 NUEVO: Estado para el acta
     const videoRef = useRef(null);
     const canvasRef = useRef(null); 
     const streamRef = useRef(null);
@@ -51,14 +53,18 @@ const PlayerHome = () => {
             [m.home_team, m.away_team].forEach(t => {
                 if (!table[t]) table[t] = { name: t, pj: 0, pts: 0, gf: 0, gc: 0 };
             });
-            if (m.home_team_goals !== null && m.home_team_goals !== undefined) {
+    
+            // 🛡️ CORRECCIÓN: 'if' bien escrito y variables correctas (score_home/score_away)
+            if (m.score_home !== null && m.score_home !== undefined) {
                 const h = table[m.home_team];
                 const a = table[m.away_team];
                 h.pj++; a.pj++;
-                h.gf += m.home_team_goals; h.gc += m.away_team_goals;
-                a.gf += m.away_team_goals; a.gc += m.home_team_goals;
-                if (m.home_team_goals > m.away_team_goals) h.pts += 3;
-                else if (m.home_team_goals < m.away_team_goals) a.pts += 3;
+                h.gf += m.score_home; h.gc += m.score_away;
+                a.gf += m.score_away; a.gc += m.score_home;
+    
+                // 🏆 CORRECCIÓN: Usar score_home y score_away para los puntos
+                if (m.score_home > m.score_away) h.pts += 3;
+                else if (m.score_home < m.score_away) a.pts += 3;
                 else { h.pts += 1; a.pts += 1; }
             }
         });
@@ -102,6 +108,16 @@ const PlayerHome = () => {
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`);
                         const mData = await mRes.json();
                         setMatches(mData);
+
+                        if (data.is_captain === 1) { 
+                            const pendingRes = await fetch(`${API_BASE_URL}/api/leagues/pending-match/${data.team_id}`);
+                            if (pendingRes.ok) {
+                                const pendingData = await pendingRes.json();
+                                // Si hay un partido esperando resultado o validación, lo guardamos
+                                if (pendingData && pendingData.id) setPendingMatch(pendingData);
+                            }
+                        }
+
                         setStandings(calculateStandings(mData));
 
                         try {
@@ -368,6 +384,18 @@ const PlayerHome = () => {
             </main>
 
             <AnimatePresence>
+
+            {pendingMatch && (
+                <MatchRecordModal 
+                        match={pendingMatch} 
+                        user={user} 
+                        onComplete={() => {
+                            setPendingMatch(null); // Cerramos el modal
+                            window.location.reload(); // Refrescamos para ver la clasificación actualizada
+                        }} 
+                    />
+                )}
+
                 {modalView === 'CALENDAR' && (
                     <CalendarModal matches={matches} onClose={() => { playClick(); setModalView(null); }} />
                 )}

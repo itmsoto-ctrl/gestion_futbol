@@ -6,6 +6,7 @@ const pool = require('./config/db');
 const adminRoutes = require('./routes/admin.routes');
 const authRoutes = require('./routes/auth.routes');
 const leagueRoutes = require('./routes/league.routes');
+const { startMatchWatcher } = require('./services/cron.service');
 
 const app = express();
 
@@ -54,6 +55,10 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ SERVIDOR VORA LISTO EN PUERTO ${PORT}`);
+
+    // 🔥 ¡ENCENDEMOS EL VIGILANTE AQUÍ! 🔥
+    // Arranca justo cuando el servidor empieza a escuchar
+    startMatchWatcher();
 });
 
 // TEST DB
