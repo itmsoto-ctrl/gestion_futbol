@@ -352,27 +352,28 @@ router.get('/team-portal/:token', async (req, res) => {
 // FICHAJE COMPLETO (Guarda al jugador)
 // ==========================================
 // --- RUTA: Registro completo del jugador (VERSIÓN RESTAURADA) ---
+// --- RUTA: Registro completo del jugador (CORREGIDA Y SEGURA) ---
 router.post('/register-player-full', async (req, res) => {
-    const { email, fullName, teamId, dorsal, dni, phone, age } = req.body;
+    // 1. Recibimos todos los datos (incluido age, aunque no lo guardemos en DB)
+    const { email, fullName, teamId, dorsal, dni, phone } = req.body; 
     
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
 
-        // 1. Actualizamos los datos en la tabla 'users' (DNI, Teléfono, Edad)
-        // Estas columnas SÍ existen en tu tabla 'users'
+        // 2. Actualizamos 'users' SOLO con las columnas que sabemos que existen
         await connection.execute(
-            `UPDATE users SET dni = ?, phone = ?, age = ? WHERE email = ?`,
-            [dni || null, phone || null, age || null, email]
+            `UPDATE users SET dni = ?, phone = ? WHERE email = ?`,
+            [dni || null, phone || null, email]
         );
 
-        // 2. Obtenemos el ID del usuario para la relación
+        // 3. Obtenemos el ID del usuario
         const [users] = await connection.execute('SELECT id FROM users WHERE email = ?', [email]);
         if (users.length === 0) throw new Error("Usuario no encontrado");
         const userId = users[0].id;
 
-        // 3. Insertamos en 'league_players' (SIN league_id para evitar el error 42S22)
-        // Usamos solo las columnas que tienes: team_id, user_id, full_name, dorsal, dni
+        // 4. Insertamos la ficha deportiva en 'league_players'
+        // (Sin 'league_id' ni 'age', usando estrictamente tu estructura)
         await connection.execute(
             `INSERT INTO league_players (team_id, user_id, full_name, dorsal, dni) 
              VALUES (?, ?, ?, ?, ?)`,
@@ -380,7 +381,6 @@ router.post('/register-player-full', async (req, res) => {
         );
 
         await connection.commit();
-        console.log(`✅ Jugador ${fullName} registrado correctamente en el equipo ${teamId}`);
         res.json({ success: true, message: "¡Fichaje completado con éxito!" });
 
     } catch (error) {
