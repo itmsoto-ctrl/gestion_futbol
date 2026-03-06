@@ -301,12 +301,26 @@ router.get('/pending-match/:teamId', async (req, res) => {
     }
 });
 
-// 👥 9. OBTENER PLANTILLA DE UN EQUIPO
+// 👥 9. OBTENER PLANTILLA DE UN EQUIPO (🛠️ REPARADO PARA FUSIONAR DATOS)
 router.get('/teams/:teamId/players', verifyToken, async (req, res) => {
     try {
         const { teamId } = req.params;
         const [players] = await pool.execute(
-            `SELECT lp.*, u.is_pwa 
+            `SELECT 
+                lp.id, 
+                lp.team_id, 
+                lp.user_id, 
+                lp.full_name,
+                lp.full_name AS name,
+                lp.full_name AS fullName,
+                lp.dorsal, 
+                lp.is_captain,
+                u.dni, 
+                u.phone, 
+                u.age, 
+                COALESCE(u.photo_url, lp.photo_url) AS photo_url,
+                u.position,
+                u.is_pwa 
              FROM league_players lp
              LEFT JOIN users u ON lp.user_id = u.id
              WHERE lp.team_id = ?`,
@@ -314,6 +328,7 @@ router.get('/teams/:teamId/players', verifyToken, async (req, res) => {
         );
         res.json(players);
     } catch (error) {
+        console.error("🚨 Error al cargar plantilla:", error);
         res.status(500).json({ error: error.message });
     }
 });
