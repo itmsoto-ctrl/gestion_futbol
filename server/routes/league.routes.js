@@ -263,7 +263,7 @@ router.delete('/nuke-database', verifyToken, async (req, res) => {
     }
 });
 
-// 🔍 BUSCAR PARTIDO PENDIENTE DE ACTA (Para Capitanes)
+// 🔍 BUSCAR PARTIDO PENDIENTE DE ACTA (Para Capitanes) - VERSIÓN PERMISIVA
 router.get('/pending-match/:teamId', verifyToken, async (req, res) => {
     const { teamId } = req.params;
     try {
@@ -273,9 +273,9 @@ router.get('/pending-match/:teamId', verifyToken, async (req, res) => {
              JOIN league_teams t1 ON m.home_team_id = t1.id
              JOIN league_teams t2 ON m.away_team_id = t2.id
              WHERE (m.home_team_id = ? OR m.away_team_id = ?)
-             AND m.status IN ('scheduled', 'awaiting_validation')
-             AND m.match_date = CURDATE()
-             ORDER BY m.match_time ASC LIMIT 1`,
+             AND m.status IN ('scheduled', 'awaiting_validation') 
+             AND m.match_date <= CURDATE() -- 🔥 CAMBIO: Hoy o cualquier día pasado
+             ORDER BY m.match_date ASC, m.match_time ASC LIMIT 1`,
             [teamId, teamId]
         );
 
