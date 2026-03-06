@@ -301,7 +301,7 @@ router.get('/pending-match/:teamId', async (req, res) => {
     }
 });
 
-// 👥 9. OBTENER PLANTILLA DE UN EQUIPO (🛠️ REPARADO PARA FUSIONAR DATOS)
+// 👥 9. OBTENER PLANTILLA DE UN EQUIPO (🛠️ REPARADO: Se eliminó u.age inexistente)
 router.get('/teams/:teamId/players', verifyToken, async (req, res) => {
     try {
         const { teamId } = req.params;
@@ -317,7 +317,6 @@ router.get('/teams/:teamId/players', verifyToken, async (req, res) => {
                 lp.is_captain,
                 u.dni, 
                 u.phone, 
-                u.age, 
                 COALESCE(u.photo_url, lp.photo_url) AS photo_url,
                 u.position,
                 u.is_pwa 
@@ -366,29 +365,22 @@ router.get('/team-portal/:token', async (req, res) => {
 // ==========================================
 // FICHAJE COMPLETO (Guarda al jugador)
 // ==========================================
-// --- RUTA: Registro completo del jugador (VERSIÓN RESTAURADA) ---
-// --- RUTA: Registro completo del jugador (CORREGIDA Y SEGURA) ---
 router.post('/register-player-full', async (req, res) => {
-    // 1. Recibimos todos los datos (incluido age, aunque no lo guardemos en DB)
     const { email, fullName, teamId, dorsal, dni, phone } = req.body; 
     
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
 
-        // 2. Actualizamos 'users' SOLO con las columnas que sabemos que existen
         await connection.execute(
             `UPDATE users SET dni = ?, phone = ? WHERE email = ?`,
             [dni || null, phone || null, email]
         );
 
-        // 3. Obtenemos el ID del usuario
         const [users] = await connection.execute('SELECT id FROM users WHERE email = ?', [email]);
         if (users.length === 0) throw new Error("Usuario no encontrado");
         const userId = users[0].id;
 
-        // 4. Insertamos la ficha deportiva en 'league_players'
-        // (Sin 'league_id' ni 'age', usando estrictamente tu estructura)
         await connection.execute(
             `INSERT INTO league_players (team_id, user_id, full_name, dorsal, dni) 
              VALUES (?, ?, ?, ?, ?)`,
