@@ -194,6 +194,7 @@ router.post('/complete-tutorial', async (req, res) => {
 });
 
 // Ruta: GET /api/auth/user-profile
+// Ruta: GET /api/auth/user-profile
 router.get('/user-profile', async (req, res) => {
     const { email } = req.query;
     try {
@@ -205,11 +206,10 @@ router.get('/user-profile', async (req, res) => {
         
         const userBase = users[0];
 
-        // 🔍 AQUÍ ESTÁ EL CAMBIO: Añadimos lp.is_captain
         const queryTeams = `
             SELECT 
                 lp.team_id, 
-                lp.is_captain, 
+                lp.is_captain, -- 👈 ESTA ES LA COLUMNA QUE FALTABA
                 t.name AS team_name, 
                 t.logo AS team_logo, 
                 l.name AS league_name
@@ -221,7 +221,6 @@ router.get('/user-profile', async (req, res) => {
         const [teams] = await db.execute(queryTeams, [userBase.id]);
 
         // Si el usuario está en un equipo, el primer equipo será el "activo"
-        // y ahora incluirá la propiedad is_captain
         const activeTeam = teams.length > 0 ? teams[0] : { is_captain: 0 };
 
         const responseData = {
@@ -231,7 +230,7 @@ router.get('/user-profile', async (req, res) => {
         };
 
         // Log para que veas en la terminal de Railway qué estás enviando
-        console.log(`✅ Enviando perfil de ${email}. Capitán: ${responseData.is_captain}`);
+        console.log(`✅ Perfil enviado para ${email}. Capitán: ${responseData.is_captain}`);
 
         res.json(responseData);
 
