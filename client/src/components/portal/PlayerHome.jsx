@@ -123,29 +123,39 @@ const PlayerHome = () => {
                         }
 
                         // 🔍 SUSTITUYE ESTE BLOQUE EN TU useEffect
-                        if (data.is_captain === 1 || data.is_captain === true) { 
-                            console.log("🕵️‍♂️ 7. El usuario es capitán. Buscando acta...");
+                        // 🔍 BUSCA EL BLOQUE DEL CAPITÁN EN TU useEffect Y SUSTITÚYELO POR ESTE:
+
+                        if (Number(data.is_captain) === 1) { 
+                            console.log("🕵️‍♂️ 7. ¡CAPITÁN DETECTADO! Buscando acta para team_id:", data.team_id);
                             try {
+                                const teamIdStr = String(data.team_id);
+                                const cleanTeamId = teamIdStr.includes(':') ? teamIdStr.split(':')[0] : teamIdStr;
+                                
                                 const pendingRes = await fetch(`${API_BASE_URL}/api/leagues/pending-match/${cleanTeamId}`, {
                                     headers: { 'Authorization': `Bearer ${token}` }
                                 });
                                 
                                 if (pendingRes.ok) {
                                     const pendingData = await pendingRes.json();
-                                    console.log("🕵️‍♂️ 8. Respuesta del servidor para acta:", pendingData);
+                                    console.log("🕵️‍♂️ 8. Respuesta cruda del servidor:", pendingData);
                                     
-                                    // 🚀 EL TRUCO: Un pequeño delay de 500ms para que el Home 
-                                    // termine de cargar su interfaz antes de lanzar el modal
                                     if (pendingData && pendingData.id) {
+                                        console.log("🎯 ¡PARTIDO ENCONTRADO! ID:", pendingData.id, "Estado:", pendingData.status);
+                                        // Usamos un pequeño delay para asegurar que el DOM esté listo
                                         setTimeout(() => {
-                                            console.log("🎯 Disparando Modal de Acta...");
                                             setPendingMatch(pendingData);
-                                        }, 500); 
+                                        }, 600);
+                                    } else {
+                                        console.log("ℹ️ No hay partidos pendientes para este equipo.");
                                     }
+                                } else {
+                                    console.log("❌ Error en la petición pending-match:", pendingRes.status);
                                 }
                             } catch (error) {
-                                console.error("❌ Error buscando acta pendiente:", error);
+                                console.error("❌ Error fatal buscando acta:", error);
                             }
+                        } else {
+                            console.log("👤 El usuario no es capitán (is_captain =", data.is_captain, ")");
                         }
 
                         try {
