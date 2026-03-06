@@ -36,7 +36,7 @@ const startMatchWatcher = () => {
                     await pool.execute(
                         `UPDATE league_matches 
                          SET notification_sent = 1, 
-                             status = 'scheduled' -- Lo dejamos en scheduled pero el notification_sent=1 es la señal
+                             status = 'awaiting_score' -- 👈 ESTO ES LO QUE EL PLAYERHOME VA A LEER
                          WHERE id = ?`,
                         [match.id]
                     );
