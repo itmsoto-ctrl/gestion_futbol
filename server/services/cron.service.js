@@ -33,8 +33,12 @@ const startMatchWatcher = () => {
                 if (currentTimeInMinutes >= matchTimeInMinutes) {
                     console.log(`⚽ ¡MATCH! ${match.home} vs ${match.away}. Abriendo acta...`);
 
+                    // El Vigilante hace el trabajo sucio en la sombra
                     await pool.execute(
-                        'UPDATE league_matches SET notification_sent = 1 WHERE id = ?',
+                        `UPDATE league_matches 
+                        SET notification_sent = 1, 
+                            status = 'awaiting_score' -- 👈 ESTO ES LO QUE EL PLAYERHOME VA A LEER
+                        WHERE id = ?`,
                         [match.id]
                     );
                     console.log(`✅ Partido ${match.id} actualizado en la tabla.`);
