@@ -141,7 +141,6 @@ router.post('/matches/:matchId/report-score', verifyToken, async (req, res) => {
     const userId = req.user.id;
 
     try {
-        // Verificar si el usuario es capitán de uno de los dos equipos
         const [perm] = await pool.execute(
             `SELECT m.* FROM league_matches m
              JOIN league_players lp ON (lp.team_id = m.home_team_id OR lp.team_id = m.away_team_id)
@@ -163,7 +162,6 @@ router.post('/matches/:matchId/report-score', verifyToken, async (req, res) => {
             return res.json({ success: true, message: "Resultado enviado para validación" });
 
         } else if (action === 'VALIDATE') {
-            // Seguridad: El proponente no puede validarse a sí mismo
             if (Number(match.score_proposer_id) === Number(userId)) {
                 return res.status(403).json({ error: "Debes esperar a que el capitán rival valide el resultado" });
             }
@@ -175,7 +173,6 @@ router.post('/matches/:matchId/report-score', verifyToken, async (req, res) => {
             return res.json({ success: true, message: "Acta cerrada y confirmada" });
 
         } else if (action === 'REJECT') {
-            // Seguridad: El proponente no puede impugnar su propia propuesta
             if (Number(match.score_proposer_id) === Number(userId)) {
                 return res.status(403).json({ error: "No puedes impugnar tu propia propuesta" });
             }
@@ -321,9 +318,9 @@ router.get('/teams/:teamId/players', verifyToken, async (req, res) => {
     }
 });
 
-module.exports = router;
-
-// --- RUTA: Datos del equipo para el portal de invitación ---
+// ==========================================
+// PORTAL DE INVITACIÓN (Carga el equipo)
+// ==========================================
 router.get('/team-portal/:token', async (req, res) => {
     try {
         const { token } = req.params;
@@ -350,3 +347,31 @@ router.get('/team-portal/:token', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// ==========================================
+// FICHAJE COMPLETO (Guarda al jugador)
+// ==========================================
+router.post('/register-player-full', async (req, res) => {
+    const { email, fullName, teamId, dorsal, dni, phone, age } = req.body;
+    try {
+        const [users] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
+        if (users.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
+        const userId = users[0].id;
+
+        const [team] = await pool.execute('SELECT league_id FROM league_teams WHERE id = ?', [teamId]);
+        const leagueId = team[0].league_id;
+
+        await pool.execute(
+            `INSERT INTO league_players (league_id, team_id, user_id, full_name, dni, phone, age, dorsal) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [leagueId, teamId, userId, fullName, dni || null, phone || null, age || null, dorsal || null]
+        );
+
+        res.json({ success: true, message: "Fichaje completado con éxito" });
+    } catch (error) {
+        console.error("🚨 Error en registro:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+module.exports = router;
