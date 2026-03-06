@@ -73,10 +73,14 @@ const PlayerHome = () => {
         const fetchUserData = async () => {
             try {
                 const savedEmail = localStorage.getItem('userEmail');
+                console.log("🕵️‍♂️ 1. Email en LocalStorage:", savedEmail);
+                
                 if (!savedEmail) { setLoading(false); return; }
                 
                 const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`);
                 const data = await res.json();
+
+                console.log("🕵️‍♂️ 2. Perfil recibido de la BD:", data);
 
                 if (data) {
                     const statsBase = data.stats ? 
@@ -101,19 +105,32 @@ const PlayerHome = () => {
                         setView('HOME'); 
                     }
 
+                    console.log("🕵️‍♂️ 3. ¿Tiene team_id?:", data.team_id);
+
                     if (data.team_id) {
                         const teamIdStr = String(data.team_id);
                         const cleanTeamId = teamIdStr.includes(':') ? teamIdStr.split(':')[0] : teamIdStr;
+                        console.log("🕵️‍♂️ 4. ID de equipo limpio:", cleanTeamId);
 
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${cleanTeamId}`);
                         const mData = await mRes.json();
+                        console.log("🕵️‍♂️ 5. Calendario recibido:", mData);
                         setMatches(mData);
 
-                        if (data.is_captain === 1) { 
+                        console.log("🕵️‍♂️ 6. ¿Es capitán?:", data.is_captain);
+
+                        if (data.is_captain === 1 || data.is_captain === true) { 
+                            console.log("🕵️‍♂️ 7. ¡Es capitán! Buscando acta pendiente...");
                             const pendingRes = await fetch(`${API_BASE_URL}/api/leagues/pending-match/${cleanTeamId}`);
                             if (pendingRes.ok) {
                                 const pendingData = await pendingRes.json();
-                                if (pendingData && pendingData.id) setPendingMatch(pendingData);
+                                console.log("🕵️‍♂️ 8. Respuesta del acta pendiente:", pendingData);
+                                if (pendingData && pendingData.id) {
+                                    console.log("🚀 ¡ACTA ENCONTRADA! Mostrando modal.");
+                                    setPendingMatch(pendingData);
+                                }
+                            } else {
+                                console.error("🚨 Error HTTP al buscar acta pendiente:", pendingRes.status);
                             }
                         }
 
@@ -133,6 +150,8 @@ const PlayerHome = () => {
                         } catch(err) { 
                             console.error("❌ Error de red o conexión cargando plantilla:", err); 
                         }
+                    } else {
+                        console.log("⚠️ El jugador no tiene equipo asignado en la respuesta de user-profile.");
                     }
                 }
             } catch (err) { console.error(err); } finally { setLoading(false); }
