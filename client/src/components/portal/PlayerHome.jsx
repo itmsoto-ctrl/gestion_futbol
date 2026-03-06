@@ -88,7 +88,8 @@ const PlayerHome = () => {
                         country_code: data.country_code || 'es'
                     });
 
-                    if (data.is_pwa === 0 || data.tutorial_seen === 0) {
+                    // 👇 CAMBIO 1: Quitamos lo de is_pwa para que no entre en bucle infinito
+                    if (data.tutorial_seen === 0) {
                         setShowTutorial(true); 
                         setView('SELFIE'); 
                     } else if (!data.photo_url) {
@@ -128,12 +129,13 @@ const PlayerHome = () => {
         return () => stopCamera();
     }, []);
 
+    // 👇 CAMBIO 2: Cerramos el tutorial al instante, sin esperar a la base de datos
     const finishTutorial = async () => {
+        setShowTutorial(false);
         try {
             await fetch(`${API_BASE_URL}/api/auth/complete-tutorial`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email })
             });
-            setShowTutorial(false);
         } catch (err) { console.error(err); }
     };
 
