@@ -1,7 +1,7 @@
+// 📄 src/components/portal/PlayerHome.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Camera, X, Check, Home, Calendar, Trophy, Users, BarChart2, Settings, Loader2, UploadCloud, User } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Camera, X, Check, User } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
@@ -12,38 +12,42 @@ import CalendarModal from '../player/CalendarModal';
 import useInteractionSounds from '../../hooks/useInteractionSounds';
 import RosterModal from '../player/RosterModal';
 
+// 👇 Importamos los nuevos módulos visuales
+import ProfileForm from './ProfileForm';
+import PlayerSidebar from './PlayerSidebar';
+
 const PlayerHome = () => {
-    const { playClick, playSwipe } = useInteractionSounds();
+    const { playClick } = useInteractionSounds();
+    const { showInstallBtn, handleInstallClick } = usePWAInstall();
+    
+    // Estados Globales
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [view, setView] = useState('HOME'); 
+    const [showTutorial, setShowTutorial] = useState(false);
+    const [modalView, setModalView] = useState(null); 
+    
+    // Estados de Cámara
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [tempPhoto, setTempPhoto] = useState(null);
+    const [uploading, setUploading] = useState(false);
+    const videoRef = useRef(null);
+    const canvasRef = useRef(null); 
+    const streamRef = useRef(null);
+
+    // Datos Deportivos
+    const [standings, setStandings] = useState([]);
+    const [matches, setMatches] = useState([]);
+    const [roster, setRoster] = useState([]);
+    const [formData, setFormData] = useState({
+        name: '', dni: '', dorsal: '', position: 'DEL', country_code: 'es'
+    });
 
     const handleConfirm = () => {
         playClick();
         if (window.navigator.vibrate) window.navigator.vibrate([30, 50, 30]);
         handleFinalUpdate();
     };
-
-    const navigate = useNavigate();
-    const { showInstallBtn, handleInstallClick } = usePWAInstall();
-    
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [view, setView] = useState('HOME'); 
-    const [showTutorial, setShowTutorial] = useState(false);
-    const [isCameraOpen, setIsCameraOpen] = useState(false);
-    const [tempPhoto, setTempPhoto] = useState(null);
-    const [uploading, setUploading] = useState(false);
-    
-    const [modalView, setModalView] = useState(null); 
-    const [standings, setStandings] = useState([]);
-    
-    const [formData, setFormData] = useState({
-        name: '', dni: '', dorsal: '', position: 'DEL', country_code: 'es'
-    });
-
-    const [matches, setMatches] = useState([]);
-    const [roster, setRoster] = useState([]);
-    const videoRef = useRef(null);
-    const canvasRef = useRef(null); 
-    const streamRef = useRef(null);
 
     const calculateStandings = (matchesData) => {
         const table = {};
@@ -73,7 +77,6 @@ const PlayerHome = () => {
 
                 if (!savedEmail || !token) { setLoading(false); return; }
                 
-                // ✅ 1. Llamada a Perfil CON Token
                 const res = await fetch(`${API_BASE_URL}/api/auth/user-profile?email=${savedEmail}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -103,7 +106,6 @@ const PlayerHome = () => {
                     }
 
                     if (data.team_id) {
-                        // ✅ 2. Llamada a Calendario CON Token
                         const mRes = await fetch(`${API_BASE_URL}/api/leagues/my-calendar/${data.team_id}`, {
                             headers: { 'Authorization': `Bearer ${token}` }
                         });
@@ -112,19 +114,11 @@ const PlayerHome = () => {
                         setStandings(calculateStandings(mData));
 
                         try {
-                            // ✅ 3. Llamada a Plantilla CON Token
-                            const rosterUrl = `${API_BASE_URL}/api/leagues/teams/${data.team_id}/players`;
-                            const rRes = await fetch(rosterUrl, {
+                            const rRes = await fetch(`${API_BASE_URL}/api/leagues/teams/${data.team_id}/players`, {
                                 headers: { 'Authorization': `Bearer ${token}` }
                             });
-                            
-                            if(rRes.ok) {
-                                const rData = await rRes.json();
-                                setRoster(rData);
-                            }
-                        } catch(err) { 
-                            console.error("❌ Error de red o conexión cargando plantilla:", err); 
-                        }
+                            if(rRes.ok) setRoster(await rRes.json());
+                        } catch(err) { console.error("❌ Error cargando plantilla:", err); }
                     }
                 }
             } catch (err) { console.error(err); } finally { setLoading(false); }
@@ -165,7 +159,7 @@ const PlayerHome = () => {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             setTempPhoto(canvas.toDataURL('image/jpeg', 0.8));
             stopCamera();
-        } else { console.error("No se pudo capturar: videoRef o canvasRef es null"); }
+        }
     };
 
     const handleFinalUpdate = async () => {
@@ -191,14 +185,24 @@ const PlayerHome = () => {
         } catch (err) { alert(`🚨 Error: ${err.message}`); } finally { setUploading(false); }
     };
 
+    // ==========================================
+    // RENDERIZADO MODULAR (¡Mira qué limpio!)
+    // ==========================================
+
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic tracking-widest uppercase">Accediendo al vestuario...</div>;
+
+    if (view === 'FORM') {
+        return <ProfileForm formData={formData} setFormData={setFormData} onConfirm={handleConfirm} uploading={uploading} onBack={() => setView('SELFIE')} />;
+    }
 
     if (view === 'SELFIE') {
         return (
             <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-10 px-6 relative overflow-hidden">
                 {showTutorial && <WelcomeTutorial user={user} onFinish={finishTutorial} />}
                 <div onClick={() => !tempPhoto && startCamera()} className="cursor-pointer active:scale-95 transition-transform drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transform scale-[0.80]">
-                    <FutCard player={{ ...user, name: formData.name || 'JUGADOR', photo_url: tempPhoto || user?.photo_url, position: formData.position }} />
+                    <FutCard player={{ ...user, name: formData.name || 'JUGADOR', photo_url: tempPhoto || user?.photo_url, position: formData.position }} 
+                    showAnim={true} 
+                    showShine={true}/>
                 </div>
                 {!tempPhoto ? (
                     <div className="flex flex-col w-full gap-4 mt-8">
@@ -232,67 +236,18 @@ const PlayerHome = () => {
         );
     }
 
-    if (view === 'FORM') {
-        return (
-            <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col items-center pt-8 px-6 pb-6">
-                <div className="w-full max-w-md space-y-6">
-                    <h2 className="text-2xl font-black uppercase italic text-lime-400 text-center">Datos de Ficha</h2>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="col-span-2 space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">Nombre en Carta</label>
-                            <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none text-white" />
-                        </div>
-                        <div className="col-span-2 space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">DNI / Documento</label>
-                            <input type="text" value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold uppercase focus:border-lime-400 outline-none text-white" />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">Posición</label>
-                            <select value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white">
-                                {['POR', 'LD', 'DFC', 'LI', 'MCD', 'MC', 'MCO', 'MD', 'MI', 'ED', 'EI', 'DC'].map(pos => <option key={pos} value={pos} className="bg-[#1a1a1a]">{pos}</option>)}
-                            </select>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase text-white/40 ml-2">Nacionalidad</label>
-                            <select value={formData.country_code} onChange={(e) => setFormData({...formData, country_code: e.target.value})} className="w-full bg-white/5 border border-white/20 rounded-xl py-3 px-4 font-bold outline-none text-white">
-                                <option value="es">ESPAÑA 🇪🇸</option>
-                                <option value="ar">ARGENTINA 🇦🇷</option>
-                                <option value="br">BRASIL 🇧🇷</option>
-                                <option value="fr">FRANCIA 🇫🇷</option>
-                                <option value="gb">INGLATERRA 🏴󠁧󠁢󠁥󠁮󠁧󠁿</option>
-                                <option value="de">ALEMANIA 🇩🇪</option>
-                                <option value="pt">PORTUGAL 🇵🇹</option>
-                                <option value="it">ITALIA 🇮🇹</option>
-                                <option value="mx">MÉXICO 🇲🇽</option>
-                                <option value="co">COLOMBIA 🇨🇴</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button onClick={handleConfirm} disabled={uploading || !formData.name} className="w-full bg-lime-400 text-black font-black py-5 rounded-2xl uppercase italic text-xl shadow-xl active:scale-95 transition-all disabled:opacity-30">
-                        {uploading ? <Loader2 className="animate-spin m-auto" /> : "CONFIRMAR FICHA"}
-                    </button>
-                    <button onClick={() => setView('SELFIE')} className="w-full mt-2 py-3 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">Volver a la foto</button>
-                </div>
-            </div>
-        );
-    }
-
+    // VISTA HOME PRINCIPAL
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans relative" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
-            <aside className="w-16 sm:w-20 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-8 sm:py-12 space-y-6 sm:space-y-8 z-50">
-                <button onClick={() => { playClick(); setModalView(null); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${!modalView ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Home size={24} /></button>
-                <button onClick={() => { playClick(); setModalView('CALENDAR'); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${modalView === 'CALENDAR' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Calendar size={24} /></button>
-                <button onClick={() => { playClick(); setModalView('STANDINGS'); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${modalView === 'STANDINGS' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Trophy size={24} /></button>
-                <button onClick={() => { playClick(); setModalView('ROSTER'); }} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${modalView === 'ROSTER' ? 'bg-amber-400 text-black shadow-lg' : 'border-2 border-white/10 text-white/30 hover:text-white'}`}><Users size={24} /></button>
-                
-                {showInstallBtn ? (
-                    <button onClick={() => { playClick(); handleInstallClick(); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-lime-400 text-lime-400 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(163,230,53,0.3)] animate-pulse"><UploadCloud size={24} /></button>
-                ) : (
-                    <button onClick={playClick} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 hover:text-white transition-all"><BarChart2 size={24} /></button>
-                )}
-                
-                <button onClick={() => { playClick(); setShowTutorial(true); }} className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-white/10 rounded-2xl flex items-center justify-center text-white/30 mt-auto hover:text-white transition-all"><Settings size={24} /></button>
-            </aside>
+            
+            <PlayerSidebar 
+                modalView={modalView} 
+                setModalView={setModalView} 
+                showInstallBtn={showInstallBtn} 
+                handleInstallClick={handleInstallClick} 
+                playClick={playClick} 
+                setShowTutorial={setShowTutorial} 
+            />
 
             {showTutorial && <WelcomeTutorial user={user} onFinish={() => { playClick(); setShowTutorial(false); }} />}
 
@@ -301,7 +256,12 @@ const PlayerHome = () => {
                     onClick={() => { playClick(); setView('SELFIE'); }} 
                     className="cursor-pointer transform scale-[0.54] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-115px] sm:mt-[-90px]"
                 >
-                    <FutCard player={{ ...user, name: formData.name || user?.name || 'JUGADOR', position: formData.position || user?.position || 'MCO' }} size="large" />
+                    {/* 👇 Aquí aplicamos la FutCard limpia */}
+                    <FutCard 
+                        player={{ ...user, name: formData.name || user?.name || 'JUGADOR', position: formData.position || user?.position || 'MCO' }} 
+                        showAnim={true} 
+                        showShine={true} 
+                    />
                     <div className="absolute -bottom-10 left-0 w-full text-center">
                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 animate-pulse italic">Toca para editar tu ficha</p>
                     </div>
@@ -311,17 +271,10 @@ const PlayerHome = () => {
             </main>
 
             <AnimatePresence>
-                {modalView === 'CALENDAR' && (
-                    <CalendarModal matches={matches} onClose={() => { playClick(); setModalView(null); }} />
-                )}
-                {modalView === 'STANDINGS' && (
-                    <StandingsModal standings={standings} onClose={() => { playClick(); setModalView(null); }} />
-                )}
-                {modalView === 'ROSTER' && (
-                <RosterModal roster={roster} onClose={() => { playClick(); setModalView(null); }} />
-                )}   
+                {modalView === 'CALENDAR' && <CalendarModal matches={matches} onClose={() => { playClick(); setModalView(null); }} />}
+                {modalView === 'STANDINGS' && <StandingsModal standings={standings} onClose={() => { playClick(); setModalView(null); }} />}
+                {modalView === 'ROSTER' && <RosterModal roster={roster} onClose={() => { playClick(); setModalView(null); }} />}   
             </AnimatePresence>
-
         </div>
     );
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Star, Crown, ChevronRight } from 'lucide-react';
+import { Star, Crown, ChevronRight } from 'lucide-react';
 
 const InfoCenter = ({ matches, onMatchClick }) => {
   const [index, setIndex] = useState(0);
