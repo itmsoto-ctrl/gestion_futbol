@@ -1,7 +1,6 @@
-// 📄 src/components/portal/PlayerHome.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, X, Check, User } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import API_BASE_URL from '../../apiConfig';
 import FutCard from '../FutCard'; 
 import { usePWAInstall } from '../../hooks/usePWAInstall';
@@ -15,18 +14,23 @@ import RosterModal from '../player/RosterModal';
 // 👇 Importamos los nuevos módulos visuales
 import ProfileForm from './ProfileForm';
 import PlayerSidebar from './PlayerSidebar';
+import TacticalScouting from '../scouting/TacticalScouting';
 
 const PlayerHome = () => {
     const { playClick } = useInteractionSounds();
     const { showInstallBtn, handleInstallClick } = usePWAInstall();
+    const [modalView, setModalView] = useState(null);
     
     // Estados Globales
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('HOME'); 
     const [showTutorial, setShowTutorial] = useState(false);
-    const [modalView, setModalView] = useState(null); 
     
+    // 🔥 ESTADOS PARA SCOUTING
+    const [rivals, setRivals] = useState([]);
+    const [isPlayerExpanded, setIsPlayerExpanded] = useState(false); // 👈 Controla si ocultamos la "X"
+
     // Estados de Cámara
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [tempPhoto, setTempPhoto] = useState(null);
@@ -119,6 +123,17 @@ const PlayerHome = () => {
                             });
                             if(rRes.ok) setRoster(await rRes.json());
                         } catch(err) { console.error("❌ Error cargando plantilla:", err); }
+
+                        try {
+                            const sRes = await fetch(`${API_BASE_URL}/api/leagues/scouting-next-rival/${data.team_id}`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            if (sRes.ok) {
+                                const sData = await sRes.json();
+                                setRivals(sData.rivals || []);
+                            }
+                        } catch(err) { console.error("❌ Error cargando rivales:", err); }
+
                     }
                 }
             } catch (err) { console.error(err); } finally { setLoading(false); }
@@ -185,10 +200,6 @@ const PlayerHome = () => {
         } catch (err) { alert(`🚨 Error: ${err.message}`); } finally { setUploading(false); }
     };
 
-    // ==========================================
-    // RENDERIZADO MODULAR (¡Mira qué limpio!)
-    // ==========================================
-
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-lime-400 font-black italic tracking-widest uppercase">Accediendo al vestuario...</div>;
 
     if (view === 'FORM') {
@@ -236,7 +247,6 @@ const PlayerHome = () => {
         );
     }
 
-    // VISTA HOME PRINCIPAL
     return (
         <div className="min-h-screen bg-cover bg-center flex overflow-hidden font-sans relative" style={{ backgroundImage: "url('/bg-home-player.webp')" }}>
             
@@ -256,7 +266,6 @@ const PlayerHome = () => {
                     onClick={() => { playClick(); setView('SELFIE'); }} 
                     className="cursor-pointer transform scale-[0.54] sm:scale-75 active:scale-95 transition-all drop-shadow-[0_35px_35px_rgba(0,0,0,0.7)] mt-[-115px] sm:mt-[-90px]"
                 >
-                    {/* 👇 Aquí aplicamos la FutCard limpia */}
                     <FutCard 
                         player={{ ...user, name: formData.name || user?.name || 'JUGADOR', position: formData.position || user?.position || 'MCO' }} 
                         showAnim={true} 
@@ -267,13 +276,37 @@ const PlayerHome = () => {
                     </div>
                 </div>
 
-                <InfoCenter matches={matches} onMatchClick={() => { playClick(); setModalView('CALENDAR'); }} />
+                <InfoCenter matches={matches} onMatchClick={() => { playClick(); setModalView('SCOUTING'); }} />
             </main>
 
             <AnimatePresence>
                 {modalView === 'CALENDAR' && <CalendarModal matches={matches} onClose={() => { playClick(); setModalView(null); }} />}
                 {modalView === 'STANDINGS' && <StandingsModal standings={standings} onClose={() => { playClick(); setModalView(null); }} />}
-                {modalView === 'ROSTER' && <RosterModal roster={roster} onClose={() => { playClick(); setModalView(null); }} />}   
+                {modalView === 'ROSTER' && <RosterModal roster={roster} onClose={() => { playClick(); setModalView(null); }} />}
+                
+                {modalView === 'SCOUTING' && (
+                    <motion.div 
+                        initial={{ opacity: 0 }} 
+                        animate={{ opacity: 1 }} 
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center"
+                    >
+                        {/* ✅ Solo mostramos la X si no hay jugador ampliado */}
+                        {!isPlayerExpanded && (
+                            <button 
+                                onClick={() => { playClick(); setModalView(null); setIsPlayerExpanded(false); }} 
+                                className="absolute top-12 right-6 text-white/70 hover:text-white z-[210] bg-white/10 p-2 rounded-full backdrop-blur-md"
+                            >
+                                <X size={24} />
+                            </button>
+                        )}
+
+                        <TacticalScouting 
+                            rivals={rivals} 
+                            onToggleExpand={(isExpanded) => setIsPlayerExpanded(isExpanded)} 
+                        />
+                    </motion.div>
+                )}
             </AnimatePresence>
         </div>
     );

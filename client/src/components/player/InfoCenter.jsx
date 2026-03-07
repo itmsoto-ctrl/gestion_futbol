@@ -11,14 +11,29 @@ const InfoCenter = ({ matches, onMatchClick }) => {
       content: (
         <div onClick={onMatchClick} className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-3xl flex items-center justify-between shadow-xl cursor-pointer active:scale-95 transition-all">
           <div>
-            <p className="text-[10px] font-black text-amber-400 italic">PRÓXIMA JORNADA</p>
+            <p className="text-[10px] font-black text-amber-400 italic">ANALIZA TU PRÓXIMO RIVAL</p>
             <h3 className="text-white font-bold text-lg uppercase leading-tight">{matches[0]?.home_team || 'POR DEFINIR'} vs {matches[0]?.away_team || '???'}</h3>
             <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Toca para ver detalles</p>
           </div>
           <div className="bg-amber-400 p-2 rounded-xl text-black"><ChevronRight size={20}/></div>
+
+          {/* Parte inferior: La imagen */}
+            <div className="w-full h-46 mt-3 rounded-xl overflow-hidden border border-black/10">
+              {/* Sustituye la ruta por la imagen que quieras poner en public/ */}
+              <img 
+                src="/campo.jpeg" 
+                alt="Premium Banner" 
+                className="w-full h-full object-cover" 
+              />
+            </div>
+
         </div>
       )
     },
+
+   
+
+
     {
       id: 'potw',
       content: (

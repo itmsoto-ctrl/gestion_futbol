@@ -399,4 +399,77 @@ router.post('/register-player-full', async (req, res) => {
     }
 });
 
+// 🔍 10. OBTENER SCOUTING DEL PRÓXIMO RIVAL
+router.get('/scouting-next-rival/:teamId', verifyToken, async (req, res) => {
+    try {
+        const { teamId } = req.params;
+
+        // 1. Buscamos el próximo partido (el primero que no haya terminado)
+        const [nextMatch] = await pool.execute(`
+            SELECT id, home_team_id, away_team_id, match_date, match_time
+            FROM league_matches
+            WHERE (home_team_id = ? OR away_team_id = ?) 
+              AND status != 'finished'
+            ORDER BY match_date ASC, match_time ASC
+            LIMIT 1
+        `, [teamId, teamId]);
+
+        if (nextMatch.length === 0) {
+            return res.json({ message: "No hay partidos próximos", rivals: [] });
+        }
+
+        // 2. Identificamos cuál de los dos es el ID del rival
+        const rivalId = nextMatch[0].home_team_id == teamId 
+            ? nextMatch[0].away_team_id 
+            : nextMatch[0].home_team_id;
+
+        /// 3. Obtenemos los jugadores del rival (sin u.stats que no existe aún)
+        const [rivals] = await pool.execute(`
+            SELECT 
+                lp.id, 
+                lp.full_name AS name,
+                u.position,
+                COALESCE(u.photo_url, lp.photo_url) AS photo_url,
+                u.country_code,
+                t.logo AS team_logo
+            FROM league_players lp
+            JOIN league_teams t ON lp.team_id = t.id
+            LEFT JOIN users u ON lp.user_id = u.id
+            WHERE lp.team_id = ?
+        `, [rivalId]);
+
+        // Formateamos y añadimos stats por defecto (60) para que la pizarra cargue
+        const formattedRivals = rivals.map(r => {
+            // Stats por defecto mientras no existan en DB
+            const defaultStats = { pac: 60, sho: 60, pas: 60, dri: 60, def: 60, phy: 60 };
+            
+            return {
+                ...r,
+                position: r.position || 'MC', // Evitamos que sea null para la pizarra
+                stats: defaultStats,
+                rating: 60 
+            };
+        });
+
+        res.json({ 
+            matchInfo: nextMatch[0],
+            rivalId: rivalId,
+            rivals: formattedRivals 
+        });
+
+    } catch (error) {
+        console.error("🚨 Error en Scouting:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Función auxiliar para calcular la media de la carta si no existe
+function calculateRating(stats) {
+    if (!stats) return 60;
+    const s = typeof stats === 'string' ? JSON.parse(stats) : stats;
+    const values = [s.pac, s.sho, s.pas, s.dri, s.def, s.phy];
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    return Math.round(avg);
+}
+
 module.exports = router;
